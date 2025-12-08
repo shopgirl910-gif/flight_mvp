@@ -27,6 +27,60 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
   bool isLoading = false;
   String? errorMessage;
 
+  // カード種別
+  String? selectedJALCard;
+  String? selectedANACard;
+  
+  // ステータス
+  String? selectedJALStatus;
+  String? selectedANAStatus;
+
+  final List<String> jalCardTypes = [
+    '-',
+    'JMB会員',
+    'JALカード普通会員',
+    'JALカードCLUB-A会員',
+    'JALカードCLUB-Aゴールド会員',
+    'JALカードプラチナ会員',
+    'JALグローバルクラブ会員(日本)',
+    'JALグローバルクラブ会員(海外)',
+    'JALカードNAVI会員',
+    'JAL CLUB EST 普通会員',
+    'JAL CLUB EST CLUB-A会員',
+    'JAL CLUB EST CLUB-A GOLD会員',
+    'JAL CLUB EST プラチナ会員',
+  ];
+
+  final List<String> anaCardTypes = [
+    '-',
+    'AMCカード(提携カード含む)',
+    'ANAカード 一般',
+    'ANAカード 学生用',
+    'ANAカード ワイド',
+    'ANAカード ゴールド',
+    'ANAカード プレミアム',
+    'SFC 一般',
+    'SFC ゴールド',
+    'SFC プレミアム',
+  ];
+
+  final List<String> jalStatusTypes = [
+    '-',
+    'JMBダイヤモンド',
+    'JMBサファイア',
+    'JMBクリスタル',
+  ];
+
+  final List<String> anaStatusTypes = [
+    '-',
+    'ダイヤモンド(1年目)',
+    'ダイヤモンド(継続2年以上)',
+    'プラチナ(1年目)',
+    'プラチナ(継続2年以上)',
+    'ブロンズ(1年目)',
+    'ブロンズ(継続2年以上)',
+  ];
+
   final List<String> airports = ['HND', 'NRT', 'OKA', 'CTS', 'FUK', 'KIX', 'NGO'];
   
   final Map<String, String> airportNames = {
@@ -41,12 +95,30 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
 
   final List<String> airlines = ['JAL', 'ANA'];
   final Map<String, List<String>> fareTypesByAirline = {
-    'JAL': ['ウルトラ先得', '先得割引', '特便割引', '普通運賃'],
-    'ANA': ['旅割', 'ビジネスきっぷ', 'ANA VALUE', '普通運賃'],
+    'JAL': [
+      '運賃1 (100%) フレックス等',
+      '運賃2 (75%) 株主割引',
+      '運賃3 (75%) セイバー',
+      '運賃4 (75%) スペシャルセイバー',
+      '運賃5 (50%) 包括旅行運賃',
+      '運賃6 (50%) スカイメイト等',
+    ],
+    'ANA': [
+      '運賃A (150%) フレックス/F',
+      '運賃B (130%) スタンダード/F',
+      '運賃C (120%) シンプル/F',
+      '運賃D (100%) フレックス/Y',
+      '運賃E (100%) 島民割引',
+      '運賃G (80%) 株主優待割引',
+      '運賃H (80%) スタンダード/Y',
+      '運賃I (70%) シンプル/Y',
+      '運賃J (50%) ユース・シニア',
+      '運賃K (30%) 包括旅行割引',
+    ],
   };
   final Map<String, List<String>> seatClassesByAirline = {
-    'JAL': ['普通席', 'クラスJ', 'ファースト'],
-    'ANA': ['普通席', 'プレミアムクラス'],
+    'JAL': ['普通席', 'クラスJ', 'ファーストクラス'],
+    'ANA': ['普通席', 'ファーストクラス'],
   };
 
   @override
@@ -297,18 +369,23 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
     final airline = leg['airline'] as String;
     if (dep.isEmpty || arr.isEmpty || fare.isEmpty || seat.isEmpty) return;
 
-    final seatBonus = {'JAL': {'普通席': 0.0, 'クラスJ': 0.10, 'ファースト': 0.50}, 'ANA': {'普通席': 0.0, 'プレミアムクラス': 0.50}};
+    final seatBonus = {
+      'JAL': {'普通席': 0.0, 'クラスJ': 0.10, 'ファーストクラス': 0.50}, 
+      'ANA': {'普通席': 0.0, 'ファーストクラス': 0.50}
+    };
     try {
       final routeData = await Supabase.instance.client.from('routes').select('distance_miles')
           .eq('departure_code', dep).eq('arrival_code', arr).maybeSingle();
       if (routeData == null) return;
       final distance = routeData['distance_miles'] as int;
 
-      final fareData = await Supabase.instance.client.from('fare_types').select('rate')
-          .eq('airline_code', airline).eq('fare_type_name', fare).maybeSingle();
-      if (fareData == null) return;
+      // 運賃種別名から積算率を抽出（例: "運賃I (70%) シンプル/Y" → 0.70）
+      double fareRate = 1.0;
+      final rateMatch = RegExp(r'\((\d+)%\)').firstMatch(fare);
+      if (rateMatch != null) {
+        fareRate = int.parse(rateMatch.group(1)!) / 100.0;
+      }
 
-      final fareRate = (fareData['rate'] as num).toDouble();
       final baseFOP = (distance * fareRate).round();
       final bonus = seatBonus[airline]?[seat] ?? 0.0;
       final totalFOP = baseFOP + 400 + (baseFOP * bonus).round();
@@ -437,43 +514,106 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
     return isLoading ? const Center(child: CircularProgressIndicator()) : SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // サマリー（履歴ページと同じフォーマット）
-        if (hasJAL || hasANA)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              children: [
-                if (hasJAL)
-                  _buildAirlineSummaryRow('JAL', Colors.red, 'FOP', jalFOP, jalMiles, jalCount, jalFare, jalUnitPrice),
-                if (hasJAL && hasANA)
-                  const Divider(height: 16),
-                if (hasANA)
-                  _buildAirlineSummaryRow('ANA', Colors.blue, 'PP', anaPP, anaMiles, anaCount, anaFare, anaUnitPrice),
-              ],
-            ),
+        // カード種別 + ステータス + サマリー統合
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
           ),
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              // JALカード
+              _buildCompactDropdown('JALカード', 150, selectedJALCard, jalCardTypes, Colors.red, (v) => setState(() => selectedJALCard = v)),
+              // JALステータス
+              _buildCompactDropdown('JALステータス', 120, selectedJALStatus, jalStatusTypes, Colors.red, (v) => setState(() => selectedJALStatus = v)),
+              // JAL FOP
+              _buildMiniStat('FOP', _formatNumber(jalFOP), Colors.red),
+              // JAL マイル
+              _buildMiniStat('マイル', _formatNumber(jalMiles), Colors.red),
+              // JAL レグ
+              _buildMiniStat('レグ', '$jalCount', Colors.red),
+              // JAL 総額
+              _buildMiniStat('総額', jalFare > 0 ? '¥${_formatNumber(jalFare)}' : '-', Colors.red),
+              // 区切り
+              Container(width: 1, height: 36, color: Colors.grey[300]),
+              // ANAカード
+              _buildCompactDropdown('ANAカード', 150, selectedANACard, anaCardTypes, Colors.blue, (v) => setState(() => selectedANACard = v)),
+              // ANAステータス
+              _buildCompactDropdown('ANAステータス', 140, selectedANAStatus, anaStatusTypes, Colors.blue, (v) => setState(() => selectedANAStatus = v)),
+              // ANA PP
+              _buildMiniStat('PP', _formatNumber(anaPP), Colors.blue),
+              // ANA マイル
+              _buildMiniStat('マイル', _formatNumber(anaMiles), Colors.blue),
+              // ANA レグ
+              _buildMiniStat('レグ', '$anaCount', Colors.blue),
+              // ANA 総額
+              _buildMiniStat('総額', anaFare > 0 ? '¥${_formatNumber(anaFare)}' : '-', Colors.blue),
+            ],
+          ),
+        ),
         
         ...legs.asMap().entries.map((e) => _buildLegCard(context, e.value, e.key)),
         const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          if (errorMessage != null) 
-            Expanded(child: Text(errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 14))),
-          const Spacer(),
-          ElevatedButton.icon(
-            onPressed: _saveToHistory, 
-            icon: const Icon(Icons.save), 
-            label: const Text('保存'), 
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
-          ),
-        ]),
+        if (errorMessage != null) 
+          Text(errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 14)),
         const SizedBox(height: 16),
       ]),
+    );
+  }
+
+  Widget _buildCompactDropdown(String label, double width, String? value, List<String> items, Color color, void Function(String?) onChanged) {
+    return SizedBox(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(height: 2),
+          Container(
+            height: 26,
+            decoration: BoxDecoration(border: Border.all(color: color.withOpacity(0.3)), borderRadius: BorderRadius.circular(4)),
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              underline: const SizedBox(),
+              icon: Icon(Icons.arrow_drop_down, size: 16, color: color),
+              menuWidth: width + 80,
+              hint: const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Text('-', style: TextStyle(fontSize: 10)),
+              ),
+              selectedItemBuilder: (context) {
+                return items.map((e) => Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis),
+                  ),
+                )).toList();
+              },
+              items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStat(String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(label, style: TextStyle(fontSize: 9, color: Colors.grey[600])),
+        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+      ],
     );
   }
 
@@ -537,9 +677,18 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
       child: Padding(
         padding: const EdgeInsets.all(16), 
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // ヘッダー行（クリア・削除ボタン）
+          // ヘッダー行（保存・クリア・削除ボタン）
           Row(children: [
             const Spacer(),
+            SizedBox(
+              height: 32,
+              child: TextButton.icon(
+                onPressed: _saveToHistory,
+                icon: const Icon(Icons.save, size: 16),
+                label: const Text('保存', style: TextStyle(fontSize: 12)),
+                style: TextButton.styleFrom(foregroundColor: Colors.grey[600], padding: const EdgeInsets.symmetric(horizontal: 8)),
+              ),
+            ),
             SizedBox(
               height: 32,
               child: TextButton.icon(
@@ -593,36 +742,21 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
               _calculateSingleLeg(index); 
             }),
             _buildFareAmountField(legId),
-            // レグ追加・保存ボタン（最後のレグのみ）
+            // レグ追加ボタン（最後のレグのみ）
             if (index == legs.length - 1)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('', style: TextStyle(fontSize: 12)),
                   const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        height: 32,
-                        child: ElevatedButton.icon(
-                          onPressed: _addLeg,
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('レグ追加', style: TextStyle(fontSize: 12)),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        height: 32,
-                        child: ElevatedButton.icon(
-                          onPressed: _saveToHistory,
-                          icon: const Icon(Icons.save, size: 16),
-                          label: const Text('保存', style: TextStyle(fontSize: 12)),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12)),
-                        ),
-                      ),
-                    ],
+                  SizedBox(
+                    height: 32,
+                    child: ElevatedButton.icon(
+                      onPressed: _addLeg,
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('レグ追加', style: TextStyle(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12)),
+                    ),
                   ),
                 ],
               ),
@@ -941,7 +1075,7 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
 
   Widget _buildDropdown(String label, double width, String? value, List<String> items, void Function(String?) onChanged) {
     return SizedBox(width: width, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), 
+      Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)), 
       const SizedBox(height: 4),
       Container(
         height: 32,
@@ -950,11 +1084,22 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
           value: value,
           isExpanded: true,
           underline: const SizedBox(),
+          icon: const Icon(Icons.arrow_drop_down, size: 18),
+          menuWidth: width + 100,
           hint: Padding(
-            padding: const EdgeInsets.only(left: 6),
-            child: Text(value ?? '選択', style: const TextStyle(fontSize: 12)),
+            padding: const EdgeInsets.only(left: 4),
+            child: Text('選択', style: const TextStyle(fontSize: 10)),
           ),
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 12)))).toList(),
+          selectedItemBuilder: (context) {
+            return items.map((e) => Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis),
+              ),
+            )).toList();
+          },
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(),
           onChanged: onChanged,
         ),
       ),

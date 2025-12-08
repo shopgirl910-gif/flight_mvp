@@ -17,7 +17,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
   Map<int, TextEditingController> flightNumberControllers = {};
   Map<int, TextEditingController> departureTimeControllers = {};
   Map<int, TextEditingController> arrivalTimeControllers = {};
-  Map<int, TextEditingController> fareAmountControllers = {};
+  Map<int, TextEditingController> fareAmountControllers = {};  // ← 追加
   
   Map<int, List<Map<String, dynamic>>> availableFlights = {};
   Map<int, List<String>> availableDestinations = {};
@@ -25,10 +25,6 @@ class _CalculationScreenState extends State<CalculationScreen> {
   int _legIdCounter = 0;
   bool isLoading = false;
   String? errorMessage;
-
-  // カード種別の状態
-  String selectedJALCard = 'なし';
-  String selectedANACard = 'なし';
 
   final List<String> airports = ['HND', 'NRT', 'OKA', 'CTS', 'FUK', 'KIX', 'NGO'];
   
@@ -52,26 +48,6 @@ class _CalculationScreenState extends State<CalculationScreen> {
     'ANA': ['普通席', 'プレミアムクラス'],
   };
 
-  // カード種別リスト
-  final List<String> jalCardTypes = ['なし', '普通', 'CLUB-A', 'CLUB-Aゴールド', 'プラチナ'];
-  final List<String> anaCardTypes = ['なし', '一般', 'ワイド', 'ワイドゴールド', 'プレミアム'];
-
-  // カードボーナス率（マイル積算に対するボーナス）
-  final Map<String, double> jalCardBonus = {
-    'なし': 0.0,
-    '普通': 0.10,
-    'CLUB-A': 0.25,
-    'CLUB-Aゴールド': 0.25,
-    'プラチナ': 0.25,
-  };
-  final Map<String, double> anaCardBonus = {
-    'なし': 0.0,
-    '一般': 0.10,
-    'ワイド': 0.25,
-    'ワイドゴールド': 0.25,
-    'プレミアム': 0.50,
-  };
-
   @override
   void initState() {
     super.initState();
@@ -84,7 +60,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
     flightNumberControllers.values.forEach((c) => c.dispose());
     departureTimeControllers.values.forEach((c) => c.dispose());
     arrivalTimeControllers.values.forEach((c) => c.dispose());
-    fareAmountControllers.values.forEach((c) => c.dispose());
+    fareAmountControllers.values.forEach((c) => c.dispose());  // ← 追加
     super.dispose();
   }
 
@@ -95,7 +71,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
     flightNumberControllers[legId] = TextEditingController();
     departureTimeControllers[legId] = TextEditingController();
     arrivalTimeControllers[legId] = TextEditingController();
-    fareAmountControllers[legId] = TextEditingController();
+    fareAmountControllers[legId] = TextEditingController();  // ← 追加
 
     String airline = 'JAL';
     String departureAirport = '';
@@ -137,12 +113,12 @@ class _CalculationScreenState extends State<CalculationScreen> {
     flightNumberControllers[legId]?.dispose();
     departureTimeControllers[legId]?.dispose();
     arrivalTimeControllers[legId]?.dispose();
-    fareAmountControllers[legId]?.dispose();
+    fareAmountControllers[legId]?.dispose();  // ← 追加
     dateControllers.remove(legId);
     flightNumberControllers.remove(legId);
     departureTimeControllers.remove(legId);
     arrivalTimeControllers.remove(legId);
-    fareAmountControllers.remove(legId);
+    fareAmountControllers.remove(legId);  // ← 追加
     availableFlights.remove(legId);
     availableDestinations.remove(legId);
     setState(() => legs.removeAt(index));
@@ -160,6 +136,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
     flightNumberControllers[legId]?.text = '';
     departureTimeControllers[legId]?.text = '';
     arrivalTimeControllers[legId]?.text = '';
+    // 運賃はクリアしない（ユーザーが入力した値を保持）
   }
 
   String _addMinutes(String time, int minutes) {
@@ -292,11 +269,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
     final airline = leg['airline'] as String;
     if (dep.isEmpty || arr.isEmpty || fare.isEmpty || seat.isEmpty) return;
 
-    final seatBonus = {
-      'JAL': {'普通席': 0.0, 'クラスJ': 0.10, 'ファースト': 0.50}, 
-      'ANA': {'普通席': 0.0, 'プレミアムクラス': 0.50}
-    };
-    
+    final seatBonus = {'JAL': {'普通席': 0.0, 'クラスJ': 0.10, 'ファースト': 0.50}, 'ANA': {'普通席': 0.0, 'プレミアムクラス': 0.50}};
     try {
       final routeData = await Supabase.instance.client.from('routes').select('distance_miles')
           .eq('departure_code', dep).eq('arrival_code', arr).maybeSingle();
@@ -309,24 +282,10 @@ class _CalculationScreenState extends State<CalculationScreen> {
 
       final fareRate = (fareData['rate'] as num).toDouble();
       final baseFOP = (distance * fareRate).round();
-      final seatBonusRate = seatBonus[airline]?[seat] ?? 0.0;
-      
-      // FOP/PP計算（座席ボーナスのみ）
-      final totalFOP = baseFOP + 400 + (baseFOP * seatBonusRate).round();
-      
-      // マイル計算（座席ボーナス + カードボーナス）
-      final cardBonusRate = airline == 'JAL' 
-          ? (jalCardBonus[selectedJALCard] ?? 0.0)
-          : (anaCardBonus[selectedANACard] ?? 0.0);
-      final baseMiles = (distance * fareRate).round();
-      final seatBonusMiles = (baseMiles * seatBonusRate).round();
-      final cardBonusMiles = (baseMiles * cardBonusRate).round();
-      final totalMiles = baseMiles + seatBonusMiles + cardBonusMiles;
-      
-      setState(() { 
-        legs[index]['calculatedFOP'] = totalFOP; 
-        legs[index]['calculatedMiles'] = totalMiles; 
-      });
+      final bonus = seatBonus[airline]?[seat] ?? 0.0;
+      final totalFOP = baseFOP + 400 + (baseFOP * bonus).round();
+      final totalMiles = (distance * fareRate).round() + ((distance * fareRate) * bonus).round();
+      setState(() { legs[index]['calculatedFOP'] = totalFOP; legs[index]['calculatedMiles'] = totalMiles; });
     } catch (e) {}
   }
 
@@ -334,15 +293,6 @@ class _CalculationScreenState extends State<CalculationScreen> {
     setState(() { isLoading = true; errorMessage = null; });
     for (int i = 0; i < legs.length; i++) await _calculateSingleLeg(i);
     setState(() => isLoading = false);
-  }
-
-  // カード変更時に全レグ再計算
-  void _onCardChanged() {
-    for (int i = 0; i < legs.length; i++) {
-      if (legs[i]['calculatedFOP'] != null) {
-        _calculateSingleLeg(i);
-      }
-    }
   }
 
   Future<void> _saveToHistory() async {
@@ -358,7 +308,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
         if (leg['calculatedFOP'] == null) continue;
         final dateText = dateControllers[legId]?.text ?? '';
         final fareAmountText = fareAmountControllers[legId]?.text ?? '';
-        final fareAmount = int.tryParse(fareAmountText);
+        final fareAmount = int.tryParse(fareAmountText);  // ← 追加
         
         await Supabase.instance.client.from('flight_calculations').insert({
           'airline': leg['airline'], 'departure': leg['departureAirport'], 'arrival': leg['arrivalAirport'],
@@ -367,7 +317,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
           'auto_points': leg['calculatedFOP'], 'auto_miles': leg['calculatedMiles'],
           'final_points': leg['calculatedFOP'], 'final_miles': leg['calculatedMiles'],
           'points_overridden': false, 'miles_overridden': false, 'calculation_version': 'v1.0',
-          'fare_amount': fareAmount,
+          'fare_amount': fareAmount,  // ← 追加
         });
       }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('履歴に保存しました'), backgroundColor: Colors.green));
@@ -377,6 +327,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
     setState(() => isLoading = false);
   }
 
+  // 単価計算ヘルパー
   String _calculateUnitPrice(int legId, int? fop) {
     if (fop == null || fop == 0) return 'N/A';
     final fareText = fareAmountControllers[legId]?.text ?? '';
@@ -388,11 +339,23 @@ class _CalculationScreenState extends State<CalculationScreen> {
 
   int get totalFOP => legs.fold<int>(0, (sum, leg) => sum + ((leg['calculatedFOP'] as int?) ?? 0));
   int get totalMiles => legs.fold<int>(0, (sum, leg) => sum + ((leg['calculatedMiles'] as int?) ?? 0));
+
+  // JALのFOP合計
   int get totalJALFOP => legs.where((leg) => leg['airline'] == 'JAL').fold<int>(0, (sum, leg) => sum + ((leg['calculatedFOP'] as int?) ?? 0));
+  
+  // ANAのPP合計
   int get totalANAPP => legs.where((leg) => leg['airline'] == 'ANA').fold<int>(0, (sum, leg) => sum + ((leg['calculatedFOP'] as int?) ?? 0));
+  
+  // JALマイル合計
   int get totalJALMiles => legs.where((leg) => leg['airline'] == 'JAL').fold<int>(0, (sum, leg) => sum + ((leg['calculatedMiles'] as int?) ?? 0));
+  
+  // ANAマイル合計
   int get totalANAMiles => legs.where((leg) => leg['airline'] == 'ANA').fold<int>(0, (sum, leg) => sum + ((leg['calculatedMiles'] as int?) ?? 0));
+  
+  // JALレグがあるか
   bool get hasJAL => legs.any((leg) => leg['airline'] == 'JAL' && leg['calculatedFOP'] != null);
+  
+  // ANAレグがあるか
   bool get hasANA => legs.any((leg) => leg['airline'] == 'ANA' && leg['calculatedFOP'] != null);
 
   @override
@@ -403,6 +366,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
           children: [
             const Text('修行旅程作成'),
             const SizedBox(width: 24),
+            // JAL: FOP + マイル
             if (hasJAL) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -417,6 +381,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
               ),
               const SizedBox(width: 12),
             ],
+            // ANA: PP + マイル
             if (hasANA) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -442,98 +407,6 @@ class _CalculationScreenState extends State<CalculationScreen> {
       body: isLoading ? const Center(child: CircularProgressIndicator()) : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // カード種別選択エリア
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.credit_card, size: 20, color: Colors.grey),
-                const SizedBox(width: 12),
-                const Text('保有カード:', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(width: 16),
-                // JALカード
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.red[50],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('JAL', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red[800], fontSize: 12)),
-                      const SizedBox(width: 8),
-                      DropdownButton<String>(
-                        value: selectedJALCard,
-                        underline: const SizedBox(),
-                        isDense: true,
-                        style: const TextStyle(fontSize: 13, color: Colors.black87),
-                        items: jalCardTypes.map((card) => DropdownMenuItem(
-                          value: card,
-                          child: Text(card),
-                        )).toList(),
-                        onChanged: (value) {
-                          setState(() => selectedJALCard = value ?? 'なし');
-                          _onCardChanged();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // ANAカード
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('ANA', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[800], fontSize: 12)),
-                      const SizedBox(width: 8),
-                      DropdownButton<String>(
-                        value: selectedANACard,
-                        underline: const SizedBox(),
-                        isDense: true,
-                        style: const TextStyle(fontSize: 13, color: Colors.black87),
-                        items: anaCardTypes.map((card) => DropdownMenuItem(
-                          value: card,
-                          child: Text(card),
-                        )).toList(),
-                        onChanged: (value) {
-                          setState(() => selectedANACard = value ?? 'なし');
-                          _onCardChanged();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                // ボーナス率表示
-                if (selectedJALCard != 'なし' || selectedANACard != 'なし')
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'マイルボーナス: ${selectedJALCard != 'なし' ? 'JAL+${((jalCardBonus[selectedJALCard] ?? 0) * 100).toInt()}%' : ''}${selectedJALCard != 'なし' && selectedANACard != 'なし' ? ' / ' : ''}${selectedANACard != 'なし' ? 'ANA+${((anaCardBonus[selectedANACard] ?? 0) * 100).toInt()}%' : ''}',
-                      style: TextStyle(fontSize: 12, color: Colors.green[800]),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // レグカード
           ...legs.asMap().entries.map((e) => _buildLegCard(context, e.value, e.key)),
           const SizedBox(height: 8),
           Row(mainAxisAlignment: MainAxisAlignment.end, children: [
@@ -603,6 +476,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
               setState(() => legs[index]['seatClass'] = v ?? ''); 
               _calculateSingleLeg(index); 
             }),
+            // 運賃入力フィールド追加
             _buildFareAmountField(legId),
           ]),
           const SizedBox(height: 12),
@@ -623,21 +497,23 @@ class _CalculationScreenState extends State<CalculationScreen> {
                   const SizedBox(width: 16),
                   Text('マイル: ${leg['calculatedMiles']}', style: const TextStyle(fontSize: 14)),
                   const SizedBox(width: 16),
-                  if (unitPrice != 'N/A')
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green[100],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '単価: $unitPrice/${airline == 'JAL' ? 'FOP' : 'PP'}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green[800],
-                        ),
+                  // 単価表示
+                 // 単価未入力時は、ラベルを出さない
+                if (unitPrice != 'N/A')
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green[100],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '単価: $unitPrice/${airline == 'JAL' ? 'FOP' : 'PP'}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[800],
                       ),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -646,6 +522,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
     );
   }
 
+  // 運賃入力フィールド
   Widget _buildFareAmountField(int legId) {
     return SizedBox(
       width: 120,
@@ -663,7 +540,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
               border: OutlineInputBorder(),
               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             ),
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) => setState(() {}),  // 単価を即時更新
           ),
         ],
       ),

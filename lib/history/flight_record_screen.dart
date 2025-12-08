@@ -537,9 +537,8 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
       child: Padding(
         padding: const EdgeInsets.all(16), 
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // ヘッダー行（レグ番号 + クリア・削除ボタン）
+          // ヘッダー行（クリア・削除ボタン）
           Row(children: [
-            Text('レグ ${index + 1}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const Spacer(),
             SizedBox(
               height: 32,
@@ -568,7 +567,7 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
               setState(() { legs[index]['airline'] = v!; legs[index]['fareType'] = ''; legs[index]['seatClass'] = ''; }); 
               _clearFlightInfo(index, legId);
             }),
-            _buildDatePicker('日付', 130, dateControllers[legId]!, context),
+            _buildDatePicker('日付', 115, dateControllers[legId]!, context),
             _buildTextField('便名', 65, flightNumberControllers[legId]!, '', 
               onChanged: (v) async { 
                 if (v.isEmpty) { 

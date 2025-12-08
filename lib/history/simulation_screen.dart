@@ -400,14 +400,14 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   Widget build(BuildContext context) {
     super.build(context); // AutomaticKeepAliveClientMixin required
     return isLoading ? const Center(child: CircularProgressIndicator()) : SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16,8,16,16),//レグ帯の高さ変更16→12
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // サマリー（履歴ページと同じフォーマット）
         if (hasJAL || hasANA)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(bottom: 16),
+            margin: const EdgeInsets.only(bottom: 8),//レグ帯を16から８に変更
             decoration: BoxDecoration(
               color: Colors.grey[100],
               borderRadius: BorderRadius.circular(8),
@@ -491,13 +491,12 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     final unitPrice = _calculateUnitPrice(legId, fop);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16), 
+      margin: const EdgeInsets.only(bottom: 8), //レグ帯高さ変更
       child: Padding(
-        padding: const EdgeInsets.all(16), 
+        padding: const EdgeInsets.all(8), 
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // ヘッダー行（レグ番号 + クリア・削除ボタン）
+          // ヘッダー行（クリア・削除ボタン）
           Row(children: [
-            Text('レグ ${index + 1}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const Spacer(),
             SizedBox(
               height: 32,
@@ -518,7 +517,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
                 ),
               ),
           ]),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),//レグ帯高さ変更
           
           // 入力フィールド行
           Wrap(spacing: 8, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.end, children: [
@@ -567,7 +566,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
                         child: ElevatedButton.icon(
                           onPressed: _addLeg,
                           icon: const Icon(Icons.add, size: 16),
-                          label: const Text('レグ追加', style: TextStyle(fontSize: 12)),
+                          label: const Text('追加', style: TextStyle(fontSize: 12)),
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12)),
                         ),
                       ),
