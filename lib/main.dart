@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '修行僧アプリ',
+      title: 'MRP - Mileage Run Planner',
       theme: ThemeData(
         primarySwatch: Colors.purple,
       ),
@@ -64,7 +64,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('修行僧アプリ'),
+        title: const Text('MRP - Mileage Run Planner'),
         backgroundColor: Colors.purple[700],
         foregroundColor: Colors.white,
         bottom: PreferredSize(
