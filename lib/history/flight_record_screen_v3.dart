@@ -57,11 +57,21 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
 
   @override
   void dispose() {
-    dateControllers.values.forEach((c) => c.dispose());
-    flightNumberControllers.values.forEach((c) => c.dispose());
-    departureTimeControllers.values.forEach((c) => c.dispose());
-    arrivalTimeControllers.values.forEach((c) => c.dispose());
-    fareAmountControllers.values.forEach((c) => c.dispose());
+    for (var c in dateControllers.values) {
+      c.dispose();
+    }
+    for (var c in flightNumberControllers.values) {
+      c.dispose();
+    }
+    for (var c in departureTimeControllers.values) {
+      c.dispose();
+    }
+    for (var c in arrivalTimeControllers.values) {
+      c.dispose();
+    }
+    for (var c in fareAmountControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -309,7 +319,9 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
 
   Future<void> _calculateFOP() async {
     setState(() { isLoading = true; errorMessage = null; });
-    for (int i = 0; i < legs.length; i++) await _calculateSingleLeg(i);
+    for (int i = 0; i < legs.length; i++) {
+      await _calculateSingleLeg(i);
+    }
     setState(() => isLoading = false);
   }
 
@@ -674,7 +686,7 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
       const SizedBox(height: 4),
       DropdownButtonFormField<String>(
         key: ValueKey('departure_${legId}_$airline'),
-        value: currentValue,
+        initialValue: currentValue,
         items: displayItems.map((e) => DropdownMenuItem(
           value: e.isEmpty ? null : e,
           child: Text(e.isEmpty ? '－' : '$e ${airportNames[e] ?? ''}', style: const TextStyle(fontSize: 12)),
@@ -708,7 +720,7 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
       const SizedBox(height: 4),
       DropdownButtonFormField<String>(
         key: ValueKey('destination_${legId}_$airline'),
-        value: currentValue,
+        initialValue: currentValue,
         items: displayItems.map((e) => DropdownMenuItem(
           value: e.isEmpty ? null : e,
           child: Text(e.isEmpty ? '－' : '$e ${airportNames[e] ?? ''}', style: const TextStyle(fontSize: 12)),
@@ -742,7 +754,7 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
       const SizedBox(height: 4),
       DropdownButtonFormField<String>(
         key: ValueKey('flight_time_${legId}_$airline'),
-        value: null,
+        initialValue: null,
         items: [
           const DropdownMenuItem(value: '__clear__', child: Text('－', style: TextStyle(fontSize: 12))),
           ...flights.map((flight) {
@@ -811,7 +823,7 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
       Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), 
       const SizedBox(height: 4),
       DropdownButtonFormField<String>(
-        value: value, 
+        initialValue: value, 
         items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 12)))).toList(),
         decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4)), 
         onChanged: onChanged,

@@ -129,11 +129,21 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
 
   @override
   void dispose() {
-    dateControllers.values.forEach((c) => c.dispose());
-    flightNumberControllers.values.forEach((c) => c.dispose());
-    departureTimeControllers.values.forEach((c) => c.dispose());
-    arrivalTimeControllers.values.forEach((c) => c.dispose());
-    fareAmountControllers.values.forEach((c) => c.dispose());
+    for (var c in dateControllers.values) {
+      c.dispose();
+    }
+    for (var c in flightNumberControllers.values) {
+      c.dispose();
+    }
+    for (var c in departureTimeControllers.values) {
+      c.dispose();
+    }
+    for (var c in arrivalTimeControllers.values) {
+      c.dispose();
+    }
+    for (var c in fareAmountControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -396,7 +406,9 @@ class _FlightRecordScreenState extends State<FlightRecordScreen> with AutomaticK
 
   Future<void> _calculateFOP() async {
     setState(() { isLoading = true; errorMessage = null; });
-    for (int i = 0; i < legs.length; i++) await _calculateSingleLeg(i);
+    for (int i = 0; i < legs.length; i++) {
+      await _calculateSingleLeg(i);
+    }
     setState(() => isLoading = false);
   }
 

@@ -29,6 +29,9 @@ class _CalculationScreenState extends State<CalculationScreen> {
   // カード種別の状態
   String selectedJALCard = 'なし';
   String selectedANACard = 'なし';
+  
+  // JALカード ツアープレミアム
+  bool jalTourPremium = false;
 
   final List<String> airports = ['HND', 'NRT', 'OKA', 'CTS', 'FUK', 'KIX', 'NGO'];
   
@@ -43,9 +46,30 @@ class _CalculationScreenState extends State<CalculationScreen> {
   };
 
   final List<String> airlines = ['JAL', 'ANA'];
+  
+  // JAL運賃種別（選択後の表示用）
+  final Map<String, String> jalFareTypeDisplay = {
+    '運賃1 (100%)': '運賃1 (100%) フレックス、JALカード割引、ビジネスフレックス、離島割引、特定路線離島割引',
+    '運賃2 (75%)': '運賃2 (75%) 株主割引',
+    '運賃3 (75%)': '運賃3 (75%) セイバー、往復セイバー',
+    '運賃4 (75%)': '運賃4 (75%) スペシャルセイバー',
+    '運賃5 (50%)': '運賃5 (50%) パッケージツアーに適用される個人包括旅行運賃など',
+    '運賃6 (50%)': '運賃6 (50%) プロモーション、当日シニア割引、スカイメイト、JALカードスカイメイト',
+  };
+  
   final Map<String, List<String>> fareTypesByAirline = {
-    'JAL': ['ウルトラ先得', '先得割引', '特便割引', '普通運賃'],
+    'JAL': ['運賃1 (100%)', '運賃2 (75%)', '運賃3 (75%)', '運賃4 (75%)', '運賃5 (50%)', '運賃6 (50%)'],
     'ANA': ['旅割', 'ビジネスきっぷ', 'ANA VALUE', '普通運賃'],
+  };
+  
+  // JAL運賃の積算率
+  final Map<String, double> jalFareRates = {
+    '運賃1 (100%)': 1.0,
+    '運賃2 (75%)': 0.75,
+    '運賃3 (75%)': 0.75,
+    '運賃4 (75%)': 0.75,
+    '運賃5 (50%)': 0.50,
+    '運賃6 (50%)': 0.50,
   };
   final Map<String, List<String>> seatClassesByAirline = {
     'JAL': ['普通席', 'クラスJ', 'ファースト'],
@@ -80,11 +104,21 @@ class _CalculationScreenState extends State<CalculationScreen> {
 
   @override
   void dispose() {
-    dateControllers.values.forEach((c) => c.dispose());
-    flightNumberControllers.values.forEach((c) => c.dispose());
-    departureTimeControllers.values.forEach((c) => c.dispose());
-    arrivalTimeControllers.values.forEach((c) => c.dispose());
-    fareAmountControllers.values.forEach((c) => c.dispose());
+    for (var c in dateControllers.values) {
+      c.dispose();
+    }
+    for (var c in flightNumberControllers.values) {
+      c.dispose();
+    }
+    for (var c in departureTimeControllers.values) {
+      c.dispose();
+    }
+    for (var c in arrivalTimeControllers.values) {
+      c.dispose();
+    }
+    for (var c in fareAmountControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -303,25 +337,45 @@ class _CalculationScreenState extends State<CalculationScreen> {
       if (routeData == null) return;
       final distance = routeData['distance_miles'] as int;
 
-      final fareData = await Supabase.instance.client.from('fare_types').select('rate')
-          .eq('airline_code', airline).eq('fare_type_name', fare).maybeSingle();
-      if (fareData == null) return;
-
-      final fareRate = (fareData['rate'] as num).toDouble();
+      // 積算率を取得（JALはローカル、ANAはDB）
+      double fareRate;
+      if (airline == 'JAL') {
+        fareRate = jalFareRates[fare] ?? 1.0;
+      } else {
+        final fareData = await Supabase.instance.client.from('fare_types').select('rate')
+            .eq('airline_code', airline).eq('fare_type_name', fare).maybeSingle();
+        if (fareData == null) return;
+        fareRate = (fareData['rate'] as num).toDouble();
+      }
       final baseFOP = (distance * fareRate).round();
       final seatBonusRate = seatBonus[airline]?[seat] ?? 0.0;
       
       // FOP/PP計算（座席ボーナスのみ）
       final totalFOP = baseFOP + 400 + (baseFOP * seatBonusRate).round();
       
-      // マイル計算（座席ボーナス + カードボーナス）
+      // マイル計算
       final cardBonusRate = airline == 'JAL' 
           ? (jalCardBonus[selectedJALCard] ?? 0.0)
           : (anaCardBonus[selectedANACard] ?? 0.0);
+      
+      // 通常のフライトマイル
       final baseMiles = (distance * fareRate).round();
+      
+      // JALカード ツアープレミアムボーナス（対象運賃で100%に引き上げ）
+      final isTourPremiumEligible = airline == 'JAL' 
+          && jalTourPremium 
+          && selectedJALCard != 'なし'
+          && (fare == '運賃4 (75%)' || fare == '運賃5 (50%)');
+      final tourPremiumBonus = isTourPremiumEligible 
+          ? (distance * (1.0 - fareRate)).round()  // 差分を補填
+          : 0;
+      
+      // 座席ボーナスマイル（通常フライトマイルに対して）
       final seatBonusMiles = (baseMiles * seatBonusRate).round();
+      // カードボーナスマイル（通常フライトマイルに対して）
       final cardBonusMiles = (baseMiles * cardBonusRate).round();
-      final totalMiles = baseMiles + seatBonusMiles + cardBonusMiles;
+      // 合計マイル
+      final totalMiles = baseMiles + tourPremiumBonus + seatBonusMiles + cardBonusMiles;
       
       setState(() { 
         legs[index]['calculatedFOP'] = totalFOP; 
@@ -332,7 +386,9 @@ class _CalculationScreenState extends State<CalculationScreen> {
 
   Future<void> _calculateFOP() async {
     setState(() { isLoading = true; errorMessage = null; });
-    for (int i = 0; i < legs.length; i++) await _calculateSingleLeg(i);
+    for (int i = 0; i < legs.length; i++) {
+      await _calculateSingleLeg(i);
+    }
     setState(() => isLoading = false);
   }
 
@@ -450,85 +506,124 @@ class _CalculationScreenState extends State<CalculationScreen> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.grey[300]!),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.credit_card, size: 20, color: Colors.grey),
-                const SizedBox(width: 12),
-                const Text('保有カード:', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(width: 16),
-                // JALカード
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.red[50],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('JAL', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red[800], fontSize: 12)),
-                      const SizedBox(width: 8),
-                      DropdownButton<String>(
-                        value: selectedJALCard,
-                        underline: const SizedBox(),
-                        isDense: true,
-                        style: const TextStyle(fontSize: 13, color: Colors.black87),
-                        items: jalCardTypes.map((card) => DropdownMenuItem(
-                          value: card,
-                          child: Text(card),
-                        )).toList(),
-                        onChanged: (value) {
-                          setState(() => selectedJALCard = value ?? 'なし');
-                          _onCardChanged();
-                        },
+                Row(
+                  children: [
+                    const Icon(Icons.credit_card, size: 20, color: Colors.grey),
+                    const SizedBox(width: 12),
+                    const Text('保有カード:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 16),
+                    // JALカード
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // ANAカード
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('ANA', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[800], fontSize: 12)),
-                      const SizedBox(width: 8),
-                      DropdownButton<String>(
-                        value: selectedANACard,
-                        underline: const SizedBox(),
-                        isDense: true,
-                        style: const TextStyle(fontSize: 13, color: Colors.black87),
-                        items: anaCardTypes.map((card) => DropdownMenuItem(
-                          value: card,
-                          child: Text(card),
-                        )).toList(),
-                        onChanged: (value) {
-                          setState(() => selectedANACard = value ?? 'なし');
-                          _onCardChanged();
-                        },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('JAL', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red[800], fontSize: 12)),
+                          const SizedBox(width: 8),
+                          DropdownButton<String>(
+                            value: selectedJALCard,
+                            underline: const SizedBox(),
+                            isDense: true,
+                            style: const TextStyle(fontSize: 13, color: Colors.black87),
+                            items: jalCardTypes.map((card) => DropdownMenuItem(
+                              value: card,
+                              child: Text(card),
+                            )).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                selectedJALCard = value ?? 'なし';
+                                // カードなしにしたらツアープレミアムもOFF
+                                if (selectedJALCard == 'なし') {
+                                  jalTourPremium = false;
+                                }
+                              });
+                              _onCardChanged();
+                            },
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 16),
+                    // ANAカード
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('ANA', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[800], fontSize: 12)),
+                          const SizedBox(width: 8),
+                          DropdownButton<String>(
+                            value: selectedANACard,
+                            underline: const SizedBox(),
+                            isDense: true,
+                            style: const TextStyle(fontSize: 13, color: Colors.black87),
+                            items: anaCardTypes.map((card) => DropdownMenuItem(
+                              value: card,
+                              child: Text(card),
+                            )).toList(),
+                            onChanged: (value) {
+                              setState(() => selectedANACard = value ?? 'なし');
+                              _onCardChanged();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    // ボーナス率表示
+                    if (selectedJALCard != 'なし' || selectedANACard != 'なし')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'マイルボーナス: ${selectedJALCard != 'なし' ? 'JAL+${((jalCardBonus[selectedJALCard] ?? 0) * 100).toInt()}%' : ''}${selectedJALCard != 'なし' && selectedANACard != 'なし' ? ' / ' : ''}${selectedANACard != 'なし' ? 'ANA+${((anaCardBonus[selectedANACard] ?? 0) * 100).toInt()}%' : ''}',
+                          style: TextStyle(fontSize: 12, color: Colors.green[800]),
+                        ),
+                      ),
+                  ],
                 ),
-                const Spacer(),
-                // ボーナス率表示
-                if (selectedJALCard != 'なし' || selectedANACard != 'なし')
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(4),
+                const SizedBox(height: 8),
+                // JALカード ツアープレミアム チェックボックス
+                Row(
+                  children: [
+                    const SizedBox(width: 32),
+                    Checkbox(
+                      value: jalTourPremium,
+                      onChanged: selectedJALCard == 'なし' 
+                          ? null  // カードなしならグレーアウト
+                          : (value) {
+                              setState(() => jalTourPremium = value ?? false);
+                              _onCardChanged();
+                            },
                     ),
-                    child: Text(
-                      'マイルボーナス: ${selectedJALCard != 'なし' ? 'JAL+${((jalCardBonus[selectedJALCard] ?? 0) * 100).toInt()}%' : ''}${selectedJALCard != 'なし' && selectedANACard != 'なし' ? ' / ' : ''}${selectedANACard != 'なし' ? 'ANA+${((anaCardBonus[selectedANACard] ?? 0) * 100).toInt()}%' : ''}',
-                      style: TextStyle(fontSize: 12, color: Colors.green[800]),
+                    Text(
+                      'JALカード ツアープレミアム（JALカード会員限定）',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: selectedJALCard == 'なし' ? Colors.grey : Colors.black87,
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Tooltip(
+                      message: '対象運賃（運賃4・運賃5）で区間マイル100%積算',
+                      child: Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -595,10 +690,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
             _buildFlightTimeDropdown(leg, legId, index),
             const Padding(padding: EdgeInsets.only(top: 20), child: Icon(Icons.arrow_forward)),
             _buildArrivalTimeField(legId, index),
-            _buildDropdown('運賃種別', 160, fareTypes.contains(leg['fareType']) ? leg['fareType'] : null, fareTypes, (v) { 
-              setState(() => legs[index]['fareType'] = v ?? ''); 
-              _calculateSingleLeg(index); 
-            }),
+            _buildFareTypeDropdown(leg, index),
             _buildDropdown('座席クラス', 160, seatClasses.contains(leg['seatClass']) ? leg['seatClass'] : null, seatClasses, (v) { 
               setState(() => legs[index]['seatClass'] = v ?? ''); 
               _calculateSingleLeg(index); 
@@ -680,7 +772,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
       const SizedBox(height: 4),
       DropdownButtonFormField<String>(
         key: ValueKey('departure_${legId}_$airline'),
-        value: currentValue,
+        initialValue: currentValue,
         items: displayItems.map((e) => DropdownMenuItem(
           value: e.isEmpty ? null : e,
           child: Text(e.isEmpty ? '－' : '$e ${airportNames[e] ?? ''}', style: const TextStyle(fontSize: 12)),
@@ -716,7 +808,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
       const SizedBox(height: 4),
       DropdownButtonFormField<String>(
         key: ValueKey('destination_${legId}_$airline'),
-        value: currentValue,
+        initialValue: currentValue,
         items: displayItems.map((e) => DropdownMenuItem(
           value: e.isEmpty ? null : e,
           child: Text(e.isEmpty ? '－' : '$e ${airportNames[e] ?? ''}', style: const TextStyle(fontSize: 12)),
@@ -752,7 +844,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
       const SizedBox(height: 4),
       DropdownButtonFormField<String>(
         key: ValueKey('flight_time_${legId}_$airline'),
-        value: null,
+        initialValue: null,
         items: [
           const DropdownMenuItem(value: '__clear__', child: Text('－', style: TextStyle(fontSize: 12))),
           ...flights.map((flight) {
@@ -826,7 +918,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
       Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), 
       const SizedBox(height: 4),
       DropdownButtonFormField<String>(
-        value: value, 
+        initialValue: value, 
         items: items.map((e) => DropdownMenuItem(
           value: e, 
           child: Text(e, style: const TextStyle(fontSize: 12)),
@@ -835,5 +927,51 @@ class _CalculationScreenState extends State<CalculationScreen> {
         onChanged: onChanged,
       ),
     ]));
+  }
+
+  // 運賃種別専用ドロップダウン（JALは詳細表示）
+  Widget _buildFareTypeDropdown(Map<String, dynamic> leg, int index) {
+    final airline = leg['airline'] as String;
+    final fareTypes = fareTypesByAirline[airline] ?? [];
+    final currentValue = fareTypes.contains(leg['fareType']) ? leg['fareType'] as String : null;
+    
+    return SizedBox(
+      width: airline == 'JAL' ? 200 : 160,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('運賃種別', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          DropdownButtonFormField<String>(
+            initialValue: currentValue,
+            items: fareTypes.map((fare) {
+              // JALの場合はプルダウンで詳細表示
+              final displayText = airline == 'JAL' 
+                  ? (jalFareTypeDisplay[fare] ?? fare)
+                  : fare;
+              return DropdownMenuItem(
+                value: fare,
+                child: Text(displayText, style: const TextStyle(fontSize: 11)),
+              );
+            }).toList(),
+            // 選択後は短縮表示
+            selectedItemBuilder: (context) {
+              return fareTypes.map((fare) {
+                return Text(fare, style: const TextStyle(fontSize: 12));
+              }).toList();
+            },
+            decoration: const InputDecoration(
+              isDense: true,
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+            onChanged: (v) {
+              setState(() => legs[index]['fareType'] = v ?? '');
+              _calculateSingleLeg(index);
+            },
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -42,10 +42,18 @@ class _CalculationScreenState extends State<CalculationScreen> {
   @override
   void dispose() {
     // 全コントローラーを破棄
-    dateControllers.values.forEach((c) => c.dispose());
-    flightNumberControllers.values.forEach((c) => c.dispose());
-    departureTimeControllers.values.forEach((c) => c.dispose());
-    arrivalTimeControllers.values.forEach((c) => c.dispose());
+    for (var c in dateControllers.values) {
+      c.dispose();
+    }
+    for (var c in flightNumberControllers.values) {
+      c.dispose();
+    }
+    for (var c in departureTimeControllers.values) {
+      c.dispose();
+    }
+    for (var c in arrivalTimeControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -395,7 +403,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
                       const Text('航空会社', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       DropdownButtonFormField<String>(
-                        value: airline,
+                        initialValue: airline,
                         items: airlines.map((code) {
                           return DropdownMenuItem(value: code, child: Text(code));
                         }).toList(),
@@ -488,7 +496,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
                       const Text('出発地', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       DropdownButtonFormField<String>(
-                        value: (leg['departureAirport'] as String).isEmpty ? null : leg['departureAirport'] as String,
+                        initialValue: (leg['departureAirport'] as String).isEmpty ? null : leg['departureAirport'] as String,
                         items: airports.map((code) {
                           return DropdownMenuItem(value: code, child: Text(code));
                         }).toList(),
@@ -541,7 +549,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
                       const Text('到着地', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       DropdownButtonFormField<String>(
-                        value: (leg['arrivalAirport'] as String).isEmpty ? null : leg['arrivalAirport'] as String,
+                        initialValue: (leg['arrivalAirport'] as String).isEmpty ? null : leg['arrivalAirport'] as String,
                         items: airports.map((code) {
                           return DropdownMenuItem(value: code, child: Text(code));
                         }).toList(),
@@ -597,7 +605,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
                       const Text('運賃種別', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       DropdownButtonFormField<String>(
-                        value: fareTypes.contains(leg['fareType']) ? leg['fareType'] as String : null,
+                        initialValue: fareTypes.contains(leg['fareType']) ? leg['fareType'] as String : null,
                         items: fareTypes.map((type) {
                           return DropdownMenuItem(value: type, child: Text(type));
                         }).toList(),
@@ -624,7 +632,7 @@ class _CalculationScreenState extends State<CalculationScreen> {
                       const Text('座席クラス', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       DropdownButtonFormField<String>(
-                        value: seatClasses.contains(leg['seatClass']) ? leg['seatClass'] as String : null,
+                        initialValue: seatClasses.contains(leg['seatClass']) ? leg['seatClass'] as String : null,
                         items: seatClasses.map((cls) {
                           return DropdownMenuItem(value: cls, child: Text(cls));
                         }).toList(),

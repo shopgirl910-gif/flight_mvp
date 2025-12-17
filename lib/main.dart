@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'simulation_screen.dart';
-import 'flight_record_screen.dart';
 import 'history_screen.dart';
 import 'quiz_screen.dart';
 
@@ -51,11 +50,10 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  final List<String> _tabLabels = ['Simulate', '搭乗記録', '履歴', 'クイズ'];
+  final List<String> _tabLabels = ['Simulate', '履歴', 'クイズ'];
 
   final List<Widget> _screens = [
     const SimulationScreen(),
-    const FlightRecordScreen(),
     const HistoryScreen(),
     const QuizScreen(),
   ];

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'simulation_screen.dart';
-import 'flight_record_screen.dart';
 import 'history_screen.dart';
 import 'quiz_screen.dart';
 
@@ -23,7 +22,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '修行僧アプリ',
+      title: 'MRP - Mileage Run Planner',
       theme: ThemeData(
         primarySwatch: Colors.purple,
       ),
@@ -51,11 +50,10 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  final List<String> _tabLabels = ['Simulate', '搭乗記録', '履歴', 'クイズ'];
+  final List<String> _tabLabels = ['Simulate', '履歴', 'クイズ'];
 
   final List<Widget> _screens = [
     const SimulationScreen(),
-    const FlightRecordScreen(),
     const HistoryScreen(),
     const QuizScreen(),
   ];
@@ -64,7 +62,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('修行僧アプリ'),
+        title: const Text('MRP - Mileage Run Planner'),
         backgroundColor: Colors.purple[700],
         foregroundColor: Colors.white,
         bottom: PreferredSize(
