@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+print(c.get_descriptive_name()import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SimulationScreen extends StatefulWidget {
@@ -236,12 +236,23 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     final departure = leg['departureAirport'] as String; final arrival = leg['arrivalAirport'] as String;
     if (departure.isEmpty) { setState(() { availableFlights[legId] = []; availableDestinations[legId] = []; }); return; }
     try {
-      var query = Supabase.instance.client.from('schedules').select().eq('airline_code', airline).eq('departure_code', departure).eq('is_active', true);
+      // 日付フィルタ用：日付未入力なら今日を使用
+      final dateText = dateControllers[legId]?.text ?? '';
+      final targetDate = dateText.isEmpty 
+          ? DateTime.now().toIso8601String().substring(0, 10)
+          : dateText.replaceAll('/', '-');
+      
+      var query = Supabase.instance.client.from('schedules').select()
+          .eq('airline_code', airline)
+          .eq('departure_code', departure)
+          .eq('is_active', true)
+          .lte('period_start', targetDate)
+          .gte('period_end', targetDate);
       if (arrival.isNotEmpty) query = query.eq('arrival_code', arrival);
       final response = await query.order('departure_time');
       List<Map<String, dynamic>> flights = (response as List).cast<Map<String, dynamic>>();
       
-      // ä¿®æ­£1: é‡è¤‡é™¤åŽ»ï¼ˆä¾¿å+å‡ºç™ºæ™‚åˆ»+åˆ°ç€åœ°ã§ãƒ¦ãƒ‹ãƒ¼ã‚¯åŒ–ï¼‰
+      // 重複除去（便名+出発時刻+到着地でユニーク化）
       final seen = <String>{};
       flights = flights.where((flight) {
         String depTime = flight['departure_time'] ?? '';
@@ -260,8 +271,13 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
           flights = flights.where((flight) { String depTime = flight['departure_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); return _isTimeAfterOrEqual(depTime, minDepartureTime); }).toList();
         }
       }
-      final destinations = flights.map((f) => f['arrival_code'] as String).toSet().toList(); destinations.sort();
-      setState(() { availableFlights[legId] = flights; availableDestinations[legId] = destinations; });
+      // 到着地が確定済みの場合はdestinationsを更新しない
+      if (arrival.isEmpty) {
+        final destinations = flights.map((f) => f['arrival_code'] as String).toSet().toList(); destinations.sort();
+        setState(() { availableFlights[legId] = flights; availableDestinations[legId] = destinations; });
+      } else {
+        setState(() { availableFlights[legId] = flights; });
+      }
     } catch (e) { setState(() { availableFlights[legId] = []; availableDestinations[legId] = []; }); }
   }
 
