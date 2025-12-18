@@ -521,8 +521,8 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: airlineColor.withOpacity(0.3)), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-          TextButton(onPressed: () {}, child: Text('å®Œäº†', style: TextStyle(color: Colors.grey[600], fontSize: 12))),
-          TextButton(onPressed: () => _clearLeg(index, legId), child: Text('ã‚¯ãƒªã‚¢', style: TextStyle(color: Colors.grey[600], fontSize: 12))),
+          TextButton(onPressed: _addLeg, child: Text('+ レグ追加', style: TextStyle(color: Colors.grey[600], fontSize: 12))),
+          TextButton(onPressed: () => _clearLeg(index, legId), child: Text('クリア', style: TextStyle(color: Colors.grey[600], fontSize: 12))),
           if (legs.length > 1) IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => _removeLeg(index), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
         ]),
         SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
@@ -540,10 +540,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
           // LSPè¿½åŠ : lspãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã‚’è¿½åŠ 
           if (fop != null) _buildPointsDisplay(airline, fop, miles, lsp, legId),
         ])),
-        const SizedBox(height: 8),
-        Row(children: [
-          ElevatedButton.icon(onPressed: _addLeg, icon: const Icon(Icons.add, size: 16), label: const Text('ãƒ¬ã‚°è¿½åŠ '), style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), textStyle: const TextStyle(fontSize: 12))),
-        ]),
       ]),
     );
   }
@@ -574,7 +570,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     return SizedBox(width: 85, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('å‡ºç™ºåœ°', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(key: ValueKey('departure_${legId}_$airline'), value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 180,
+        child: DropdownButton<String>(key: ValueKey('departure_${legId}_$airline'), value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 180, itemHeight: 36,
           hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(displayText, style: const TextStyle(fontSize: 12))),
           selectedItemBuilder: (context) => airportList.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e == '---' ? '' : e, style: const TextStyle(fontSize: 12))))).toList(),
           items: airportList.map((e) {
