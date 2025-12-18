@@ -1,4 +1,4 @@
-print(c.get_descriptive_name()import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SimulationScreen extends StatefulWidget {
@@ -579,14 +579,18 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   Widget _buildDepartureDropdown(Map<String, dynamic> leg, int legId, int index) {
     final airline = leg['airline'] as String;
     final departure = leg['departureAirport'] as String;
-    // å°±èˆªç©ºæ¸¯ãƒªã‚¹ãƒˆã‚’å–å¾—ï¼ˆã‚­ãƒ£ãƒƒã‚·ãƒ¥ãŒã‚ã‚Œã°ãã‚Œã‚’ä½¿ç”¨ï¼‰
-    final airportList = airlineAirports[airline] ?? airports;
+    // 就航空港リストを取得（キャッシュがあればそれを使用）
+    var airportList = List<String>.from(airlineAirports[airline] ?? airports);
+    // 便名検索で設定された空港がリストにない場合は追加
+    if (departure.isNotEmpty && !airportList.contains(departure)) {
+      airportList = [departure, ...airportList];
+    }
     final currentValue = departure.isEmpty ? null : departure;
-    final displayText = currentValue ?? 'é¸æŠž';
+    final displayText = currentValue ?? '選択';
     return SizedBox(width: 85, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('å‡ºç™ºåœ°', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+      const Text('出発地', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(key: ValueKey('departure_${legId}_$airline'), value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 180, itemHeight: 36,
+        child: DropdownButton<String>(key: ValueKey('departure_${legId}_${airline}_$departure'), value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 180, itemHeight: 36,
           hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(displayText, style: const TextStyle(fontSize: 12))),
           selectedItemBuilder: (context) => airportList.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e == '---' ? '' : e, style: const TextStyle(fontSize: 12))))).toList(),
           items: airportList.map((e) {
@@ -601,22 +605,24 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     ]));
   }
 
-  // ä¿®æ­£3: å°±èˆªè·¯ç·šã®ã¿è¡¨ç¤ºï¼ˆãƒ•ã‚©ãƒ¼ãƒ«ãƒãƒƒã‚¯å‰Šé™¤ï¼‰
   Widget _buildDestinationDropdown(Map<String, dynamic> leg, int legId, int index) {
     final airline = leg['airline'] as String;
     final arrival = leg['arrivalAirport'] as String;
     final destinations = availableDestinations[legId] ?? [];
-    // ãƒ•ã‚©ãƒ¼ãƒ«ãƒãƒƒã‚¯å‰Šé™¤: å°±èˆªå…ˆãŒãªã‘ã‚Œã°ç©ºã®ã¾ã¾
-    final displayItems = ['', ...destinations];
-    final currentValue = arrival.isEmpty || !displayItems.contains(arrival) ? null : arrival;
-    final displayText = currentValue ?? 'é¸æŠž';
+    // 便名検索で設定された空港がリストにない場合は追加
+    var displayItems = ['', ...destinations];
+    if (arrival.isNotEmpty && !displayItems.contains(arrival)) {
+      displayItems = ['', arrival, ...destinations];
+    }
+    final currentValue = arrival.isEmpty ? null : arrival;
+    final displayText = currentValue ?? '選択';
     return SizedBox(width: 85, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('åˆ°ç€åœ°', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+      const Text('到着地', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(key: ValueKey('destination_${legId}_$airline'), value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 150,
+        child: DropdownButton<String>(key: ValueKey('destination_${legId}_${airline}_$arrival'), value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 150,
           hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(displayText, style: const TextStyle(fontSize: 12))),
           selectedItemBuilder: (context) => displayItems.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 12))))).toList(),
-          items: displayItems.map((e) => DropdownMenuItem(value: e.isEmpty ? null : e, child: Text(e.isEmpty ? 'ï¼' : '$e ${airportNames[e] ?? ''}', style: const TextStyle(fontSize: 12)))).toList(),
+          items: displayItems.map((e) => DropdownMenuItem(value: e.isEmpty ? null : e, child: Text(e.isEmpty ? '－' : '$e ${airportNames[e] ?? ''}', style: const TextStyle(fontSize: 12)))).toList(),
           onChanged: (v) { if (v == null || v.isEmpty) { _clearFlightInfo(index, legId); } else { setState(() => legs[index]['arrivalAirport'] = v); _fetchAvailableFlights(index); _calculateSingleLeg(index); } },
         ),
       ),
