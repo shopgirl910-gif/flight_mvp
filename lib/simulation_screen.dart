@@ -23,161 +23,83 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   Map<int, List<Map<String, dynamic>>> availableFlights = {};
   Map<int, List<String>> availableDestinations = {};
   
-  // 追加: 航空会社別就航空港キャッシュ
+  // è¿½åŠ : èˆªç©ºä¼šç¤¾åˆ¥å°±èˆªç©ºæ¸¯ã‚­ãƒ£ãƒƒã‚·ãƒ¥
   Map<String, List<String>> airlineAirports = {};
-  
-  // 追加: レグ別エラーメッセージ
-  Map<int, String?> legErrorMessages = {};
   
   int _legIdCounter = 0;
   bool isLoading = false;
+  String? errorMessage;
 
   String? selectedJALCard;
   String? selectedANACard;
   String? selectedJALStatus;
   String? selectedANAStatus;
-  bool jalTourPremium = false; // JALカードツアープレミアム
-  bool jalShoppingMilePremium = false; // JALカードショッピングマイル・プレミアム
+  bool jalTourPremium = false; // JALã‚«ãƒ¼ãƒ‰ãƒ„ã‚¢ãƒ¼ãƒ—ãƒ¬ãƒŸã‚¢ãƒ 
+  bool jalShoppingMilePremium = false; // JALã‚«ãƒ¼ãƒ‰ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°ãƒžã‚¤ãƒ«ãƒ»ãƒ—ãƒ¬ãƒŸã‚¢ãƒ 
 
-  final List<String> jalCardTypes = ['-', 'JMB会員', 'JALカード普通会員', 'JALカードCLUB-A会員', 'JALカードCLUB-Aゴールド会員', 'JALカードプラチナ会員', 'JALグローバルクラブ会員(日本)', 'JALグローバルクラブ会員(海外)', 'JALカードNAVI会員', 'JAL CLUB EST 普通会員', 'JAL CLUB EST CLUB-A会員', 'JAL CLUB EST CLUB-A GOLD会員', 'JAL CLUB EST プラチナ会員'];
-  final List<String> anaCardTypes = ['-', 'AMCカード(提携カード含む)', 'ANAカード 一般', 'ANAカード 学生用', 'ANAカード ワイド', 'ANAカード ゴールド', 'ANAカード プレミアム', 'SFC 一般', 'SFC ゴールド', 'SFC プレミアム'];
-  final List<String> jalStatusTypes = ['-', 'JMBダイヤモンド', 'JMBサファイア', 'JMBクリスタル'];
-  final List<String> anaStatusTypes = ['-', 'ダイヤモンド(1年目)', 'ダイヤモンド(継続2年以上)', 'プラチナ(1年目)', 'プラチナ(継続2年以上)', 'ブロンズ(1年目)', 'ブロンズ(継続2年以上)'];
+  final List<String> jalCardTypes = ['-', 'JMBä¼šå“¡', 'JALã‚«ãƒ¼ãƒ‰æ™®é€šä¼šå“¡', 'JALã‚«ãƒ¼ãƒ‰CLUB-Aä¼šå“¡', 'JALã‚«ãƒ¼ãƒ‰CLUB-Aã‚´ãƒ¼ãƒ«ãƒ‰ä¼šå“¡', 'JALã‚«ãƒ¼ãƒ‰ãƒ—ãƒ©ãƒãƒŠä¼šå“¡', 'JALã‚°ãƒ­ãƒ¼ãƒãƒ«ã‚¯ãƒ©ãƒ–ä¼šå“¡(æ—¥æœ¬)', 'JALã‚°ãƒ­ãƒ¼ãƒãƒ«ã‚¯ãƒ©ãƒ–ä¼šå“¡(æµ·å¤–)', 'JALã‚«ãƒ¼ãƒ‰NAVIä¼šå“¡', 'JAL CLUB EST æ™®é€šä¼šå“¡', 'JAL CLUB EST CLUB-Aä¼šå“¡', 'JAL CLUB EST CLUB-A GOLDä¼šå“¡', 'JAL CLUB EST ãƒ—ãƒ©ãƒãƒŠä¼šå“¡'];
+  final List<String> anaCardTypes = ['-', 'AMCã‚«ãƒ¼ãƒ‰(ææºã‚«ãƒ¼ãƒ‰å«ã‚€)', 'ANAã‚«ãƒ¼ãƒ‰ ä¸€èˆ¬', 'ANAã‚«ãƒ¼ãƒ‰ å­¦ç”Ÿç”¨', 'ANAã‚«ãƒ¼ãƒ‰ ãƒ¯ã‚¤ãƒ‰', 'ANAã‚«ãƒ¼ãƒ‰ ã‚´ãƒ¼ãƒ«ãƒ‰', 'ANAã‚«ãƒ¼ãƒ‰ ãƒ—ãƒ¬ãƒŸã‚¢ãƒ ', 'SFC ä¸€èˆ¬', 'SFC ã‚´ãƒ¼ãƒ«ãƒ‰', 'SFC ãƒ—ãƒ¬ãƒŸã‚¢ãƒ '];
+  final List<String> jalStatusTypes = ['-', 'JMBãƒ€ã‚¤ãƒ¤ãƒ¢ãƒ³ãƒ‰', 'JMBã‚µãƒ•ã‚¡ã‚¤ã‚¢', 'JMBã‚¯ãƒªã‚¹ã‚¿ãƒ«'];
+  final List<String> anaStatusTypes = ['-', 'ãƒ€ã‚¤ãƒ¤ãƒ¢ãƒ³ãƒ‰(1å¹´ç›®)', 'ãƒ€ã‚¤ãƒ¤ãƒ¢ãƒ³ãƒ‰(ç¶™ç¶š2å¹´ä»¥ä¸Š)', 'ãƒ—ãƒ©ãƒãƒŠ(1å¹´ç›®)', 'ãƒ—ãƒ©ãƒãƒŠ(ç¶™ç¶š2å¹´ä»¥ä¸Š)', 'ãƒ–ãƒ­ãƒ³ã‚º(1å¹´ç›®)', 'ãƒ–ãƒ­ãƒ³ã‚º(ç¶™ç¶š2å¹´ä»¥ä¸Š)'];
   final List<String> airports = [
-    // ===== 主要空港 =====
-    'HND',  // 東京(羽田)
-    'NRT',  // 東京(成田)
-    'ITM',  // 大阪(伊丹)
-    'KIX',  // 大阪(関西)
-    'UKB',  // 大阪(神戸) ※伊丹・関西・神戸グループ
-    'CTS',  // 札幌(新千歳)
-    'NGO',  // 名古屋(中部)
-    'NKM',  // 名古屋(小牧)
-    'FUK',  // 福岡
-    'OKA',  // 沖縄(那覇)
-    // ===== 北から順 =====
-    // 北海道
-    'OKD',  // 札幌(丘珠)
-    'WKJ',  // 稚内
-    'MBE',  // 紋別
-    'AKJ',  // 旭川
-    'MMB',  // 女満別
-    'SHB',  // 中標津
-    'KUH',  // 釧路
-    'OBO',  // 帯広
-    'HKD',  // 函館
-    'OIR',  // 奥尻
-    // 東北
-    'AOJ',  // 青森
-    'MSJ',  // 三沢
-    'ONJ',  // 大館能代
-    'AXT',  // 秋田
-    'SYO',  // 庄内
-    'GAJ',  // 山形
-    'HNA',  // 花巻
-    'SDJ',  // 仙台
-    'FKS',  // 福島
+    // 主要空港
+    'HND', 'NRT', 'ITM', 'KIX', 'UKB', 'CTS', 'NGO', 'FUK', 'OKA',
+    // 区切り線
+    '---',
+    // 北海道（北から）
+    'WKJ', 'MBE', 'MMB', 'SHB', 'KUH', 'OBO', 'AKJ', 'CTS', 'OKD', 'HKD', 'OIR',
+    // 東北（北から）
+    'AOJ', 'MSJ', 'HNA', 'AXT', 'ONJ', 'GAJ', 'SDJ', 'FKS',
     // 関東・中部
-    'HAC',  // 八丈島
-    'NTQ',  // 能登
-    'TOY',  // 富山
-    'KMQ',  // 小松
-    'MMJ',  // 松本
-    'FSZ',  // 静岡
-    'SHM',  // 南紀白浜
+    'HND', 'NRT', 'HAC', 'FSZ', 'MMJ', 'NTQ', 'TOY', 'KMQ', 'NGO', 'NKM', 'SHM',
+    // 関西
+    'ITM', 'KIX', 'UKB', 'TJH',
     // 中国・四国
-    'TJH',  // 但馬
-    'TTJ',  // 鳥取
-    'YGJ',  // 米子
-    'IZO',  // 出雲
-    'OKI',  // 隠岐
-    'OKJ',  // 岡山
-    'HIJ',  // 広島
-    'IWK',  // 岩国
-    'UBJ',  // 山口宇部
-    'TKS',  // 徳島
-    'TAK',  // 高松
-    'KCZ',  // 高知
-    'MYJ',  // 松山
-    // 九州
-    'KKJ',  // 北九州
-    'HSG',  // 佐賀
-    'NGS',  // 長崎
-    'KMJ',  // 熊本
-    'OIT',  // 大分
-    'KMI',  // 宮崎
-    'KOJ',  // 鹿児島
-    'AXJ',  // 天草
-    // 離島（九州・沖縄）
-    'IKI',  // 壱岐
-    'TSJ',  // 対馬
-    'FUJ',  // 五島福江
-    'TNE',  // 種子島
-    'KUM',  // 屋久島
-    'ASJ',  // 奄美
-    'KKX',  // 喜界
-    'TKN',  // 徳之島
-    'RNJ',  // 与論
-    'OGN',  // 与那国
-    'MMY',  // 宮古
-    'ISG',  // 石垣
+    'TTJ', 'YGJ', 'IZO', 'OKI', 'OKJ', 'HIJ', 'IWK', 'UBJ', 'TKS', 'TAK', 'KCZ', 'MYJ',
+    // 九州（北から）
+    'KKJ', 'FUK', 'HSG', 'NGS', 'KMJ', 'OIT', 'KMI', 'KOJ', 'AXJ',
+    // 離島
+    'IKI', 'TSJ', 'FUJ', 'TNE', 'KUM', 'ASJ', 'KKX', 'TKN', 'OKA', 'OGN', 'MMY', 'ISG', 'RNJ',
   ];
   final Map<String, String> airportNames = {
-    // 主要空港
-    'HND': '東京(羽田)', 'NRT': '東京(成田)', 
-    'ITM': '大阪(伊丹)', 'KIX': '大阪(関西)', 'UKB': '大阪(神戸)',
-    'CTS': '札幌(新千歳)', 
-    'NGO': '名古屋(中部)', 'NKM': '名古屋(小牧)',
-    'FUK': '福岡', 'OKA': '沖縄(那覇)',
-    // 北海道
-    'OKD': '札幌(丘珠)', 'WKJ': '稚内', 'MBE': '紋別', 'AKJ': '旭川', 
-    'MMB': '女満別', 'SHB': '中標津', 'KUH': '釧路', 'OBO': '帯広', 
-    'HKD': '函館', 'OIR': '奥尻',
-    // 東北
-    'AOJ': '青森', 'MSJ': '三沢', 'ONJ': '大館能代', 'AXT': '秋田',
-    'SYO': '庄内', 'GAJ': '山形', 'HNA': '花巻', 'SDJ': '仙台', 'FKS': '福島',
-    // 関東・中部
-    'HAC': '八丈島', 'NTQ': '能登', 'TOY': '富山', 'KMQ': '小松',
-    'MMJ': '松本', 'FSZ': '静岡', 'SHM': '南紀白浜',
-    // 中国・四国
-    'TJH': '但馬', 'TTJ': '鳥取', 'YGJ': '米子', 'IZO': '出雲', 'OKI': '隠岐',
-    'OKJ': '岡山', 'HIJ': '広島', 'IWK': '岩国', 'UBJ': '山口宇部',
-    'TKS': '徳島', 'TAK': '高松', 'KCZ': '高知', 'MYJ': '松山',
-    // 九州
-    'KKJ': '北九州', 'HSG': '佐賀', 'NGS': '長崎', 'KMJ': '熊本',
-    'OIT': '大分', 'KMI': '宮崎', 'KOJ': '鹿児島', 'AXJ': '天草',
-    // 離島
-    'IKI': '壱岐', 'TSJ': '対馬', 'FUJ': '五島福江', 'TNE': '種子島',
-    'KUM': '屋久島', 'ASJ': '奄美', 'KKX': '喜界', 'TKN': '徳之島',
-    'RNJ': '与論', 'OGN': '与那国', 'MMY': '宮古', 'ISG': '石垣',
+    'HND': 'ç¾½ç”°', 'NRT': 'æˆç”°', 'KIX': 'é–¢è¥¿', 'ITM': 'ä¼Šä¸¹', 'NGO': 'ä¸­éƒ¨', 'CTS': 'æ–°åƒæ­³', 'FUK': 'ç¦å²¡', 'OKA': 'é‚£è¦‡',
+    'NGS': 'é•·å´Ž', 'KMJ': 'ç†Šæœ¬', 'OIT': 'å¤§åˆ†', 'MYJ': 'æ¾å±±', 'HIJ': 'åºƒå³¶', 'TAK': 'é«˜æ¾', 'KCZ': 'é«˜çŸ¥', 'TKS': 'å¾³å³¶', 'KOJ': 'é¹¿å…å³¶',
+    'SDJ': 'ä»™å°', 'AOJ': 'é’æ£®', 'AKJ': 'æ—­å·', 'AXT': 'ç§‹ç”°', 'GAJ': 'å±±å½¢', 'KIJ': 'æ–°æ½Ÿ', 'TOY': 'å¯Œå±±', 'KMQ': 'å°æ¾', 'FSZ': 'é™å²¡',
+    'MMB': 'å¥³æº€åˆ¥', 'OBO': 'å¸¯åºƒ', 'KUH': 'é‡§è·¯', 'HKD': 'å‡½é¤¨', 'ISG': 'çŸ³åž£', 'MMY': 'å®®å¤', 'UBJ': 'å±±å£å®‡éƒ¨', 'IWK': 'å²©å›½',
+    'OKJ': 'å²¡å±±', 'TTJ': 'é³¥å–', 'YGJ': 'ç±³å­', 'IZO': 'å‡ºé›²', 'NKM': 'çœŒå–¶åå¤å±‹', 'UKB': 'ç¥žæˆ¸', 'HSG': 'ä½è³€', 'KMI': 'å®®å´Ž',
+    'ASJ': 'å¥„ç¾Ž', 'TKN': 'å¾³ä¹‹å³¶', 'OKI': 'éš å²', 'FKS': 'ç¦å³¶', 'HNA': 'èŠ±å·»', 'MSJ': 'ä¸‰æ²¢', 'ONJ': 'å¤§é¤¨èƒ½ä»£', 'SHM': 'å—ç´€ç™½æµœ',
+    'NTQ': 'èƒ½ç™»', 'KKJ': 'åŒ—ä¹å·ž', 'TNE': 'ç¨®å­å³¶', 'KUM': 'å±‹ä¹…å³¶', 'RNJ': 'ä¸Žè«–', 'OGN': 'ä¸Žé‚£å›½', 'HAC': 'å…«ä¸ˆå³¶',
+    'MBE': 'ç´‹åˆ¥', 'SHB': 'ä¸­æ¨™æ´¥', 'WKJ': 'ç¨šå†…', 'OKD': 'ä¸˜ç ', 'IKI': 'å£±å²', 'TSJ': 'å¯¾é¦¬', 'FUJ': 'äº”å³¶ç¦æ±Ÿ', 'OIR': 'å¥¥å°»',
+    'SYO': 'åº„å†…', 'MMJ': 'æ¾æœ¬', 'AXJ': 'å¤©è‰', 'TJH': 'ä½†é¦¬', 'KKX': 'å–œç•Œ',
+    '---': '──────',
   };
   final List<String> airlines = ['JAL', 'ANA'];
   final Map<String, List<String>> fareTypesByAirline = {
-    'JAL': ['運賃1 (100%) フレックス等', '運賃2 (75%) 株主割引', '運賃3 (75%) セイバー', '運賃4 (75%) スペシャルセイバー', '運賃5 (50%) 包括旅行運賃', '運賃6 (50%) スカイメイト等'],
-    'ANA': ['運賃1 (150%) プレミアム運賃', '運賃2 (125%) プレミアム小児', '運賃3 (100%) 片道・往復', '運賃4 (100%) ビジネス', '運賃5 (75%) 特割A', '運賃6 (75%) 特割B', '運賃7 (75%) 特割C', '運賃8 (50%) いっしょにマイル割', '運賃9 (150%) プレミアム株主', '運賃10 (100%) 普通株主', '運賃11 (70%) 特割プラス', '運賃12 (50%) スマートシニア', '運賃13 (30%) 個人包括'],
+    'JAL': ['é‹è³ƒ1 (100%) ãƒ•ãƒ¬ãƒƒã‚¯ã‚¹ç­‰', 'é‹è³ƒ2 (75%) æ ªä¸»å‰²å¼•', 'é‹è³ƒ3 (75%) ã‚»ã‚¤ãƒãƒ¼', 'é‹è³ƒ4 (75%) ã‚¹ãƒšã‚·ãƒ£ãƒ«ã‚»ã‚¤ãƒãƒ¼', 'é‹è³ƒ5 (50%) åŒ…æ‹¬æ—…è¡Œé‹è³ƒ', 'é‹è³ƒ6 (50%) ã‚¹ã‚«ã‚¤ãƒ¡ã‚¤ãƒˆç­‰'],
+    'ANA': ['é‹è³ƒ1 (150%) ãƒ—ãƒ¬ãƒŸã‚¢ãƒ é‹è³ƒ', 'é‹è³ƒ2 (125%) ãƒ—ãƒ¬ãƒŸã‚¢ãƒ å°å…', 'é‹è³ƒ3 (100%) ç‰‡é“ãƒ»å¾€å¾©', 'é‹è³ƒ4 (100%) ãƒ“ã‚¸ãƒã‚¹', 'é‹è³ƒ5 (75%) ç‰¹å‰²A', 'é‹è³ƒ6 (75%) ç‰¹å‰²B', 'é‹è³ƒ7 (75%) ç‰¹å‰²C', 'é‹è³ƒ8 (50%) ã„ã£ã—ã‚‡ã«ãƒžã‚¤ãƒ«å‰²', 'é‹è³ƒ9 (150%) ãƒ—ãƒ¬ãƒŸã‚¢ãƒ æ ªä¸»', 'é‹è³ƒ10 (100%) æ™®é€šæ ªä¸»', 'é‹è³ƒ11 (70%) ç‰¹å‰²ãƒ—ãƒ©ã‚¹', 'é‹è³ƒ12 (50%) ã‚¹ãƒžãƒ¼ãƒˆã‚·ãƒ‹ã‚¢', 'é‹è³ƒ13 (30%) å€‹äººåŒ…æ‹¬'],
   };
-  final Map<String, List<String>> seatClassesByAirline = {'JAL': ['普通席', 'クラスJ', 'ファーストクラス'], 'ANA': ['普通席', 'プレミアムクラス']};
+  final Map<String, List<String>> seatClassesByAirline = {'JAL': ['æ™®é€šå¸­', 'ã‚¯ãƒ©ã‚¹J', 'ãƒ•ã‚¡ãƒ¼ã‚¹ãƒˆã‚¯ãƒ©ã‚¹'], 'ANA': ['æ™®é€šå¸­', 'ãƒ—ãƒ¬ãƒŸã‚¢ãƒ ã‚¯ãƒ©ã‚¹']};
 
-  // JAL搭乗ボーナスFOP（運賃種別で決定）
-  final Map<String, int> jalBonusFOP = {'運賃1': 400, '運賃2': 400, '運賃3': 200, '運賃4': 200, '運賃5': 0, '運賃6': 0};
+  // JALæ­ä¹—ãƒœãƒ¼ãƒŠã‚¹FOPï¼ˆé‹è³ƒç¨®åˆ¥ã§æ±ºå®šï¼‰
+  final Map<String, int> jalBonusFOP = {'é‹è³ƒ1': 400, 'é‹è³ƒ2': 400, 'é‹è³ƒ3': 200, 'é‹è³ƒ4': 200, 'é‹è³ƒ5': 0, 'é‹è³ƒ6': 0};
   
-  // ANA搭乗ポイント（運賃種別で決定）
-  final Map<String, int> anaBonusPoint = {'運賃1': 400, '運賃2': 400, '運賃3': 400, '運賃4': 0, '運賃5': 400, '運賃6': 200, '運賃7': 0, '運賃8': 0, '運賃9': 0, '運賃10': 0, '運賃11': 0, '運賃12': 0, '運賃13': 0};
+  // ANAæ­ä¹—ãƒã‚¤ãƒ³ãƒˆï¼ˆé‹è³ƒç¨®åˆ¥ã§æ±ºå®šï¼‰
+  final Map<String, int> anaBonusPoint = {'é‹è³ƒ1': 400, 'é‹è³ƒ2': 400, 'é‹è³ƒ3': 400, 'é‹è³ƒ4': 0, 'é‹è³ƒ5': 400, 'é‹è³ƒ6': 200, 'é‹è³ƒ7': 0, 'é‹è³ƒ8': 0, 'é‹è³ƒ9': 0, 'é‹è³ƒ10': 0, 'é‹è³ƒ11': 0, 'é‹è³ƒ12': 0, 'é‹è³ƒ13': 0};
 
   @override
   void initState() {
     super.initState();
-    _initAirlineAirports(); // 就航空港を初期化
+    _initAirlineAirports(); // å°±èˆªç©ºæ¸¯ã‚’åˆæœŸåŒ–
     _addLeg();
   }
 
-  // 追加: 両航空会社の就航空港を初期化
+  // è¿½åŠ : ä¸¡èˆªç©ºä¼šç¤¾ã®å°±èˆªç©ºæ¸¯ã‚’åˆæœŸåŒ–
   Future<void> _initAirlineAirports() async {
     await _fetchAirlineAirports('JAL');
     await _fetchAirlineAirports('ANA');
   }
 
-  // 追加: 航空会社別の就航空港を取得
+  // è¿½åŠ : èˆªç©ºä¼šç¤¾åˆ¥ã®å°±èˆªç©ºæ¸¯ã‚’å–å¾—
   Future<List<String>> _fetchAirlineAirports(String airline) async {
     if (airlineAirports.containsKey(airline)) {
       return airlineAirports[airline]!;
@@ -197,7 +119,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       setState(() => airlineAirports[airline] = codes);
       return codes;
     } catch (e) {
-      return airports; // フォールバック
+      return airports; // ãƒ•ã‚©ãƒ¼ãƒ«ãƒãƒƒã‚¯
     }
   }
 
@@ -227,7 +149,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       date = dateControllers[prevLegId]?.text ?? '';
     }
     dateControllers[legId]?.text = date;
-    // LSP追加: 'calculatedLSP': null
+    // LSPè¿½åŠ : 'calculatedLSP': null
     setState(() { legs.add({'id': legId, 'airline': airline, 'departureAirport': departureAirport, 'arrivalAirport': arrivalAirport, 'fareType': '', 'seatClass': '', 'calculatedFOP': null, 'calculatedMiles': null, 'calculatedLSP': null}); });
     if (departureAirport.isNotEmpty) _fetchAvailableFlights(legs.length - 1);
   }
@@ -236,13 +158,13 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     final legId = legs[index]['id'] as int;
     dateControllers[legId]?.dispose(); flightNumberControllers[legId]?.dispose(); departureTimeControllers[legId]?.dispose(); arrivalTimeControllers[legId]?.dispose(); fareAmountControllers[legId]?.dispose();
     dateControllers.remove(legId); flightNumberControllers.remove(legId); departureTimeControllers.remove(legId); arrivalTimeControllers.remove(legId); fareAmountControllers.remove(legId);
-    availableFlights.remove(legId); availableDestinations.remove(legId); legErrorMessages.remove(legId);
+    availableFlights.remove(legId); availableDestinations.remove(legId);
     setState(() => legs.removeAt(index));
   }
 
   void _clearFlightInfo(int index, int legId) {
-    // LSP追加: 'calculatedLSP': null
-    setState(() { legs[index]['departureAirport'] = ''; legs[index]['arrivalAirport'] = ''; legs[index]['calculatedFOP'] = null; legs[index]['calculatedMiles'] = null; legs[index]['calculatedLSP'] = null; availableFlights[legId] = []; availableDestinations[legId] = []; legErrorMessages[legId] = null; });
+    // LSPè¿½åŠ : 'calculatedLSP': null
+    setState(() { legs[index]['departureAirport'] = ''; legs[index]['arrivalAirport'] = ''; legs[index]['calculatedFOP'] = null; legs[index]['calculatedMiles'] = null; legs[index]['calculatedLSP'] = null; availableFlights[legId] = []; availableDestinations[legId] = []; });
     flightNumberControllers[legId]?.text = ''; departureTimeControllers[legId]?.text = ''; arrivalTimeControllers[legId]?.text = '';
   }
 
@@ -269,7 +191,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
 
   Future<Map<String, dynamic>?> _fetchScheduleByFlightNumber(String airline, String flightNumber, String date) async {
     try {
-      // 日付未入力なら今日の日付を使用
+      // æ—¥ä»˜æœªå…¥åŠ›ãªã‚‰ä»Šæ—¥ã®æ—¥ä»˜ã‚’ä½¿ç”¨
       final targetDate = date.isEmpty 
           ? DateTime.now().toIso8601String().substring(0, 10)
           : date.replaceAll('/', '-');
@@ -290,41 +212,41 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     final airline = legs[index]['airline'] as String;
     final flightNumber = flightNumberControllers[legId]?.text ?? '';
     final date = dateControllers[legId]?.text ?? '';
-    if (flightNumber.isEmpty) { setState(() => legErrorMessages[legId] = '便名を入力してください'); return; }
+    if (flightNumber.isEmpty) { setState(() => errorMessage = 'ä¾¿åã‚’å…¥åŠ›ã—ã¦ãã ã•ã„'); return; }
     final schedule = await _fetchScheduleByFlightNumber(airline, flightNumber, date);
     if (schedule != null) {
       String depTime = schedule['departure_time'] ?? ''; String arrTime = schedule['arrival_time'] ?? '';
       if (depTime.length > 5) depTime = depTime.substring(0, 5); if (arrTime.length > 5) arrTime = arrTime.substring(0, 5);
       final depCode = schedule['departure_code'] as String; final arrCode = schedule['arrival_code'] as String;
       final remarks = schedule['remarks'] as String? ?? '';
-      setState(() { legs[index]['departureAirport'] = depCode; legs[index]['arrivalAirport'] = arrCode; legErrorMessages[legId] = null; });
+      setState(() { legs[index]['departureAirport'] = depCode; legs[index]['arrivalAirport'] = arrCode; errorMessage = null; });
       departureTimeControllers[legId]?.text = depTime; arrivalTimeControllers[legId]?.text = arrTime;
-      // remarks警告表示
+      // remarksè­¦å‘Šè¡¨ç¤º
       if (remarks.isNotEmpty) {
-        setState(() => legErrorMessages[legId] = '⚠️ 一部期間で時刻変更あり。公式サイトで確認してください。');
+        setState(() => errorMessage = 'âš ï¸ ä¸€éƒ¨æœŸé–“ã§æ™‚åˆ»å¤‰æ›´ã‚ã‚Šã€‚å…¬å¼ã‚µã‚¤ãƒˆã§ç¢ºèªã—ã¦ãã ã•ã„ã€‚');
       }
       await _fetchAvailableFlights(index);
       if (index + 1 < legs.length) _fetchAvailableFlights(index + 1);
       _calculateSingleLeg(index);
-    } else { setState(() => legErrorMessages[legId] = '$flightNumber便が見つかりません'); }
+    } else { setState(() => errorMessage = '$flightNumberä¾¿ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“'); }
   }
 
   Future<void> _fetchAvailableFlights(int index) async {
     final leg = legs[index]; final legId = leg['id'] as int; final airline = leg['airline'] as String;
-    final departure = leg['departureAirport'] as String;
+    final departure = leg['departureAirport'] as String; final arrival = leg['arrivalAirport'] as String;
     if (departure.isEmpty) { setState(() { availableFlights[legId] = []; availableDestinations[legId] = []; }); return; }
     try {
-      // 到着地フィルタなしで全便取得（到着地候補を表示するため）
       var query = Supabase.instance.client.from('schedules').select().eq('airline_code', airline).eq('departure_code', departure).eq('is_active', true);
+      if (arrival.isNotEmpty) query = query.eq('arrival_code', arrival);
       final response = await query.order('departure_time');
       List<Map<String, dynamic>> flights = (response as List).cast<Map<String, dynamic>>();
       
-      // 修正1: 重複除去（出発時刻+到着地でユニーク化、便名は無視）
+      // ä¿®æ­£1: é‡è¤‡é™¤åŽ»ï¼ˆä¾¿å+å‡ºç™ºæ™‚åˆ»+åˆ°ç€åœ°ã§ãƒ¦ãƒ‹ãƒ¼ã‚¯åŒ–ï¼‰
       final seen = <String>{};
       flights = flights.where((flight) {
         String depTime = flight['departure_time'] ?? '';
         if (depTime.length > 5) depTime = depTime.substring(0, 5);
-        final key = '${depTime}_${flight['arrival_code']}';
+        final key = '${flight['flight_number']}_${depTime}_${flight['arrival_code']}';
         if (seen.contains(key)) return false;
         seen.add(key);
         return true;
@@ -338,9 +260,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
           flights = flights.where((flight) { String depTime = flight['departure_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); return _isTimeAfterOrEqual(depTime, minDepartureTime); }).toList();
         }
       }
-      // 到着地候補を空港リストの順番でソート（主要空港→北から順）
-      final destinationSet = flights.map((f) => f['arrival_code'] as String).toSet();
-      final destinations = airports.where((code) => destinationSet.contains(code)).toList();
+      final destinations = flights.map((f) => f['arrival_code'] as String).toSet().toList(); destinations.sort();
       setState(() { availableFlights[legId] = flights; availableDestinations[legId] = destinations; });
     } catch (e) { setState(() { availableFlights[legId] = []; availableDestinations[legId] = []; }); }
   }
@@ -355,82 +275,82 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       if (routeData == null) return;
       final distance = routeData['distance_miles'] as int;
 
-      // 運賃種別名から積算率を抽出
+      // é‹è³ƒç¨®åˆ¥åã‹ã‚‰ç©ç®—çŽ‡ã‚’æŠ½å‡º
       double fareRate = 1.0;
       final rateMatch = RegExp(r'\((\d+)%\)').firstMatch(fare);
       if (rateMatch != null) fareRate = int.parse(rateMatch.group(1)!) / 100.0;
 
-      // 運賃番号を抽出（例: "運賃1 (100%)" → "運賃1"）
+      // é‹è³ƒç•ªå·ã‚’æŠ½å‡ºï¼ˆä¾‹: "é‹è³ƒ1 (100%)" â†’ "é‹è³ƒ1"ï¼‰
       final fareNumber = fare.split(' ').first;
 
       int totalPoints = 0;
       int totalMiles = 0;
-      int totalLSP = 0; // LSP追加
+      int totalLSP = 0; // LSPè¿½åŠ 
 
       if (airline == 'JAL') {
-        // === JAL計算 ===
-        // 座席ボーナス率
-        final seatBonusRate = {'普通席': 0.0, 'クラスJ': 0.1, 'ファーストクラス': 0.5}[seat] ?? 0.0;
+        // === JALè¨ˆç®— ===
+        // åº§å¸­ãƒœãƒ¼ãƒŠã‚¹çŽ‡
+        final seatBonusRate = {'æ™®é€šå¸­': 0.0, 'ã‚¯ãƒ©ã‚¹J': 0.1, 'ãƒ•ã‚¡ãƒ¼ã‚¹ãƒˆã‚¯ãƒ©ã‚¹': 0.5}[seat] ?? 0.0;
         
-        // JALカードツアープレミアム適用時、運賃4,5は積算率100%
+        // JALã‚«ãƒ¼ãƒ‰ãƒ„ã‚¢ãƒ¼ãƒ—ãƒ¬ãƒŸã‚¢ãƒ é©ç”¨æ™‚ã€é‹è³ƒ4,5ã¯ç©ç®—çŽ‡100%
         double effectiveFareRate = fareRate;
-        if (jalTourPremium && (fareNumber == '運賃4' || fareNumber == '運賃5')) {
+        if (jalTourPremium && (fareNumber == 'é‹è³ƒ4' || fareNumber == 'é‹è³ƒ5')) {
           effectiveFareRate = 1.0;
         }
 
-        // フライトマイル = round(区間マイル × (積算率 + 座席ボーナス率))
+        // ãƒ•ãƒ©ã‚¤ãƒˆãƒžã‚¤ãƒ« = round(åŒºé–“ãƒžã‚¤ãƒ« Ã— (ç©ç®—çŽ‡ + åº§å¸­ãƒœãƒ¼ãƒŠã‚¹çŽ‡))
         final flightMiles = (distance * (effectiveFareRate + seatBonusRate)).round();
 
-        // ステータスボーナス率
-        final statusBonusRate = {'-': 0.0, 'JMBダイヤモンド': 1.30, 'JMBサファイア': 1.05, 'JMBクリスタル': 0.55}[selectedJALStatus ?? '-'] ?? 0.0;
+        // ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹ãƒœãƒ¼ãƒŠã‚¹çŽ‡
+        final statusBonusRate = {'-': 0.0, 'JMBãƒ€ã‚¤ãƒ¤ãƒ¢ãƒ³ãƒ‰': 1.30, 'JMBã‚µãƒ•ã‚¡ã‚¤ã‚¢': 1.05, 'JMBã‚¯ãƒªã‚¹ã‚¿ãƒ«': 0.55}[selectedJALStatus ?? '-'] ?? 0.0;
 
-        // マイルUPボーナス = round(フライトマイル × ステータスボーナス率)
+        // ãƒžã‚¤ãƒ«UPãƒœãƒ¼ãƒŠã‚¹ = round(ãƒ•ãƒ©ã‚¤ãƒˆãƒžã‚¤ãƒ« Ã— ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹ãƒœãƒ¼ãƒŠã‚¹çŽ‡)
         final mileUpBonus = (flightMiles * statusBonusRate).round();
 
-        // 合計マイル
+        // åˆè¨ˆãƒžã‚¤ãƒ«
         totalMiles = flightMiles + mileUpBonus;
 
-        // 搭乗ボーナスFOP（運賃種別で決定）
+        // æ­ä¹—ãƒœãƒ¼ãƒŠã‚¹FOPï¼ˆé‹è³ƒç¨®åˆ¥ã§æ±ºå®šï¼‰
         final bonusFOP = jalBonusFOP[fareNumber] ?? 0;
 
-        // FOP = (フライトマイル × 2) + 搭乗ボーナス
+        // FOP = (ãƒ•ãƒ©ã‚¤ãƒˆãƒžã‚¤ãƒ« Ã— 2) + æ­ä¹—ãƒœãƒ¼ãƒŠã‚¹
         totalPoints = (flightMiles * 2) + bonusFOP;
 
-        // LSP計算: 国内線で積算率50%以上なら5LSP、それ以外は0
-        // 将来の国際線対応: isDomestic ? 5 : (miles ~/ 1000) * 5
+        // LSPè¨ˆç®—: å›½å†…ç·šã§ç©ç®—çŽ‡50%ä»¥ä¸Šãªã‚‰5LSPã€ãã‚Œä»¥å¤–ã¯0
+        // å°†æ¥ã®å›½éš›ç·šå¯¾å¿œ: isDomestic ? 5 : (miles ~/ 1000) * 5
         totalLSP = (fareRate >= 0.5) ? 5 : 0;
 
       } else {
-        // === ANA計算 ===
-        // フライトマイル = int(区間マイル × 積算率)
+        // === ANAè¨ˆç®— ===
+        // ãƒ•ãƒ©ã‚¤ãƒˆãƒžã‚¤ãƒ« = int(åŒºé–“ãƒžã‚¤ãƒ« Ã— ç©ç®—çŽ‡)
         final flightMiles = (distance * fareRate).toInt();
 
-        // カードボーナス率
-        final cardBonusRate = {'-': 0.0, 'AMCカード(提携カード含む)': 0.0, 'ANAカード 一般': 0.10, 'ANAカード 学生用': 0.10, 'ANAカード ワイド': 0.25, 'ANAカード ゴールド': 0.25, 'ANAカード プレミアム': 0.50, 'SFC 一般': 0.35, 'SFC ゴールド': 0.40, 'SFC プレミアム': 0.50}[selectedANACard ?? '-'] ?? 0.0;
+        // ã‚«ãƒ¼ãƒ‰ãƒœãƒ¼ãƒŠã‚¹çŽ‡
+        final cardBonusRate = {'-': 0.0, 'AMCã‚«ãƒ¼ãƒ‰(ææºã‚«ãƒ¼ãƒ‰å«ã‚€)': 0.0, 'ANAã‚«ãƒ¼ãƒ‰ ä¸€èˆ¬': 0.10, 'ANAã‚«ãƒ¼ãƒ‰ å­¦ç”Ÿç”¨': 0.10, 'ANAã‚«ãƒ¼ãƒ‰ ãƒ¯ã‚¤ãƒ‰': 0.25, 'ANAã‚«ãƒ¼ãƒ‰ ã‚´ãƒ¼ãƒ«ãƒ‰': 0.25, 'ANAã‚«ãƒ¼ãƒ‰ ãƒ—ãƒ¬ãƒŸã‚¢ãƒ ': 0.50, 'SFC ä¸€èˆ¬': 0.35, 'SFC ã‚´ãƒ¼ãƒ«ãƒ‰': 0.40, 'SFC ãƒ—ãƒ¬ãƒŸã‚¢ãƒ ': 0.50}[selectedANACard ?? '-'] ?? 0.0;
 
-        // ステータスボーナス率
-        final statusBonusRate = {'-': 0.0, 'ダイヤモンド(1年目)': 1.15, 'ダイヤモンド(継続2年以上)': 1.25, 'プラチナ(1年目)': 0.90, 'プラチナ(継続2年以上)': 1.00, 'ブロンズ(1年目)': 0.40, 'ブロンズ(継続2年以上)': 0.50}[selectedANAStatus ?? '-'] ?? 0.0;
+        // ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹ãƒœãƒ¼ãƒŠã‚¹çŽ‡
+        final statusBonusRate = {'-': 0.0, 'ãƒ€ã‚¤ãƒ¤ãƒ¢ãƒ³ãƒ‰(1å¹´ç›®)': 1.15, 'ãƒ€ã‚¤ãƒ¤ãƒ¢ãƒ³ãƒ‰(ç¶™ç¶š2å¹´ä»¥ä¸Š)': 1.25, 'ãƒ—ãƒ©ãƒãƒŠ(1å¹´ç›®)': 0.90, 'ãƒ—ãƒ©ãƒãƒŠ(ç¶™ç¶š2å¹´ä»¥ä¸Š)': 1.00, 'ãƒ–ãƒ­ãƒ³ã‚º(1å¹´ç›®)': 0.40, 'ãƒ–ãƒ­ãƒ³ã‚º(ç¶™ç¶š2å¹´ä»¥ä¸Š)': 0.50}[selectedANAStatus ?? '-'] ?? 0.0;
 
-        // 適用ボーナス率 = max(カードボーナス率, ステータスボーナス率)
+        // é©ç”¨ãƒœãƒ¼ãƒŠã‚¹çŽ‡ = max(ã‚«ãƒ¼ãƒ‰ãƒœãƒ¼ãƒŠã‚¹çŽ‡, ã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹ãƒœãƒ¼ãƒŠã‚¹çŽ‡)
         final effectiveBonusRate = cardBonusRate > statusBonusRate ? cardBonusRate : statusBonusRate;
 
-        // マイルUPボーナス = int(フライトマイル × 適用ボーナス率)
+        // ãƒžã‚¤ãƒ«UPãƒœãƒ¼ãƒŠã‚¹ = int(ãƒ•ãƒ©ã‚¤ãƒˆãƒžã‚¤ãƒ« Ã— é©ç”¨ãƒœãƒ¼ãƒŠã‚¹çŽ‡)
         final mileUpBonus = (flightMiles * effectiveBonusRate).toInt();
 
-        // 合計マイル
+        // åˆè¨ˆãƒžã‚¤ãƒ«
         totalMiles = flightMiles + mileUpBonus;
 
-        // 搭乗ポイント（運賃種別で決定）
+        // æ­ä¹—ãƒã‚¤ãƒ³ãƒˆï¼ˆé‹è³ƒç¨®åˆ¥ã§æ±ºå®šï¼‰
         final bonusPoint = anaBonusPoint[fareNumber] ?? 0;
 
-        // PP = int((区間マイル × 積算率 × 2) + 搭乗ポイント)
+        // PP = int((åŒºé–“ãƒžã‚¤ãƒ« Ã— ç©ç®—çŽ‡ Ã— 2) + æ­ä¹—ãƒã‚¤ãƒ³ãƒˆ)
         totalPoints = ((distance * fareRate * 2) + bonusPoint).toInt();
         
-        // ANAはLSP対象外
+        // ANAã¯LSPå¯¾è±¡å¤–
         totalLSP = 0;
       }
 
-      // LSP追加: calculatedLSPをstateに格納
+      // LSPè¿½åŠ : calculatedLSPã‚’stateã«æ ¼ç´
       setState(() { legs[index]['calculatedFOP'] = totalPoints; legs[index]['calculatedMiles'] = totalMiles; legs[index]['calculatedLSP'] = totalLSP; });
     } catch (e) {}
   }
@@ -447,39 +367,39 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
 
   int get jalFOP => legs.where((leg) => leg['airline'] == 'JAL').fold<int>(0, (sum, leg) => sum + ((leg['calculatedFOP'] as int?) ?? 0));
   int get jalMiles => legs.where((leg) => leg['airline'] == 'JAL').fold<int>(0, (sum, leg) => sum + ((leg['calculatedMiles'] as int?) ?? 0));
-  int get jalFlightLSP => legs.where((leg) => leg['airline'] == 'JAL').fold<int>(0, (sum, leg) => sum + ((leg['calculatedLSP'] as int?) ?? 0)); // フライトLSP
+  int get jalFlightLSP => legs.where((leg) => leg['airline'] == 'JAL').fold<int>(0, (sum, leg) => sum + ((leg['calculatedLSP'] as int?) ?? 0)); // ãƒ•ãƒ©ã‚¤ãƒˆLSP
   
-  // ショッピングマイルプレミアム自動入会カード判定（チェック強制＆グレーアウト）
+  // ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°ãƒžã‚¤ãƒ«ãƒ—ãƒ¬ãƒŸã‚¢ãƒ è‡ªå‹•å…¥ä¼šã‚«ãƒ¼ãƒ‰åˆ¤å®šï¼ˆãƒã‚§ãƒƒã‚¯å¼·åˆ¶ï¼†ã‚°ãƒ¬ãƒ¼ã‚¢ã‚¦ãƒˆï¼‰
   bool get isAutoShoppingMilePremium {
     final card = selectedJALCard ?? '-';
-    return card.contains('ゴールド') || card.contains('プラチナ') || card.contains('JAL CLUB EST') || card == 'JALカードNAVI会員';
+    return card.contains('ã‚´ãƒ¼ãƒ«ãƒ‰') || card.contains('ãƒ—ãƒ©ãƒãƒŠ') || card.contains('JAL CLUB EST') || card == 'JALã‚«ãƒ¼ãƒ‰NAVIä¼šå“¡';
   }
   
-  // ショッピングマイル対象カード判定（JMB会員以外のJALカード）
+  // ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°ãƒžã‚¤ãƒ«å¯¾è±¡ã‚«ãƒ¼ãƒ‰åˆ¤å®šï¼ˆJMBä¼šå“¡ä»¥å¤–ã®JALã‚«ãƒ¼ãƒ‰ï¼‰
   bool get isShoppingMileEligible {
     final card = selectedJALCard ?? '-';
-    return card != '-' && card != 'JMB会員';
+    return card != '-' && card != 'JMBä¼šå“¡';
   }
   
-  // ショッピングマイルプレミアム有効判定（自動入会 or ユーザーチェック）
+  // ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°ãƒžã‚¤ãƒ«ãƒ—ãƒ¬ãƒŸã‚¢ãƒ æœ‰åŠ¹åˆ¤å®šï¼ˆè‡ªå‹•å…¥ä¼š or ãƒ¦ãƒ¼ã‚¶ãƒ¼ãƒã‚§ãƒƒã‚¯ï¼‰
   bool get isShoppingMilePremiumActive {
     return isAutoShoppingMilePremium || jalShoppingMilePremium;
   }
   
-  // ショッピングマイル計算（総額から）
+  // ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°ãƒžã‚¤ãƒ«è¨ˆç®—ï¼ˆç·é¡ã‹ã‚‰ï¼‰
   int get jalShoppingMiles {
     if (!isShoppingMileEligible) return 0;
     if (isShoppingMilePremiumActive) {
-      return jalFare ~/ 100; // 100円=1マイル
+      return jalFare ~/ 100; // 100å††=1ãƒžã‚¤ãƒ«
     } else {
-      return jalFare ~/ 200; // 200円=1マイル
+      return jalFare ~/ 200; // 200å††=1ãƒžã‚¤ãƒ«
     }
   }
   
-  // ショッピングLSP（2,000マイルごとに5 LSP）
+  // ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°LSPï¼ˆ2,000ãƒžã‚¤ãƒ«ã”ã¨ã«5 LSPï¼‰
   int get jalShoppingLSP => (jalShoppingMiles ~/ 2000) * 5;
   
-  // 合計LSP（フライト + ショッピング）
+  // åˆè¨ˆLSPï¼ˆãƒ•ãƒ©ã‚¤ãƒˆ + ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°ï¼‰
   int get jalTotalLSP => jalFlightLSP + jalShoppingLSP;
   
   int get jalCount => legs.where((leg) => leg['airline'] == 'JAL' && leg['calculatedFOP'] != null).length;
@@ -501,13 +421,13 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
           width: double.infinity, padding: const EdgeInsets.all(10), margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey[300]!)),
           child: Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            _buildCompactDropdown('JALカード', 150, selectedJALCard, jalCardTypes, Colors.red, _onJALCardChanged),
-            // JALカードツアープレミアム & ショッピングマイルプレミアム チェックボックス（縦並び）
+            _buildCompactDropdown('JALã‚«ãƒ¼ãƒ‰', 150, selectedJALCard, jalCardTypes, Colors.red, _onJALCardChanged),
+            // JALã‚«ãƒ¼ãƒ‰ãƒ„ã‚¢ãƒ¼ãƒ—ãƒ¬ãƒŸã‚¢ãƒ  & ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°ãƒžã‚¤ãƒ«ãƒ—ãƒ¬ãƒŸã‚¢ãƒ  ãƒã‚§ãƒƒã‚¯ãƒœãƒƒã‚¯ã‚¹ï¼ˆç¸¦ä¸¦ã³ï¼‰
             Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisSize: MainAxisSize.min, children: [
                 SizedBox(width: 18, height: 18, child: Checkbox(value: jalTourPremium, onChanged: _onJALTourPremiumChanged, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap)),
                 const SizedBox(width: 4),
-                const Text('ツアープレミアム', style: TextStyle(fontSize: 9, color: Colors.red)),
+                const Text('ãƒ„ã‚¢ãƒ¼ãƒ—ãƒ¬ãƒŸã‚¢ãƒ ', style: TextStyle(fontSize: 9, color: Colors.red)),
               ]),
               const SizedBox(height: 2),
               Row(mainAxisSize: MainAxisSize.min, children: [
@@ -517,27 +437,28 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 )),
                 const SizedBox(width: 4),
-                Text('ショッピングマイルP', style: TextStyle(fontSize: 9, color: isAutoShoppingMilePremium ? Colors.grey : Colors.red)),
+                Text('ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°ãƒžã‚¤ãƒ«P', style: TextStyle(fontSize: 9, color: isAutoShoppingMilePremium ? Colors.grey : Colors.red)),
               ]),
             ]),
-            _buildCompactDropdown('JALステータス', 120, selectedJALStatus, jalStatusTypes, Colors.red, _onJALStatusChanged),
+            _buildCompactDropdown('JALã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹', 120, selectedJALStatus, jalStatusTypes, Colors.red, _onJALStatusChanged),
             _buildMiniStat('FOP', _formatNumber(jalFOP), Colors.red),
-            _buildMiniStat('マイル', _formatNumber(jalMiles), Colors.red),
-            _buildMiniStat('LSP', '${_formatNumber(jalFlightLSP)}+${_formatNumber(jalShoppingLSP)}', Colors.red), // フライト+ショッピング
-            _buildMiniStat('レグ', '$jalCount', Colors.red),
-            _buildMiniStat('総額', jalFare > 0 ? '¥${_formatNumber(jalFare)}' : '-', Colors.red),
-            _buildMiniStat('単価', jalUnitPrice != '-' ? '¥$jalUnitPrice' : '-', Colors.red),
+            _buildMiniStat('ãƒžã‚¤ãƒ«', _formatNumber(jalMiles), Colors.red),
+            _buildMiniStat('LSP', '${_formatNumber(jalFlightLSP)}+${_formatNumber(jalShoppingLSP)}', Colors.red), // ãƒ•ãƒ©ã‚¤ãƒˆ+ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°
+            _buildMiniStat('ãƒ¬ã‚°', '$jalCount', Colors.red),
+            _buildMiniStat('ç·é¡', jalFare > 0 ? 'Â¥${_formatNumber(jalFare)}' : '-', Colors.red),
+            _buildMiniStat('å˜ä¾¡', jalUnitPrice != '-' ? 'Â¥$jalUnitPrice' : '-', Colors.red),
             Container(width: 1, height: 36, color: Colors.grey[300]),
-            _buildCompactDropdown('ANAカード', 150, selectedANACard, anaCardTypes, Colors.blue, _onANACardChanged),
-            _buildCompactDropdown('ANAステータス', 140, selectedANAStatus, anaStatusTypes, Colors.blue, _onANAStatusChanged),
+            _buildCompactDropdown('ANAã‚«ãƒ¼ãƒ‰', 150, selectedANACard, anaCardTypes, Colors.blue, _onANACardChanged),
+            _buildCompactDropdown('ANAã‚¹ãƒ†ãƒ¼ã‚¿ã‚¹', 140, selectedANAStatus, anaStatusTypes, Colors.blue, _onANAStatusChanged),
             _buildMiniStat('PP', _formatNumber(anaPP), Colors.blue),
-            _buildMiniStat('マイル', _formatNumber(anaMiles), Colors.blue),
-            _buildMiniStat('レグ', '$anaCount', Colors.blue),
-            _buildMiniStat('総額', anaFare > 0 ? '¥${_formatNumber(anaFare)}' : '-', Colors.blue),
-            _buildMiniStat('単価', anaUnitPrice != '-' ? '¥$anaUnitPrice' : '-', Colors.blue),
+            _buildMiniStat('ãƒžã‚¤ãƒ«', _formatNumber(anaMiles), Colors.blue),
+            _buildMiniStat('ãƒ¬ã‚°', '$anaCount', Colors.blue),
+            _buildMiniStat('ç·é¡', anaFare > 0 ? 'Â¥${_formatNumber(anaFare)}' : '-', Colors.blue),
+            _buildMiniStat('å˜ä¾¡', anaUnitPrice != '-' ? 'Â¥$anaUnitPrice' : '-', Colors.blue),
           ]),
         ),
         ...legs.asMap().entries.map((e) => _buildLegCard(context, e.value, e.key)),
+        if (errorMessage != null) Text(errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 14)),
       ]),
     );
   }
@@ -548,7 +469,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       const SizedBox(height: 2),
       Container(height: 26, decoration: BoxDecoration(border: Border.all(color: labelColor.withOpacity(0.3)), borderRadius: BorderRadius.circular(4)),
         child: DropdownButton<String>(value: value, isExpanded: true, underline: const SizedBox(), icon: Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey[600]), menuWidth: width + 100,
-          hint: Padding(padding: const EdgeInsets.only(left: 4), child: Text('選択', style: TextStyle(fontSize: 10, color: Colors.grey[600]))),
+          hint: Padding(padding: const EdgeInsets.only(left: 4), child: Text('é¸æŠž', style: TextStyle(fontSize: 10, color: Colors.grey[600]))),
           selectedItemBuilder: (context) => items.map((e) => Padding(padding: const EdgeInsets.only(left: 4), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10, color: Colors.black), overflow: TextOverflow.ellipsis)))).toList(),
           items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10, color: Colors.black)))).toList(),
           onChanged: onChanged,
@@ -574,20 +495,17 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: airlineColor, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: airlineColor, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 1行目: FOP/PP
-          Text('$pointLabel: ${_formatNumber(fop)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
-          // 2行目: マイル
-          Text('マイル: ${_formatNumber(miles ?? 0)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
-          // 3行目: LSP（JALのみ）
+          // JALã®å ´åˆã¯LSPã‚‚è¡¨ç¤º
           if (airline == 'JAL')
-            Text('LSP: ${lsp ?? 0}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
-          // 単価（運賃入力時のみ）
-          if (fare > 0) Text('単価: ¥$unitPrice', style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 10)),
+            Text('$pointLabel: $fop  ãƒžã‚¤ãƒ«: $miles  LSP: ${lsp ?? 0}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11))
+          else
+            Text('$pointLabel: $fop  ãƒžã‚¤ãƒ«: $miles', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+          if (fare > 0) Text('å˜ä¾¡: Â¥$unitPrice/$pointLabel', style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 10)),
         ],
       ),
     );
@@ -596,24 +514,20 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   Widget _buildLegCard(BuildContext context, Map<String, dynamic> leg, int index) {
     final legId = leg['id'] as int; final airline = leg['airline'] as String;
     final fop = leg['calculatedFOP'] as int?; final miles = leg['calculatedMiles'] as int?;
-    final lsp = leg['calculatedLSP'] as int?; // LSP追加
+    final lsp = leg['calculatedLSP'] as int?; // LSPè¿½åŠ 
     final airlineColor = airline == 'JAL' ? Colors.red : Colors.blue;
-    final legError = legErrorMessages[legId]; // レグ別エラーメッセージ
     return Container(
       margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: airlineColor.withOpacity(0.3)), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          if (legError != null) Expanded(child: Text(legError, style: const TextStyle(color: Colors.orange, fontSize: 11)))
-          else const Expanded(child: SizedBox()),
-          TextButton.icon(onPressed: _addLeg, icon: const Icon(Icons.add, size: 16), label: const Text('レグ追加'), style: TextButton.styleFrom(foregroundColor: Colors.grey[600], padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), textStyle: const TextStyle(fontSize: 12))),
-          TextButton.icon(onPressed: () {}, icon: const Icon(Icons.save_outlined, size: 16), label: const Text('履歴に保存'), style: TextButton.styleFrom(foregroundColor: Colors.grey[600], padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), textStyle: const TextStyle(fontSize: 12))),
-          TextButton(onPressed: () => _clearLeg(index, legId), child: Text('クリア', style: TextStyle(color: Colors.grey[600], fontSize: 12))),
-          if (legs.length > 1) IconButton(icon: Icon(Icons.delete_outline, size: 18, color: Colors.grey[600]), onPressed: () => _removeLeg(index), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+          TextButton(onPressed: () {}, child: Text('å®Œäº†', style: TextStyle(color: Colors.grey[600], fontSize: 12))),
+          TextButton(onPressed: () => _clearLeg(index, legId), child: Text('ã‚¯ãƒªã‚¢', style: TextStyle(color: Colors.grey[600], fontSize: 12))),
+          if (legs.length > 1) IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => _removeLeg(index), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
         ]),
         SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
           _buildAirlineDropdown(leg, legId, index), const SizedBox(width: 8),
-          _buildDatePicker('日付', 130, dateControllers[legId]!, context), const SizedBox(width: 8),
+          _buildDatePicker('æ—¥ä»˜', 130, dateControllers[legId]!, context), const SizedBox(width: 8),
           _buildFlightNumberField(legId, index), const SizedBox(width: 8),
           _buildDepartureDropdown(leg, legId, index), const SizedBox(width: 4),
           Icon(Icons.swap_horiz, size: 16, color: Colors.grey[400]), const SizedBox(width: 4),
@@ -622,10 +536,14 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
           _buildArrivalTimeField(legId, index), const SizedBox(width: 8),
           _buildFareTypeDropdown(leg, legId, index), const SizedBox(width: 8),
           _buildSeatClassDropdown(leg, legId, index), const SizedBox(width: 8),
-          _buildTextField('運賃', 70, fareAmountControllers[legId]!, '15000', onChanged: (_) => setState(() {})), const SizedBox(width: 8),
-          // LSP追加: lspパラメータを追加
+          _buildTextField('é‹è³ƒ', 70, fareAmountControllers[legId]!, '15000', onChanged: (_) => setState(() {})), const SizedBox(width: 8),
+          // LSPè¿½åŠ : lspãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã‚’è¿½åŠ 
           if (fop != null) _buildPointsDisplay(airline, fop, miles, lsp, legId),
         ])),
+        const SizedBox(height: 8),
+        Row(children: [
+          ElevatedButton.icon(onPressed: _addLeg, icon: const Icon(Icons.add, size: 16), label: const Text('ãƒ¬ã‚°è¿½åŠ '), style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), textStyle: const TextStyle(fontSize: 12))),
+        ]),
       ]),
     );
   }
@@ -633,10 +551,10 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   Widget _buildAirlineDropdown(Map<String, dynamic> leg, int legId, int index) {
     final airline = leg['airline'] as String;
     return SizedBox(width: 60, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('航空会社', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+      const Text('èˆªç©ºä¼šç¤¾', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
         child: DropdownButton<String>(value: airline.isEmpty ? null : airline, isExpanded: true, underline: const SizedBox(),
-          hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 12))),
+          hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('é¸æŠž', style: TextStyle(fontSize: 12))),
           selectedItemBuilder: (context) => airlines.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: TextStyle(fontSize: 12, color: e == 'JAL' ? Colors.red : Colors.blue, fontWeight: FontWeight.bold))))).toList(),
           items: airlines.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: 12, color: e == 'JAL' ? Colors.red : Colors.blue, fontWeight: FontWeight.bold)))).toList(),
           onChanged: (v) { if (v != null && v != airline) { _clearFlightInfo(index, legId); setState(() { legs[index]['airline'] = v; legs[index]['fareType'] = ''; legs[index]['seatClass'] = ''; }); } },
@@ -645,169 +563,64 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     ]));
   }
 
-  // 修正2: 航空会社別就航空港のみ表示 + 3レターコード入力対応
+  // ä¿®æ­£2: èˆªç©ºä¼šç¤¾åˆ¥å°±èˆªç©ºæ¸¯ã®ã¿è¡¨ç¤º
   Widget _buildDepartureDropdown(Map<String, dynamic> leg, int legId, int index) {
     final airline = leg['airline'] as String;
     final departure = leg['departureAirport'] as String;
-    // 就航空港リストを取得（キャッシュがあればそれを使用）
+    // å°±èˆªç©ºæ¸¯ãƒªã‚¹ãƒˆã‚’å–å¾—ï¼ˆã‚­ãƒ£ãƒƒã‚·ãƒ¥ãŒã‚ã‚Œã°ãã‚Œã‚’ä½¿ç”¨ï¼‰
     final airportList = airlineAirports[airline] ?? airports;
-    
-    return SizedBox(width: 100, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('出発地', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+    final currentValue = departure.isEmpty ? null : departure;
+    final displayText = currentValue ?? 'é¸æŠž';
+    return SizedBox(width: 85, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('å‡ºç™ºåœ°', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: Autocomplete<String>(
-          initialValue: TextEditingValue(text: departure),
-          optionsBuilder: (textEditingValue) {
-            if (textEditingValue.text.isEmpty) {
-              return airportList;
+        child: DropdownButton<String>(key: ValueKey('departure_${legId}_$airline'), value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 180,
+          hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(displayText, style: const TextStyle(fontSize: 12))),
+          selectedItemBuilder: (context) => airportList.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e == '---' ? '' : e, style: const TextStyle(fontSize: 12))))).toList(),
+          items: airportList.map((e) {
+            if (e == '---') {
+              return DropdownMenuItem<String>(enabled: false, child: Divider(height: 1, color: Colors.grey[400]));
             }
-            final query = textEditingValue.text.toUpperCase();
-            return airportList.where((code) {
-              final name = airportNames[code] ?? '';
-              return code.contains(query) || name.contains(textEditingValue.text);
-            });
-          },
-          displayStringForOption: (code) => code,
-          optionsViewBuilder: (context, onSelected, options) {
-            return Align(
-              alignment: Alignment.topLeft,
-              child: Material(
-                elevation: 4,
-                child: Container(
-                  width: 150,
-                  constraints: const BoxConstraints(maxHeight: 200),
-                  child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    itemBuilder: (context, i) {
-                      final code = options.elementAt(i);
-                      return ListTile(
-                        dense: true,
-                        title: Text('$code ${airportNames[code] ?? ''}', style: const TextStyle(fontSize: 12)),
-                        onTap: () => onSelected(code),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            );
-          },
-          fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-            return TextField(
-              controller: controller,
-              focusNode: focusNode,
-              style: const TextStyle(fontSize: 12),
-              decoration: const InputDecoration(
-                hintText: '選択/入力',
-                isDense: true,
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              ),
-              onSubmitted: (_) => onFieldSubmitted(),
-            );
-          },
-          onSelected: (code) {
-            _clearFlightInfo(index, legId);
-            setState(() => legs[index]['departureAirport'] = code);
-            _fetchAvailableFlights(index);
-          },
+            return DropdownMenuItem(value: e, child: Text('$e ${airportNames[e] ?? ''}', style: const TextStyle(fontSize: 12)));
+          }).toList(),
+          onChanged: (v) { if (v != null && v != '---') { _clearFlightInfo(index, legId); setState(() => legs[index]['departureAirport'] = v); _fetchAvailableFlights(index); } },
         ),
       ),
     ]));
   }
 
-  // 修正3: 就航路線のみ表示 + 3レターコード入力対応
+  // ä¿®æ­£3: å°±èˆªè·¯ç·šã®ã¿è¡¨ç¤ºï¼ˆãƒ•ã‚©ãƒ¼ãƒ«ãƒãƒƒã‚¯å‰Šé™¤ï¼‰
   Widget _buildDestinationDropdown(Map<String, dynamic> leg, int legId, int index) {
     final airline = leg['airline'] as String;
     final arrival = leg['arrivalAirport'] as String;
     final destinations = availableDestinations[legId] ?? [];
-    
-    return SizedBox(width: 100, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('到着地', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+    // ãƒ•ã‚©ãƒ¼ãƒ«ãƒãƒƒã‚¯å‰Šé™¤: å°±èˆªå…ˆãŒãªã‘ã‚Œã°ç©ºã®ã¾ã¾
+    final displayItems = ['', ...destinations];
+    final currentValue = arrival.isEmpty || !displayItems.contains(arrival) ? null : arrival;
+    final displayText = currentValue ?? 'é¸æŠž';
+    return SizedBox(width: 85, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('åˆ°ç€åœ°', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: Autocomplete<String>(
-          initialValue: TextEditingValue(text: arrival),
-          optionsBuilder: (textEditingValue) {
-            // 就航先がない場合は空リスト
-            if (destinations.isEmpty) return const Iterable<String>.empty();
-            if (textEditingValue.text.isEmpty) {
-              return destinations;
-            }
-            final query = textEditingValue.text.toUpperCase();
-            return destinations.where((code) {
-              final name = airportNames[code] ?? '';
-              return code.contains(query) || name.contains(textEditingValue.text);
-            });
-          },
-          displayStringForOption: (code) => code,
-          optionsViewBuilder: (context, onSelected, options) {
-            return Align(
-              alignment: Alignment.topLeft,
-              child: Material(
-                elevation: 4,
-                child: Container(
-                  width: 150,
-                  constraints: const BoxConstraints(maxHeight: 200),
-                  child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    itemBuilder: (context, i) {
-                      final code = options.elementAt(i);
-                      return ListTile(
-                        dense: true,
-                        title: Text('$code ${airportNames[code] ?? ''}', style: const TextStyle(fontSize: 12)),
-                        onTap: () => onSelected(code),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            );
-          },
-          fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-            return TextField(
-              controller: controller,
-              focusNode: focusNode,
-              style: const TextStyle(fontSize: 12),
-              decoration: const InputDecoration(
-                hintText: '選択/入力',
-                isDense: true,
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              ),
-              onSubmitted: (_) => onFieldSubmitted(),
-            );
-          },
-          onSelected: (code) {
-            setState(() => legs[index]['arrivalAirport'] = code);
-            _fetchAvailableFlights(index);
-            _calculateSingleLeg(index);
-          },
+        child: DropdownButton<String>(key: ValueKey('destination_${legId}_$airline'), value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 150,
+          hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(displayText, style: const TextStyle(fontSize: 12))),
+          selectedItemBuilder: (context) => displayItems.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 12))))).toList(),
+          items: displayItems.map((e) => DropdownMenuItem(value: e.isEmpty ? null : e, child: Text(e.isEmpty ? 'ï¼' : '$e ${airportNames[e] ?? ''}', style: const TextStyle(fontSize: 12)))).toList(),
+          onChanged: (v) { if (v == null || v.isEmpty) { _clearFlightInfo(index, legId); } else { setState(() => legs[index]['arrivalAirport'] = v); _fetchAvailableFlights(index); _calculateSingleLeg(index); } },
         ),
       ),
     ]));
   }
 
   Widget _buildFlightTimeDropdown(Map<String, dynamic> leg, int legId, int index) {
-    final allFlights = availableFlights[legId] ?? []; 
-    final airline = leg['airline'] as String;
-    final arrival = leg['arrivalAirport'] as String;
+    final flights = availableFlights[legId] ?? []; final airline = leg['airline'] as String;
     final currentTime = departureTimeControllers[legId]?.text ?? '';
-    
-    // 到着地が選択されている場合、その到着地の便のみ表示
-    final flights = arrival.isNotEmpty 
-        ? allFlights.where((f) => f['arrival_code'] == arrival).toList()
-        : allFlights;
-    
     return SizedBox(width: 70, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('出発時刻', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+      const Text('å‡ºç™ºæ™‚åˆ»', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(key: ValueKey('flight_time_${legId}_${airline}_$arrival'), value: null, isExpanded: true, underline: const SizedBox(), menuWidth: 120,
-          hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(currentTime.isEmpty ? '選択' : currentTime, style: const TextStyle(fontSize: 12))),
-          items: [const DropdownMenuItem(value: '__clear__', child: Text('－', style: TextStyle(fontSize: 12))), ...flights.map((flight) { String depTime = flight['departure_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); return DropdownMenuItem(value: '${flight['id']}', child: Text(depTime, style: const TextStyle(fontSize: 12))); })],
-          onChanged: (value) { if (value == null) return; if (value == '__clear__') { _clearFlightInfo(index, legId); return; } final flight = allFlights.firstWhere((f) => f['id'].toString() == value, orElse: () => {}); if (flight.isNotEmpty) { String depTime = flight['departure_time'] ?? ''; String arrTime = flight['arrival_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); if (arrTime.length > 5) arrTime = arrTime.substring(0, 5); departureTimeControllers[legId]?.text = depTime; arrivalTimeControllers[legId]?.text = arrTime; flightNumberControllers[legId]?.text = flight['flight_number'] ?? ''; setState(() => legs[index]['arrivalAirport'] = flight['arrival_code'] ?? ''); if (index + 1 < legs.length) _fetchAvailableFlights(index + 1); _calculateSingleLeg(index); } },
+        child: DropdownButton<String>(key: ValueKey('flight_time_${legId}_$airline'), value: null, isExpanded: true, underline: const SizedBox(), menuWidth: 150,
+          hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(currentTime.isEmpty ? 'é¸æŠž' : currentTime, style: const TextStyle(fontSize: 12))),
+          items: [const DropdownMenuItem(value: '__clear__', child: Text('ï¼', style: TextStyle(fontSize: 12))), ...flights.map((flight) { String depTime = flight['departure_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); final arrCode = flight['arrival_code'] ?? ''; return DropdownMenuItem(value: '${flight['id']}', child: Text('${airportNames[arrCode] ?? arrCode} $depTime', style: const TextStyle(fontSize: 12))); })],
+          onChanged: (value) { if (value == null) return; if (value == '__clear__') { _clearFlightInfo(index, legId); return; } final flight = flights.firstWhere((f) => f['id'].toString() == value, orElse: () => {}); if (flight.isNotEmpty) { String depTime = flight['departure_time'] ?? ''; String arrTime = flight['arrival_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); if (arrTime.length > 5) arrTime = arrTime.substring(0, 5); departureTimeControllers[legId]?.text = depTime; arrivalTimeControllers[legId]?.text = arrTime; flightNumberControllers[legId]?.text = flight['flight_number'] ?? ''; setState(() => legs[index]['arrivalAirport'] = flight['arrival_code'] ?? ''); if (index + 1 < legs.length) _fetchAvailableFlights(index + 1); _calculateSingleLeg(index); } },
         ),
       ),
     ]));
@@ -815,7 +628,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
 
   Widget _buildArrivalTimeField(int legId, int index) {
     return SizedBox(width: 65, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('到着時刻', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+      const Text('åˆ°ç€æ™‚åˆ»', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
         child: TextFormField(controller: arrivalTimeControllers[legId], style: const TextStyle(fontSize: 12), decoration: const InputDecoration(hintText: 'HH:MM', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8)), onChanged: (v) { if (v.isEmpty) _clearFlightInfo(index, legId); }),
       ),
@@ -827,10 +640,10 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     final fareTypes = fareTypesByAirline[airline] ?? [];
     final currentValue = fareType.isEmpty || !fareTypes.contains(fareType) ? null : fareType;
     return SizedBox(width: 150, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('運賃種別', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+      const Text('é‹è³ƒç¨®åˆ¥', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
         child: DropdownButton<String>(value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 250,
-          hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 10))),
+          hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('é¸æŠž', style: TextStyle(fontSize: 10))),
           selectedItemBuilder: (context) => fareTypes.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(),
           items: fareTypes.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(),
           onChanged: (v) { if (v != null) { setState(() => legs[index]['fareType'] = v); _calculateSingleLeg(index); } },
@@ -844,10 +657,10 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     final seatClasses = seatClassesByAirline[airline] ?? [];
     final currentValue = seatClass.isEmpty || !seatClasses.contains(seatClass) ? null : seatClass;
     return SizedBox(width: 100, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('座席クラス', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+      const Text('åº§å¸­ã‚¯ãƒ©ã‚¹', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
         child: DropdownButton<String>(value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 150,
-          hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 10))),
+          hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('é¸æŠž', style: TextStyle(fontSize: 10))),
           selectedItemBuilder: (context) => seatClasses.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(),
           items: seatClasses.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(),
           onChanged: (v) { if (v != null) { setState(() => legs[index]['seatClass'] = v); _calculateSingleLeg(index); } },
@@ -867,7 +680,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
 
   Widget _buildFlightNumberField(int legId, int index) {
     return SizedBox(width: 60, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('便名', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+      const Text('ä¾¿å', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
         child: Focus(
           onFocusChange: (hasFocus) { if (!hasFocus) { final flightNumber = flightNumberControllers[legId]?.text ?? ''; if (flightNumber.isNotEmpty) _autoFillFromFlightNumber(index); } },
@@ -882,7 +695,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
         child: TextFormField(controller: controller, readOnly: true, style: const TextStyle(fontSize: 12),
-          decoration: const InputDecoration(hintText: '選択', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8), suffixIcon: Icon(Icons.calendar_today, size: 14)),
+          decoration: const InputDecoration(hintText: 'é¸æŠž', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8), suffixIcon: Icon(Icons.calendar_today, size: 14)),
           onTap: () async { final now = DateTime.now(); final picked = await showDatePicker(context: context, initialDate: _parseDate(controller.text) ?? now, firstDate: DateTime(2020), lastDate: DateTime(2030), locale: const Locale('ja')); if (picked != null) { controller.text = '${picked.year}/${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}'; setState(() {}); } },
         ),
       ),
