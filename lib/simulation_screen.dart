@@ -232,8 +232,10 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   }
 
   Future<void> _fetchAvailableFlights(int index) async {
-    final leg = legs[index]; final legId = leg['id'] as int; final airline = leg['airline'] as String;
-    final departure = leg['departureAirport'] as String; final arrival = leg['arrivalAirport'] as String;
+    final legId = legs[index]['id'] as int; 
+    final airline = legs[index]['airline'] as String;
+    final departure = legs[index]['departureAirport'] as String; 
+    final arrival = legs[index]['arrivalAirport'] as String;
     if (departure.isEmpty) { setState(() { availableFlights[legId] = []; availableDestinations[legId] = []; }); return; }
     try {
       // 日付フィルタ用：日付未入力なら今日を使用
