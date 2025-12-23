@@ -1,652 +1,393 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:html' as html;
-import 'dart:convert';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
+  State<HistoryScreen> createState() => HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
-  List<Map<String, dynamic>> history = [];
-  List<Map<String, dynamic>> filteredHistory = [];
+class HistoryScreenState extends State<HistoryScreen> {
+  List<Map<String, dynamic>> itineraries = [];
   bool isLoading = true;
-  String selectedAirline = '全て';
-
-  // JAL集計
-  int jalFOP = 0;
-  int jalMiles = 0;
-  int jalCount = 0;
-  int jalFare = 0;
-  int jalFareCount = 0;
-
-  // ANA集計
-  int anaPP = 0;
-  int anaMiles = 0;
-  int anaCount = 0;
-  int anaFare = 0;
-  int anaFareCount = 0;
+  String? errorMessage;
+  String? _expandedId; // 展開中の旅程ID
 
   @override
   void initState() {
     super.initState();
-    _fetchHistory();
+    _loadItineraries();
   }
 
-  Future<void> _fetchHistory() async {
-    try {
-      final response = await Supabase.instance.client
-          .from('flight_calculations')
-          .select()
-          .order('created_at', ascending: false);
+  // 外部から呼び出し可能なリフレッシュメソッド
+  void refresh() {
+    _loadItineraries();
+  }
 
-      final list = (response as List).cast<Map<String, dynamic>>();
+  Future<void> _loadItineraries() async {
+    setState(() => isLoading = true);
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      
+      // ログインしていない場合は空リスト
+      if (userId == null) {
+        setState(() {
+          itineraries = [];
+          isLoading = false;
+          errorMessage = null;
+        });
+        return;
+      }
+      
+      final response = await Supabase.instance.client
+          .from('saved_itineraries')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
       
       setState(() {
-        history = list;
+        itineraries = List<Map<String, dynamic>>.from(response);
         isLoading = false;
+        errorMessage = null;
       });
-      _applyFilter();
     } catch (e) {
-      print('履歴取得エラー: $e');
-      setState(() => isLoading = false);
+      setState(() {
+        isLoading = false;
+        errorMessage = 'データの読み込みに失敗しました: $e';
+      });
     }
   }
 
-  void _applyFilter() {
-    List<Map<String, dynamic>> filtered;
-    if (selectedAirline == '全て') {
-      filtered = history;
-    } else {
-      filtered = history.where((r) => r['airline'] == selectedAirline).toList();
-    }
-
-    // JAL集計
-    int jFOP = 0, jMiles = 0, jCount = 0, jFare = 0, jFareNum = 0;
-    // ANA集計
-    int aPP = 0, aMiles = 0, aCount = 0, aFare = 0, aFareNum = 0;
-
-    for (var record in history) {
-      final airline = record['airline'] ?? '';
-      final points = (record['final_points'] as int?) ?? 0;
-      final miles = (record['final_miles'] as int?) ?? 0;
-      final fare = record['fare_amount'] as int?;
-
-      if (airline == 'JAL') {
-        jFOP += points;
-        jMiles += miles;
-        jCount++;
-        if (fare != null && fare > 0) {
-          jFare += fare;
-          jFareNum++;
-        }
-      } else if (airline == 'ANA') {
-        aPP += points;
-        aMiles += miles;
-        aCount++;
-        if (fare != null && fare > 0) {
-          aFare += fare;
-          aFareNum++;
-        }
-      }
-    }
-
-    setState(() {
-      filteredHistory = filtered;
-      jalFOP = jFOP;
-      jalMiles = jMiles;
-      jalCount = jCount;
-      jalFare = jFare;
-      jalFareCount = jFareNum;
-      anaPP = aPP;
-      anaMiles = aMiles;
-      anaCount = aCount;
-      anaFare = aFare;
-      anaFareCount = aFareNum;
-    });
-  }
-
-  String _jalUnitPrice() {
-    if (jalFOP == 0 || jalFare == 0) return 'N/A';
-    return '${(jalFare / jalFOP).toStringAsFixed(1)}円';
-  }
-
-  String _anaUnitPrice() {
-    if (anaPP == 0 || anaFare == 0) return 'N/A';
-    return '${(anaFare / anaPP).toStringAsFixed(1)}円';
-  }
-
-  void _exportCSV() {
-    if (filteredHistory.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('エクスポートするデータがありません'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
-    final header = ['日付', '航空会社', '出発地', '到着地', '運賃種別', '座席クラス', 'FOP/PP', 'マイル', '運賃(円)', '単価(円)'];
-    final rows = <List<String>>[header];
-    
-    for (var record in filteredHistory) {
-      final fop = record['final_points'] ?? 0;
-      final fareAmount = record['fare_amount'] as int?;
-      String unitPrice = '';
-      if (fareAmount != null && fareAmount > 0 && fop > 0) {
-        unitPrice = (fareAmount / fop).toStringAsFixed(1);
-      }
-      
-      String dateStr = '';
-      if (record['flight_date'] != null) {
-        dateStr = record['flight_date'].toString().substring(0, 10);
-      }
-
-      rows.add([
-        dateStr,
-        record['airline'] ?? '',
-        record['departure'] ?? '',
-        record['arrival'] ?? '',
-        record['fare_type'] ?? '',
-        record['seat_class'] ?? '',
-        fop.toString(),
-        (record['final_miles'] ?? 0).toString(),
-        fareAmount?.toString() ?? '',
-        unitPrice,
-      ]);
-    }
-
-    final csvContent = rows.map((row) => row.map((cell) => '"$cell"').join(',')).join('\n');
-    final bom = '\uFEFF';
-    final csvWithBom = bom + csvContent;
-
-    final bytes = utf8.encode(csvWithBom);
-    final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    
-    final now = DateTime.now();
-    final fileName = '修行履歴_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.csv';
-    
-    final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', fileName)
-      ..click();
-    
-    html.Url.revokeObjectUrl(url);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$fileName をダウンロードしました'), backgroundColor: Colors.green),
-    );
-  }
-
-  Future<void> _deleteRecord(String id) async {
+  Future<void> _deleteItinerary(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning, color: Colors.orange[700]),
-            const SizedBox(width: 8),
-            const Text('削除確認'),
-          ],
-        ),
-        content: const Text(
-          'この搭乗記録を削除しますか？\n\n削除すると元に戻せません。',
-          style: TextStyle(fontSize: 15),
-        ),
+        title: const Text('削除確認'),
+        content: const Text('この旅程を削除しますか？'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('キャンセル'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('削除する'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('キャンセル')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('削除', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
+    
+    if (confirm == true) {
+      try {
+        await Supabase.instance.client.from('saved_itineraries').delete().eq('id', id);
+        _loadItineraries();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('削除しました'), backgroundColor: Colors.green),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('削除に失敗しました: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
 
-    if (confirm != true) return;
+  String _formatNumber(int number) {
+    if (number == 0) return '0';
+    return number.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
 
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '';
     try {
-      await Supabase.instance.client
-          .from('flight_calculations')
-          .delete()
-          .eq('id', id);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('削除しました'), backgroundColor: Colors.green),
-        );
-      }
-      _fetchHistory();
+      final date = DateTime.parse(dateStr);
+      return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('削除に失敗: $e'), backgroundColor: Colors.red),
-        );
-      }
+      return dateStr;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            children: [
-              // 航空会社別サマリー
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                color: Colors.grey[100],
-                child: Column(
-                  children: [
-                    // JAL行
-                    if (jalCount > 0)
-                      _buildAirlineSummaryRow(
-                        'JAL',
-                        Colors.red,
-                        'FOP',
-                        jalFOP,
-                        jalMiles,
-                        jalCount,
-                        jalFare,
-                        _jalUnitPrice(),
-                        jalFareCount,
-                      ),
-                    if (jalCount > 0 && anaCount > 0)
-                      const Divider(height: 16),
-                    // ANA行
-                    if (anaCount > 0)
-                      _buildAirlineSummaryRow(
-                        'ANA',
-                        Colors.blue,
-                        'PP',
-                        anaPP,
-                        anaMiles,
-                        anaCount,
-                        anaFare,
-                        _anaUnitPrice(),
-                        anaFareCount,
-                      ),
-                  ],
-                ),
-              ),
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-              // フィルタ＆エクスポート
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Text('表示: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ChoiceChip(
-                          label: const Text('全て'),
-                          selected: selectedAirline == '全て',
-                          onSelected: (_) { setState(() => selectedAirline = '全て'); _applyFilter(); },
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('JAL'),
-                          selected: selectedAirline == 'JAL',
-                          selectedColor: Colors.red[100],
-                          onSelected: (_) { setState(() => selectedAirline = 'JAL'); _applyFilter(); },
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('ANA'),
-                          selected: selectedAirline == 'ANA',
-                          selectedColor: Colors.blue[100],
-                          onSelected: (_) { setState(() => selectedAirline = 'ANA'); _applyFilter(); },
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.download),
-                      tooltip: 'CSVエクスポート',
-                      onPressed: _exportCSV,
-                    ),
-                  ],
-                ),
-              ),
+    if (errorMessage != null) {
+      return Center(
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text(errorMessage!, style: const TextStyle(color: Colors.red)),
+          const SizedBox(height: 16),
+          ElevatedButton(onPressed: _loadItineraries, child: const Text('再読み込み')),
+        ]),
+      );
+    }
 
-              // 履歴リスト
-              Expanded(
-                child: filteredHistory.isEmpty
-                    ? const Center(
-                        child: Text('履歴がありません', style: TextStyle(color: Colors.grey)),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(8),
-                        itemCount: filteredHistory.length,
-                        itemBuilder: (context, index) {
-                          final record = filteredHistory[index];
-                          return _buildHistoryCard(record);
-                        },
-                      ),
-              ),
-            ],
+    if (itineraries.isEmpty) {
+      final isLoggedIn = Supabase.instance.client.auth.currentUser != null;
+      return Center(
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(isLoggedIn ? Icons.history : Icons.login, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            isLoggedIn ? '保存された旅程がありません' : '旅程を保存するにはログインが必要です',
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isLoggedIn ? 'Simulateタブで旅程を作成し、保存してください' : '右上のログインボタンからログインしてください',
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
+        ]),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadItineraries,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 600;
+          return ListView.builder(
+            padding: EdgeInsets.all(isMobile ? 8 : 16),
+            itemCount: itineraries.length,
+            itemBuilder: (context, index) => _buildItineraryCard(itineraries[index], isMobile),
           );
+        },
+      ),
+    );
   }
 
-  Widget _buildAirlineSummaryRow(
-    String airline,
-    Color color,
-    String pointLabel,
-    int points,
-    int miles,
-    int count,
-    int fare,
-    String unitPrice,
-    int fareCount,
-  ) {
-    return Row(
-      children: [
-        // 航空会社ラベル
+  Widget _buildItineraryCard(Map<String, dynamic> itinerary, bool isMobile) {
+    final id = itinerary['id'] as String;
+    final title = itinerary['title'] as String? ?? '無題';
+    final totalFop = itinerary['total_fop'] as int? ?? 0;
+    final totalPp = itinerary['total_pp'] as int? ?? 0;
+    final totalMiles = itinerary['total_miles'] as int? ?? 0;
+    final totalLsp = itinerary['total_lsp'] as int? ?? 0;
+    final totalFare = itinerary['total_fare'] as int? ?? 0;
+    final createdAt = _formatDate(itinerary['created_at'] as String?);
+    final legs = itinerary['legs'] as List<dynamic>? ?? [];
+    final isExpanded = _expandedId == id;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Column(children: [
+        // ヘッダー行（常に表示）
+        InkWell(
+          onTap: () => setState(() => _expandedId = isExpanded ? null : id),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(children: [
+              // 展開ボタン
+              Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 20, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+              // タイトル＆日時
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  Text(createdAt, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                ]),
+              ),
+              // サマリー統計
+              if (totalFop > 0) _buildMiniChip('FOP', _formatNumber(totalFop), Colors.red),
+              if (totalPp > 0) _buildMiniChip('PP', _formatNumber(totalPp), Colors.blue),
+              const SizedBox(width: 8),
+              // 削除ボタン
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                color: Colors.grey[400],
+                onPressed: () => _deleteItinerary(id),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: '削除',
+              ),
+            ]),
+          ),
+        ),
+        // 展開時の詳細
+        if (isExpanded) ...[
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // 統計チップ
+              Wrap(spacing: 8, runSpacing: 6, children: [
+                if (totalFop > 0) _buildStatChip('FOP', _formatNumber(totalFop), Colors.red),
+                if (totalPp > 0) _buildStatChip('PP', _formatNumber(totalPp), Colors.blue),
+                if (totalMiles > 0) _buildStatChip('マイル', _formatNumber(totalMiles), Colors.orange),
+                if (totalLsp > 0) _buildStatChip('LSP', _formatNumber(totalLsp), Colors.purple),
+                if (totalFare > 0) _buildStatChip('総額', '¥${_formatNumber(totalFare)}', Colors.green),
+              ]),
+              const SizedBox(height: 12),
+              // レグ一覧
+              ...legs.map((leg) => _buildLegSummary(leg as Map<String, dynamic>)),
+            ]),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  Widget _buildMiniChip(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+      child: Text('$value', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+    );
+  }
+
+  Widget _buildStatChip(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Text(label, style: TextStyle(fontSize: 10, color: color)),
+        const SizedBox(width: 4),
+        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+      ]),
+    );
+  }
+
+  Widget _buildLegSummary(Map<String, dynamic> leg) {
+    final airline = leg['airline'] as String? ?? '';
+    final dep = leg['departure_airport'] as String? ?? '';
+    final arr = leg['arrival_airport'] as String? ?? '';
+    final flightNumber = leg['flight_number'] as String? ?? '';
+    final fop = leg['fop'] as int? ?? 0;
+    final airlineColor = airline == 'JAL' ? Colors.red : Colors.blue;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(children: [
         Container(
-          width: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            airline,
-            style: TextStyle(fontWeight: FontWeight.bold, color: color),
-            textAlign: TextAlign.center,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          decoration: BoxDecoration(color: airlineColor, borderRadius: BorderRadius.circular(4)),
+          child: Text(airline, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
         ),
-        const SizedBox(width: 12),
-        // 統計項目
-        Expanded(
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            children: [
-              _buildSummaryItem(pointLabel, _formatNumber(points), color),
-              _buildSummaryItem('マイル', _formatNumber(miles), color),
-              _buildSummaryItem('搭乗', '$count回', color),
-              _buildSummaryItem('総支出', fare > 0 ? '¥${_formatNumber(fare)}' : 'N/A', Colors.green[700]!),
-              _buildSummaryItem('単価', unitPrice, Colors.orange[700]!),
-              _buildSummaryItem('入力率', count > 0 ? '${(fareCount * 100 / count).round()}%' : '0%', Colors.grey[600]!),
-            ],
-          ),
-        ),
-      ],
+        const SizedBox(width: 8),
+        Text('$flightNumber', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+        const SizedBox(width: 8),
+        Text('$dep → $arr', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+        const Spacer(),
+        Text('${airline == "JAL" ? "FOP" : "PP"}: $fop', style: TextStyle(fontSize: 11, color: airlineColor)),
+      ]),
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[600])),
-        Text(
-          value,
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+  void _showItineraryDetail(Map<String, dynamic> itinerary) {
+    final title = itinerary['title'] as String? ?? '無題';
+    final legs = itinerary['legs'] as List<dynamic>? ?? [];
+    final jalCard = itinerary['jal_card'] as String?;
+    final anaCard = itinerary['ana_card'] as String?;
+    final jalStatus = itinerary['jal_status'] as String?;
+    final anaStatus = itinerary['ana_status'] as String?;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // ハンドル
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            // タイトル
+            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            // カード・ステータス情報
+            if (jalCard != null && jalCard != '-') Text('JALカード: $jalCard', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            if (jalStatus != null && jalStatus != '-') Text('JALステータス: $jalStatus', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            if (anaCard != null && anaCard != '-') Text('ANAカード: $anaCard', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            if (anaStatus != null && anaStatus != '-') Text('ANAステータス: $anaStatus', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            const SizedBox(height: 16),
+            const Divider(),
+            // レグ一覧
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: legs.length,
+                itemBuilder: (context, index) => _buildDetailLegCard(legs[index] as Map<String, dynamic>, index),
+              ),
+            ),
+          ]),
         ),
-      ],
+      ),
     );
   }
 
-  String _formatNumber(int number) {
-    return number.toString().replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (match) => '${match[1]},',
-    );
-  }
-
-  Widget _buildHistoryCard(Map<String, dynamic> record) {
-    final airline = record['airline'] ?? '';
-    final departure = record['departure'] ?? '';
-    final arrival = record['arrival'] ?? '';
-    final fareType = record['fare_type'] ?? '';
-    final seatClass = record['seat_class'] ?? '';
-    final fop = record['final_points'] ?? 0;
-    final miles = record['final_miles'] ?? 0;
-    final fareAmount = record['fare_amount'] as int?;
-    final flightDate = record['flight_date'];
-    final createdAt = record['created_at'];
-
-    String unitPrice = '';
-    if (fareAmount != null && fareAmount > 0 && fop > 0) {
-      unitPrice = '${(fareAmount / fop).toStringAsFixed(1)}円';
-    }
-
-    String dateDisplay = '';
-    if (flightDate != null) {
-      dateDisplay = flightDate.toString().substring(0, 10);
-    } else if (createdAt != null) {
-      dateDisplay = '(${createdAt.toString().substring(0, 10)})';
-    }
+  Widget _buildDetailLegCard(Map<String, dynamic> leg, int index) {
+    final airline = leg['airline'] as String? ?? '';
+    final date = leg['date'] as String? ?? '';
+    final flightNumber = leg['flight_number'] as String? ?? '';
+    final dep = leg['departure_airport'] as String? ?? '';
+    final arr = leg['arrival_airport'] as String? ?? '';
+    final depTime = leg['departure_time'] as String? ?? '';
+    final arrTime = leg['arrival_time'] as String? ?? '';
+    final fareType = leg['fare_type'] as String? ?? '';
+    final seatClass = leg['seat_class'] as String? ?? '';
+    final fareAmount = leg['fare_amount'] as int? ?? 0;
+    final fop = leg['fop'] as int? ?? 0;
+    final miles = leg['miles'] as int? ?? 0;
+    final lsp = leg['lsp'] as int? ?? 0;
+    final airlineColor = airline == 'JAL' ? Colors.red : Colors.blue;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            // 航空会社アイコン
-            CircleAvatar(
-              backgroundColor: airline == 'JAL' ? Colors.red[100] : Colors.blue[100],
-              child: Text(
-                airline,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: airline == 'JAL' ? Colors.red : Colors.blue,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // 中央部（路線・運賃情報）
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        '$departure → $arrival',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        dateDisplay,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        '$fareType / $seatClass',
-                        style: const TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
-                      if (fareAmount != null && fareAmount > 0) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.green[50],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '¥${_formatNumber(fareAmount)}',
-                            style: TextStyle(fontSize: 11, color: Colors.green[700]),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // ポイント・マイル表示
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${airline == 'JAL' ? 'FOP' : 'PP'}: $fop',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: airline == 'JAL' ? Colors.red[700] : Colors.blue[700],
-                  ),
-                ),
-                Text(
-                  'マイル: $miles',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                if (unitPrice.isNotEmpty)
-                  Text(
-                    unitPrice,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green[700]),
-                  ),
-              ],
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // ヘッダー
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: airlineColor, borderRadius: BorderRadius.circular(4)),
+              child: Text(airline, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
             ),
             const SizedBox(width: 8),
-            // 編集・削除アイコン
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                InkWell(
-                  onTap: () => _showEditDialog(record),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.edit, size: 20, color: Colors.grey[600]),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                InkWell(
-                  onTap: () => _deleteRecord(record['id']),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.delete, size: 20, color: Colors.red[400]),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showEditDialog(Map<String, dynamic> record) async {
-    final fareController = TextEditingController(
-      text: record['fare_amount']?.toString() ?? '',
-    );
-    
-    // 日付の初期値（YYYY-MM-DD形式）
-    String initialDate = '';
-    if (record['flight_date'] != null) {
-      initialDate = record['flight_date'].toString().substring(0, 10);
-    }
-    final dateController = TextEditingController(text: initialDate);
-
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              Icons.edit,
-              color: record['airline'] == 'JAL' ? Colors.red : Colors.blue,
-            ),
+            Text('$flightNumber', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            Text(date, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          ]),
+          const SizedBox(height: 8),
+          // 区間
+          Row(children: [
+            Text(dep, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(width: 8),
-            Text('${record['departure']} → ${record['arrival']}'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: dateController,
-              decoration: const InputDecoration(
-                labelText: '搭乗日',
-                hintText: 'YYYY-MM-DD',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: fareController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: '運賃（円）',
-                hintText: '例: 15000',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, {
-                'date': dateController.text,
-                'fare': fareController.text,
-              });
-            },
-            child: const Text('保存'),
-          ),
-        ],
+            Icon(Icons.arrow_forward, size: 16, color: Colors.grey[400]),
+            const SizedBox(width: 8),
+            Text(arr, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            Text('$depTime - $arrTime', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          ]),
+          const SizedBox(height: 8),
+          // 詳細
+          Wrap(spacing: 8, runSpacing: 4, children: [
+            Text(fareType, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            Text(seatClass, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            if (fareAmount > 0) Text('¥${_formatNumber(fareAmount)}', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+          ]),
+          const SizedBox(height: 8),
+          // ポイント
+          Row(children: [
+            _buildStatChip(airline == 'JAL' ? 'FOP' : 'PP', _formatNumber(fop), airlineColor),
+            const SizedBox(width: 8),
+            _buildStatChip('マイル', _formatNumber(miles), Colors.orange),
+            if (airline == 'JAL' && lsp > 0) ...[
+              const SizedBox(width: 8),
+              _buildStatChip('LSP', _formatNumber(lsp), Colors.purple),
+            ],
+          ]),
+        ]),
       ),
     );
-
-    if (result == null) return;
-
-    // 更新処理
-    try {
-      final updates = <String, dynamic>{};
-      
-      // 日付の更新
-      if (result['date'] != null && result['date'].toString().isNotEmpty) {
-        updates['flight_date'] = result['date'];
-      } else {
-        updates['flight_date'] = null;
-      }
-      
-      // 運賃の更新
-      final fareText = result['fare']?.toString() ?? '';
-      if (fareText.isNotEmpty) {
-        updates['fare_amount'] = int.tryParse(fareText);
-      } else {
-        updates['fare_amount'] = null;
-      }
-
-      await Supabase.instance.client
-          .from('flight_calculations')
-          .update(updates)
-          .eq('id', record['id']);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('更新しました'), backgroundColor: Colors.green),
-        );
-      }
-      _fetchHistory();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新に失敗: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
   }
 }
