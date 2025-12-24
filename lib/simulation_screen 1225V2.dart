@@ -482,14 +482,10 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
 
   Widget _buildSummaryBar(bool isMobile) {
     if (isMobile) {
-      // 各航空会社のレグがあるかチェック
-      final hasJAL = legs.any((leg) => leg['airline'] == 'JAL');
-      final hasANA = legs.any((leg) => leg['airline'] == 'ANA');
-      
       return Column(children: [
-        if (hasJAL) _buildMobileSummaryCard('JAL', Colors.red),
-        if (hasJAL && hasANA) const SizedBox(height: 6),
-        if (hasANA) _buildMobileSummaryCard('ANA', Colors.blue),
+        _buildMobileSummaryCard('JAL', Colors.red),
+        const SizedBox(height: 6),
+        _buildMobileSummaryCard('ANA', Colors.blue),
         const SizedBox(height: 10),
       ]);
     } else {
