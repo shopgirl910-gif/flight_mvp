@@ -26,7 +26,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   Map<int, List<Map<String, dynamic>>> availableFlights = {};
   Map<int, List<String>> availableDestinations = {};
   
-  // 追加: 航空会社別就航空港キャッシュ
   Map<String, List<String>> airlineAirports = {};
   
   int _legIdCounter = 0;
@@ -37,32 +36,20 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   String? selectedANACard;
   String? selectedJALStatus;
   String? selectedANAStatus;
-  bool jalTourPremium = false; // JALカードツアープレミアム
-  bool jalShoppingMilePremium = false; // JALカードショッピングマイル・プレミアム
+  bool jalTourPremium = false;
+  bool jalShoppingMilePremium = false;
 
   final List<String> jalCardTypes = ['-', 'JMB会員', 'JALカード普通会員', 'JALカードCLUB-A会員', 'JALカードCLUB-Aゴールド会員', 'JALカードプラチナ会員', 'JALグローバルクラブ会員(日本)', 'JALグローバルクラブ会員(海外)', 'JALカードNAVI会員', 'JAL CLUB EST 普通会員', 'JAL CLUB EST CLUB-A会員', 'JAL CLUB EST CLUB-A GOLD会員', 'JAL CLUB EST プラチナ会員'];
   final List<String> anaCardTypes = ['-', 'AMCカード(提携カード含む)', 'ANAカード 一般', 'ANAカード 学生用', 'ANAカード ワイド', 'ANAカード ゴールド', 'ANAカード プレミアム', 'SFC 一般', 'SFC ゴールド', 'SFC プレミアム'];
   final List<String> jalStatusTypes = ['-', 'JMBダイヤモンド', 'JMBサファイア', 'JMBクリスタル'];
   final List<String> anaStatusTypes = ['-', 'ダイヤモンド(1年目)', 'ダイヤモンド(継続2年以上)', 'プラチナ(1年目)', 'プラチナ(継続2年以上)', 'ブロンズ(1年目)', 'ブロンズ(継続2年以上)'];
   final List<String> airports = [
-    // 主要空港
-    'HND', 'NRT',  // 東京
-    'ITM', 'KIX', 'UKB',  // 大阪
-    'CTS', 'OKD',  // 札幌
-    'NGO', 'NKM',  // 名古屋
-    'FUK',  // 福岡
-    'OKA',  // 沖縄
-    // 北海道（北から）
+    'HND', 'NRT', 'ITM', 'KIX', 'UKB', 'CTS', 'OKD', 'NGO', 'NKM', 'FUK', 'OKA',
     'WKJ', 'MBE', 'MMB', 'SHB', 'KUH', 'OBO', 'AKJ', 'HKD', 'OIR',
-    // 東北（北から）
     'AOJ', 'MSJ', 'HNA', 'AXT', 'ONJ', 'GAJ', 'SDJ', 'FKS',
-    // 関東・中部
     'HAC', 'FSZ', 'MMJ', 'NTQ', 'TOY', 'KMQ', 'SHM',
-    // 中国・四国
     'TTJ', 'YGJ', 'IZO', 'OKJ', 'HIJ', 'IWK', 'UBJ', 'TKS', 'TAK', 'KCZ', 'MYJ',
-    // 九州（北から）
     'KKJ', 'HSG', 'NGS', 'KMJ', 'OIT', 'KMI', 'KOJ', 'AXJ',
-    // 離島
     'IKI', 'TSJ', 'FUJ', 'TNE', 'KUM', 'ASJ', 'KKX', 'TKN', 'OGN', 'MMY', 'ISG', 'RNJ',
   ];
   final Map<String, String> airportNames = {
@@ -83,26 +70,21 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   };
   final Map<String, List<String>> seatClassesByAirline = {'JAL': ['普通席', 'クラスJ', 'ファーストクラス'], 'ANA': ['普通席', 'プレミアムクラス']};
 
-  // JAL搭乗ボーナスFOP（運賃種別で決定）
   final Map<String, int> jalBonusFOP = {'運賃1': 400, '運賃2': 400, '運賃3': 200, '運賃4': 200, '運賃5': 0, '運賃6': 0};
-  
-  // ANA搭乗ポイント（運賃種別で決定）
   final Map<String, int> anaBonusPoint = {'運賃1': 400, '運賃2': 400, '運賃3': 400, '運賃4': 0, '運賃5': 400, '運賃6': 200, '運賃7': 0, '運賃8': 0, '運賃9': 0, '運賃10': 0, '運賃11': 0, '運賃12': 0, '運賃13': 0};
 
   @override
   void initState() {
     super.initState();
-    _initAirlineAirports(); // 就航空港を初期化
+    _initAirlineAirports();
     _addLeg();
   }
 
-  // 追加: 両航空会社の就航空港を初期化
   Future<void> _initAirlineAirports() async {
     await _fetchAirlineAirports('JAL');
     await _fetchAirlineAirports('ANA');
   }
 
-  // 追加: 航空会社別の就航空港を取得
   Future<List<String>> _fetchAirlineAirports(String airline) async {
     if (airlineAirports.containsKey(airline)) {
       return airlineAirports[airline]!;
@@ -122,7 +104,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       setState(() => airlineAirports[airline] = codes);
       return codes;
     } catch (e) {
-      return airports; // フォールバック
+      return airports;
     }
   }
 
@@ -152,7 +134,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       date = dateControllers[prevLegId]?.text ?? '';
     }
     dateControllers[legId]?.text = date;
-    // LSP追加: 'calculatedLSP': null
     setState(() { legs.add({'id': legId, 'airline': airline, 'departureAirport': departureAirport, 'arrivalAirport': arrivalAirport, 'fareType': '', 'seatClass': '', 'calculatedFOP': null, 'calculatedMiles': null, 'calculatedLSP': null}); });
     if (departureAirport.isNotEmpty) _fetchAvailableFlights(legs.length - 1);
   }
@@ -166,7 +147,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   }
 
   void _clearFlightInfo(int index, int legId) {
-    // LSP追加: 'calculatedLSP': null
     setState(() { legs[index]['departureAirport'] = ''; legs[index]['arrivalAirport'] = ''; legs[index]['calculatedFOP'] = null; legs[index]['calculatedMiles'] = null; legs[index]['calculatedLSP'] = null; availableFlights[legId] = []; availableDestinations[legId] = []; });
     flightNumberControllers[legId]?.text = ''; departureTimeControllers[legId]?.text = ''; arrivalTimeControllers[legId]?.text = '';
   }
@@ -194,7 +174,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
 
   Future<Map<String, dynamic>?> _fetchScheduleByFlightNumber(String airline, String flightNumber, String date) async {
     try {
-      // 日付未入力なら今日の日付を使用
       final targetDate = date.isEmpty 
           ? DateTime.now().toIso8601String().substring(0, 10)
           : date.replaceAll('/', '-');
@@ -224,7 +203,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       final remarks = schedule['remarks'] as String? ?? '';
       setState(() { legs[index]['departureAirport'] = depCode; legs[index]['arrivalAirport'] = arrCode; errorMessage = null; });
       departureTimeControllers[legId]?.text = depTime; arrivalTimeControllers[legId]?.text = arrTime;
-      // remarks警告表示
       if (remarks.isNotEmpty) {
         setState(() => errorMessage = '⚠️ 一部期間で時刻変更あり。公式サイトで確認してください。');
       }
@@ -244,7 +222,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       final response = await query.order('departure_time');
       List<Map<String, dynamic>> flights = (response as List).cast<Map<String, dynamic>>();
       
-      // 修正1: 重複除去（便名+出発時刻+到着地でユニーク化）
       final seen = <String>{};
       flights = flights.where((flight) {
         String depTime = flight['departure_time'] ?? '';
@@ -278,82 +255,58 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       if (routeData == null) return;
       final distance = routeData['distance_miles'] as int;
 
-      // 運賃種別名から積算率を抽出
       double fareRate = 1.0;
       final rateMatch = RegExp(r'\((\d+)%\)').firstMatch(fare);
       if (rateMatch != null) fareRate = int.parse(rateMatch.group(1)!) / 100.0;
 
-      // 運賃番号を抽出（例: "運賃1 (100%)" → "運賃1"）
       final fareNumber = fare.split(' ').first;
 
       int totalPoints = 0;
       int totalMiles = 0;
-      int totalLSP = 0; // LSP追加
+      int totalLSP = 0;
 
       if (airline == 'JAL') {
-        // === JAL計算 ===
-        // 座席ボーナス率
         final seatBonusRate = {'普通席': 0.0, 'クラスJ': 0.1, 'ファーストクラス': 0.5}[seat] ?? 0.0;
         
-        // JALカードツアープレミアム適用時、運賃4,5は積算率100%
         double effectiveFareRate = fareRate;
         if (jalTourPremium && (fareNumber == '運賃4' || fareNumber == '運賃5')) {
           effectiveFareRate = 1.0;
         }
 
-        // フライトマイル = round(区間マイル × (積算率 + 座席ボーナス率))
         final flightMiles = (distance * (effectiveFareRate + seatBonusRate)).round();
 
-        // ステータスボーナス率
         final statusBonusRate = {'-': 0.0, 'JMBダイヤモンド': 1.30, 'JMBサファイア': 1.05, 'JMBクリスタル': 0.55}[selectedJALStatus ?? '-'] ?? 0.0;
 
-        // マイルUPボーナス = round(フライトマイル × ステータスボーナス率)
         final mileUpBonus = (flightMiles * statusBonusRate).round();
 
-        // 合計マイル
         totalMiles = flightMiles + mileUpBonus;
 
-        // 搭乗ボーナスFOP（運賃種別で決定）
         final bonusFOP = jalBonusFOP[fareNumber] ?? 0;
 
-        // FOP = (フライトマイル × 2) + 搭乗ボーナス
         totalPoints = (flightMiles * 2) + bonusFOP;
 
-        // LSP計算: 国内線で積算率50%以上なら5LSP、それ以外は0
-        // 将来の国際線対応: isDomestic ? 5 : (miles ~/ 1000) * 5
         totalLSP = (fareRate >= 0.5) ? 5 : 0;
 
       } else {
-        // === ANA計算 ===
-        // フライトマイル = int(区間マイル × 積算率)
         final flightMiles = (distance * fareRate).toInt();
 
-        // カードボーナス率
         final cardBonusRate = {'-': 0.0, 'AMCカード(提携カード含む)': 0.0, 'ANAカード 一般': 0.10, 'ANAカード 学生用': 0.10, 'ANAカード ワイド': 0.25, 'ANAカード ゴールド': 0.25, 'ANAカード プレミアム': 0.50, 'SFC 一般': 0.35, 'SFC ゴールド': 0.40, 'SFC プレミアム': 0.50}[selectedANACard ?? '-'] ?? 0.0;
 
-        // ステータスボーナス率
         final statusBonusRate = {'-': 0.0, 'ダイヤモンド(1年目)': 1.15, 'ダイヤモンド(継続2年以上)': 1.25, 'プラチナ(1年目)': 0.90, 'プラチナ(継続2年以上)': 1.00, 'ブロンズ(1年目)': 0.40, 'ブロンズ(継続2年以上)': 0.50}[selectedANAStatus ?? '-'] ?? 0.0;
 
-        // 適用ボーナス率 = max(カードボーナス率, ステータスボーナス率)
         final effectiveBonusRate = cardBonusRate > statusBonusRate ? cardBonusRate : statusBonusRate;
 
-        // マイルUPボーナス = int(フライトマイル × 適用ボーナス率)
         final mileUpBonus = (flightMiles * effectiveBonusRate).toInt();
 
-        // 合計マイル
         totalMiles = flightMiles + mileUpBonus;
 
-        // 搭乗ポイント（運賃種別で決定）
         final bonusPoint = anaBonusPoint[fareNumber] ?? 0;
 
-        // PP = int((区間マイル × 積算率 × 2) + 搭乗ポイント)
         totalPoints = ((distance * fareRate * 2) + bonusPoint).toInt();
         
-        // ANAはLSP対象外
         totalLSP = 0;
       }
 
-      // LSP追加: calculatedLSPをstateに格納
       setState(() { legs[index]['calculatedFOP'] = totalPoints; legs[index]['calculatedMiles'] = totalMiles; legs[index]['calculatedLSP'] = totalLSP; });
     } catch (e) {}
   }
@@ -370,39 +323,33 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
 
   int get jalFOP => legs.where((leg) => leg['airline'] == 'JAL').fold<int>(0, (sum, leg) => sum + ((leg['calculatedFOP'] as int?) ?? 0));
   int get jalMiles => legs.where((leg) => leg['airline'] == 'JAL').fold<int>(0, (sum, leg) => sum + ((leg['calculatedMiles'] as int?) ?? 0));
-  int get jalFlightLSP => legs.where((leg) => leg['airline'] == 'JAL').fold<int>(0, (sum, leg) => sum + ((leg['calculatedLSP'] as int?) ?? 0)); // フライトLSP
+  int get jalFlightLSP => legs.where((leg) => leg['airline'] == 'JAL').fold<int>(0, (sum, leg) => sum + ((leg['calculatedLSP'] as int?) ?? 0));
   
-  // ショッピングマイルプレミアム自動入会カード判定（チェック強制＆グレーアウト）
   bool get isAutoShoppingMilePremium {
     final card = selectedJALCard ?? '-';
     return card.contains('ゴールド') || card.contains('プラチナ') || card.contains('JAL CLUB EST') || card == 'JALカードNAVI会員';
   }
   
-  // ショッピングマイル対象カード判定（JMB会員以外のJALカード）
   bool get isShoppingMileEligible {
     final card = selectedJALCard ?? '-';
     return card != '-' && card != 'JMB会員';
   }
   
-  // ショッピングマイルプレミアム有効判定（自動入会 or ユーザーチェック）
   bool get isShoppingMilePremiumActive {
     return isAutoShoppingMilePremium || jalShoppingMilePremium;
   }
   
-  // ショッピングマイル計算（総額から）
   int get jalShoppingMiles {
     if (!isShoppingMileEligible) return 0;
     if (isShoppingMilePremiumActive) {
-      return jalFare ~/ 100; // 100円=1マイル
+      return jalFare ~/ 100;
     } else {
-      return jalFare ~/ 200; // 200円=1マイル
+      return jalFare ~/ 200;
     }
   }
   
-  // ショッピングLSP（2,000マイルごとに5 LSP）
   int get jalShoppingLSP => (jalShoppingMiles ~/ 2000) * 5;
   
-  // 合計LSP（フライト + ショッピング）
   int get jalTotalLSP => jalFlightLSP + jalShoppingLSP;
   
   int get jalCount => legs.where((leg) => leg['airline'] == 'JAL' && leg['calculatedFOP'] != null).length;
@@ -414,14 +361,12 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   int get anaFare { int sum = 0; for (var leg in legs) { if (leg['airline'] != 'ANA') continue; final legId = leg['id'] as int; sum += int.tryParse(fareAmountControllers[legId]?.text ?? '') ?? 0; } return sum; }
   String get anaUnitPrice => (anaFare > 0 && anaPP > 0) ? (anaFare / anaPP).toStringAsFixed(1) : '-';
 
-  // ============ CSVエクスポート機能（NEW） ============
+  // CSVエクスポート機能
   void _exportToCSV() {
-    // ヘッダー行
     List<List<dynamic>> rows = [
       ['航空会社', '日付', '便名', '出発地', '到着地', '出発時刻', '到着時刻', '運賃種別', '座席クラス', '運賃(円)', 'FOP/PP', 'マイル', 'LSP', '単価']
     ];
     
-    // データ行
     for (var leg in legs) {
       final legId = leg['id'] as int;
       final airline = leg['airline'] as String;
@@ -449,10 +394,8 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       ]);
     }
     
-    // 空行
     rows.add([]);
     
-    // サマリー行追加
     if (jalCount > 0) {
       rows.add(['【JAL合計】', '', '', '', '', '', '', 'カード: ${selectedJALCard ?? "-"}', 'ステータス: ${selectedJALStatus ?? "-"}', jalFare > 0 ? jalFare : '', jalFOP, jalMiles, jalTotalLSP, jalUnitPrice]);
     }
@@ -460,29 +403,24 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       rows.add(['【ANA合計】', '', '', '', '', '', '', 'カード: ${selectedANACard ?? "-"}', 'ステータス: ${selectedANAStatus ?? "-"}', anaFare > 0 ? anaFare : '', anaPP, anaMiles, '', anaUnitPrice]);
     }
     
-    // CSV生成
     String csv = const ListToCsvConverter().convert(rows);
     
-    // BOMを追加（Excel用UTF-8）
     final bytes = utf8.encode('\uFEFF$csv');
     final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
     final url = html.Url.createObjectUrlFromBlob(blob);
     
-    // ダウンロード
     final anchor = html.AnchorElement(href: url)
       ..setAttribute('download', 'flight_simulation_${DateTime.now().toString().substring(0, 10)}.csv')
       ..click();
     
     html.Url.revokeObjectUrl(url);
     
-    // フィードバック
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('CSVをダウンロードしました'), duration: Duration(seconds: 2)),
     );
   }
 
   bool get _hasCalculatedLegs => legs.any((l) => l['calculatedFOP'] != null);
-  // ============ CSVエクスポート機能ここまで ============
 
   @override
   Widget build(BuildContext context) {
@@ -495,7 +433,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
           decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey[300]!)),
           child: Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
             _buildCompactDropdown('JALカード', 150, selectedJALCard, jalCardTypes, Colors.red, _onJALCardChanged),
-            // JALカードツアープレミアム & ショッピングマイルプレミアム チェックボックス（縦並び）
             Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisSize: MainAxisSize.min, children: [
                 SizedBox(width: 18, height: 18, child: Checkbox(value: jalTourPremium, onChanged: _onJALTourPremiumChanged, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap)),
@@ -516,7 +453,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
             _buildCompactDropdown('JALステータス', 120, selectedJALStatus, jalStatusTypes, Colors.red, _onJALStatusChanged),
             _buildMiniStat('FOP', _formatNumber(jalFOP), Colors.red),
             _buildMiniStat('マイル', _formatNumber(jalMiles), Colors.red),
-            _buildMiniStat('LSP', '${_formatNumber(jalFlightLSP)}+${_formatNumber(jalShoppingLSP)}', Colors.red), // フライト+ショッピング
+            _buildMiniStat('LSP', '${_formatNumber(jalFlightLSP)}+${_formatNumber(jalShoppingLSP)}', Colors.red),
             _buildMiniStat('レグ', '$jalCount', Colors.red),
             _buildMiniStat('総額', jalFare > 0 ? '¥${_formatNumber(jalFare)}' : '-', Colors.red),
             _buildMiniStat('単価', jalUnitPrice != '-' ? '¥$jalUnitPrice' : '-', Colors.red),
@@ -528,7 +465,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
             _buildMiniStat('レグ', '$anaCount', Colors.blue),
             _buildMiniStat('総額', anaFare > 0 ? '¥${_formatNumber(anaFare)}' : '-', Colors.blue),
             _buildMiniStat('単価', anaUnitPrice != '-' ? '¥$anaUnitPrice' : '-', Colors.blue),
-            // CSVダウンロードボタン（NEW）
             Container(width: 1, height: 36, color: Colors.grey[300]),
             Tooltip(
               message: 'CSVダウンロード',
@@ -552,7 +488,13 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: labelColor)),
       const SizedBox(height: 2),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: labelColor.withOpacity(0.3)), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(value: value, isExpanded: true, underline: const SizedBox(), icon: Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey[600]), menuWidth: width + 100,
+        child: DropdownButton<String>(
+          value: value, 
+          isExpanded: true, 
+          underline: const SizedBox(), 
+          itemHeight: null,
+          icon: Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey[600]), 
+          menuWidth: width + 100,
           hint: Padding(padding: const EdgeInsets.only(left: 4), child: Text('選択', style: TextStyle(fontSize: 10, color: Colors.grey[600]))),
           selectedItemBuilder: (context) => items.map((e) => Padding(padding: const EdgeInsets.only(left: 4), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10, color: Colors.black), overflow: TextOverflow.ellipsis)))).toList(),
           items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10, color: Colors.black)))).toList(),
@@ -584,7 +526,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // JALの場合はLSPも表示
           if (airline == 'JAL')
             Text('$pointLabel: $fop  マイル: $miles  LSP: ${lsp ?? 0}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11))
           else
@@ -598,7 +539,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   Widget _buildLegCard(BuildContext context, Map<String, dynamic> leg, int index) {
     final legId = leg['id'] as int; final airline = leg['airline'] as String;
     final fop = leg['calculatedFOP'] as int?; final miles = leg['calculatedMiles'] as int?;
-    final lsp = leg['calculatedLSP'] as int?; // LSP追加
+    final lsp = leg['calculatedLSP'] as int?;
     final airlineColor = airline == 'JAL' ? Colors.red : Colors.blue;
     return Container(
       margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(12),
@@ -621,7 +562,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
           _buildFareTypeDropdown(leg, legId, index), const SizedBox(width: 8),
           _buildSeatClassDropdown(leg, legId, index), const SizedBox(width: 8),
           _buildTextField('運賃', 70, fareAmountControllers[legId]!, '15000', onChanged: (_) => setState(() {})), const SizedBox(width: 8),
-          // LSP追加: lspパラメータを追加
           if (fop != null) _buildPointsDisplay(airline, fop, miles, lsp, legId),
         ])),
         const SizedBox(height: 8),
@@ -637,7 +577,11 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     return SizedBox(width: 60, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('航空会社', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(value: airline.isEmpty ? null : airline, isExpanded: true, underline: const SizedBox(),
+        child: DropdownButton<String>(
+          value: airline.isEmpty ? null : airline, 
+          isExpanded: true, 
+          underline: const SizedBox(),
+          itemHeight: null,
           hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 12))),
           selectedItemBuilder: (context) => airlines.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: TextStyle(fontSize: 12, color: e == 'JAL' ? Colors.red : Colors.blue, fontWeight: FontWeight.bold))))).toList(),
           items: airlines.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: 12, color: e == 'JAL' ? Colors.red : Colors.blue, fontWeight: FontWeight.bold)))).toList(),
@@ -647,18 +591,22 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     ]));
   }
 
-  // 修正2: 航空会社別就航空港のみ表示
   Widget _buildDepartureDropdown(Map<String, dynamic> leg, int legId, int index) {
     final airline = leg['airline'] as String;
     final departure = leg['departureAirport'] as String;
-    // 就航空港リストを取得（キャッシュがあればそれを使用）
     final airportList = airlineAirports[airline] ?? airports;
     final currentValue = departure.isEmpty ? null : departure;
     final displayText = currentValue ?? '選択';
     return SizedBox(width: 85, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('出発地', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(key: ValueKey('departure_${legId}_$airline'), value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 150,
+        child: DropdownButton<String>(
+          key: ValueKey('departure_${legId}_$airline'), 
+          value: currentValue, 
+          isExpanded: true, 
+          underline: const SizedBox(), 
+          itemHeight: null,
+          menuWidth: 150,
           hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(displayText, style: const TextStyle(fontSize: 12))),
           selectedItemBuilder: (context) => airportList.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 12))))).toList(),
           items: airportList.map((e) => DropdownMenuItem(value: e, child: Text('$e ${airportNames[e] ?? ''}', style: const TextStyle(fontSize: 12)))).toList(),
@@ -668,19 +616,23 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     ]));
   }
 
-  // 修正3: 就航路線のみ表示（フォールバック削除）
   Widget _buildDestinationDropdown(Map<String, dynamic> leg, int legId, int index) {
     final airline = leg['airline'] as String;
     final arrival = leg['arrivalAirport'] as String;
     final destinations = availableDestinations[legId] ?? [];
-    // フォールバック削除: 就航先がなければ空のまま
     final displayItems = ['', ...destinations];
     final currentValue = arrival.isEmpty || !displayItems.contains(arrival) ? null : arrival;
     final displayText = currentValue ?? '選択';
     return SizedBox(width: 85, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('到着地', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(key: ValueKey('destination_${legId}_$airline'), value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 150,
+        child: DropdownButton<String>(
+          key: ValueKey('destination_${legId}_$airline'), 
+          value: currentValue, 
+          isExpanded: true, 
+          underline: const SizedBox(), 
+          itemHeight: null,
+          menuWidth: 150,
           hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(displayText, style: const TextStyle(fontSize: 12))),
           selectedItemBuilder: (context) => displayItems.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 12))))).toList(),
           items: displayItems.map((e) => DropdownMenuItem(value: e.isEmpty ? null : e, child: Text(e.isEmpty ? '－' : '$e ${airportNames[e] ?? ''}', style: const TextStyle(fontSize: 12)))).toList(),
@@ -696,7 +648,13 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     return SizedBox(width: 70, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('出発時刻', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(key: ValueKey('flight_time_${legId}_$airline'), value: null, isExpanded: true, underline: const SizedBox(), menuWidth: 150,
+        child: DropdownButton<String>(
+          key: ValueKey('flight_time_${legId}_$airline'), 
+          value: null, 
+          isExpanded: true, 
+          underline: const SizedBox(), 
+          itemHeight: null,
+          menuWidth: 150,
           hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(currentTime.isEmpty ? '選択' : currentTime, style: const TextStyle(fontSize: 12))),
           items: [const DropdownMenuItem(value: '__clear__', child: Text('－', style: TextStyle(fontSize: 12))), ...flights.map((flight) { String depTime = flight['departure_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); final arrCode = flight['arrival_code'] ?? ''; return DropdownMenuItem(value: '${flight['id']}', child: Text('${airportNames[arrCode] ?? arrCode} $depTime', style: const TextStyle(fontSize: 12))); })],
           onChanged: (value) { if (value == null) return; if (value == '__clear__') { _clearFlightInfo(index, legId); return; } final flight = flights.firstWhere((f) => f['id'].toString() == value, orElse: () => {}); if (flight.isNotEmpty) { String depTime = flight['departure_time'] ?? ''; String arrTime = flight['arrival_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); if (arrTime.length > 5) arrTime = arrTime.substring(0, 5); departureTimeControllers[legId]?.text = depTime; arrivalTimeControllers[legId]?.text = arrTime; flightNumberControllers[legId]?.text = flight['flight_number'] ?? ''; setState(() => legs[index]['arrivalAirport'] = flight['arrival_code'] ?? ''); if (index + 1 < legs.length) _fetchAvailableFlights(index + 1); _calculateSingleLeg(index); } },
@@ -721,7 +679,12 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     return SizedBox(width: 150, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('運賃種別', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 250,
+        child: DropdownButton<String>(
+          value: currentValue, 
+          isExpanded: true, 
+          underline: const SizedBox(), 
+          itemHeight: null,
+          menuWidth: 250,
           hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 10))),
           selectedItemBuilder: (context) => fareTypes.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(),
           items: fareTypes.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(),
@@ -738,7 +701,12 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     return SizedBox(width: 100, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('座席クラス', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 150,
+        child: DropdownButton<String>(
+          value: currentValue, 
+          isExpanded: true, 
+          underline: const SizedBox(), 
+          itemHeight: null,
+          menuWidth: 150,
           hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 10))),
           selectedItemBuilder: (context) => seatClasses.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(),
           items: seatClasses.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(),
@@ -783,5 +751,3 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
 
   DateTime? _parseDate(String text) { if (text.isEmpty) return null; try { final parts = text.split('/'); if (parts.length == 3) return DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2])); } catch (e) {} return null; }
 }
-
-
