@@ -67,51 +67,106 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(_isLogin ? 'ログイン' : '新規登録', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('記録を保存してすごろくを進めよう！', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          const SizedBox(height: 24),
-          
-          TextField(
-            controller: _emailController,
-            decoration: const InputDecoration(labelText: 'メールアドレス', border: OutlineInputBorder(), isDense: true),
-            keyboardType: TextInputType.emailAddress,
-          ),
-          const SizedBox(height: 12),
-          
-          TextField(
-            controller: _passwordController,
-            decoration: const InputDecoration(labelText: 'パスワード', border: OutlineInputBorder(), isDense: true),
-            obscureText: true,
-          ),
-          const SizedBox(height: 16),
-          
-          if (_errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isLogin ? 'ログイン' : '新規登録'),
+        backgroundColor: Colors.purple[700],
+        foregroundColor: Colors.white,
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.flight_takeoff, size: 64, color: Colors.purple[700]),
+                const SizedBox(height: 16),
+                Text(_isLogin ? 'おかえりなさい！' : 'はじめまして！', 
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('記録を保存してすごろくを進めよう！', 
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                const SizedBox(height: 32),
+                
+                TextField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'メールアドレス', 
+                    border: OutlineInputBorder(), 
+                    isDense: true,
+                    prefixIcon: Icon(Icons.email),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 16),
+                
+                TextField(
+                  controller: _passwordController,
+                  decoration: const InputDecoration(
+                    labelText: 'パスワード', 
+                    border: OutlineInputBorder(), 
+                    isDense: true,
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 20),
+                
+                if (_errorMessage != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_errorMessage!, 
+                            style: TextStyle(color: Colors.red[700], fontSize: 13)),
+                        ),
+                      ],
+                    ),
+                  ),
+                
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple[700], 
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isLoading 
+                      ? const SizedBox(width: 20, height: 20, 
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+                      : Text(_isLogin ? 'ログイン' : '登録', 
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                TextButton(
+                  onPressed: () => setState(() { _isLogin = !_isLogin; _errorMessage = null; }),
+                  child: Text(
+                    _isLogin ? 'アカウントを新規作成する' : 'ログインに戻る', 
+                    style: TextStyle(fontSize: 14, color: Colors.purple[700]),
+                  ),
+                ),
+              ],
             ),
-          
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _submit,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B3A8B), foregroundColor: Colors.white),
-              child: _isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Text(_isLogin ? 'ログイン' : '登録'),
-            ),
           ),
-          const SizedBox(height: 12),
-          
-          TextButton(
-            onPressed: () => setState(() { _isLogin = !_isLogin; _errorMessage = null; }),
-            child: Text(_isLogin ? 'アカウントを作成' : 'ログインに戻る', style: const TextStyle(fontSize: 12)),
-          ),
-        ],
+        ),
       ),
     );
   }

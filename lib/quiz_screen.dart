@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
+import 'auth_screen.dart';
 
 class QuizScreen extends StatefulWidget {
   const QuizScreen({super.key});
@@ -20,7 +21,10 @@ class _QuizScreenState extends State<QuizScreen> {
   String? lastCorrectDate;
   bool alreadyAnsweredToday = false;
 
-  bool get isLoggedIn => Supabase.instance.client.auth.currentUser != null;
+  bool get isLoggedIn {
+    final user = Supabase.instance.client.auth.currentUser;
+    return user != null && !user.isAnonymous;
+  }
 
   @override
   void initState() {
@@ -102,6 +106,10 @@ class _QuizScreenState extends State<QuizScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('$answer でファイナルアンサー？'),
+        content: !isLoggedIn 
+          ? const Text('⚠️ ログインしないと修行ロードが進みません', 
+              style: TextStyle(color: Colors.orange, fontSize: 13))
+          : null,
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('やめる')),
           ElevatedButton(
@@ -115,31 +123,42 @@ class _QuizScreenState extends State<QuizScreen> {
     
     if (confirmed != true) return;
     
-    // 未ログインの場合の警告
+    // 未ログインの場合はログイン画面へ遷移
     if (!isLoggedIn) {
-      final proceed = await showDialog<bool>(
+      final shouldProceed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('ログインしていません'),
-          content: const Text('ログインしていないと、正解しても修行の記録が残りません。このまま回答しますか？'),
+          title: const Text('ログインが必要です'),
+          content: const Text('修行ロードを進めるにはログインが必要です。\nログイン画面に移動しますか？'),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(context, false);
-                // ログインダイアログを表示
-                _showLoginDialog();
-              },
-              child: const Text('ログインする'),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル'),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('このまま回答'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple[700], foregroundColor: Colors.white),
+              child: const Text('ログインする'),
             ),
           ],
         ),
       );
       
-      if (proceed != true) return;
+      if (shouldProceed == true && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AuthScreen(
+              onAuthSuccess: () {
+                Navigator.pop(context);
+                _fetchUserProgress();
+                setState(() {});
+              },
+            ),
+          ),
+        );
+      }
+      return;
     }
     
     _submitAnswer(answer);
@@ -234,18 +253,24 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   String _getTitle(int total) {
-    if (total >= 1000) return '伝説の修行僧';
-    if (total >= 500) return '金の翼';
-    if (total >= 100) return '銀の翼';
-    if (total >= 50) return '銅の翼';
-    if (total >= 10) return '見習い修行僧';
-    return '修行前';
+    if (total >= 1000) return 'グランドマスター';
+    if (total >= 500) return 'ミリオンマイラー';
+    if (total >= 200) return 'JGC/SFC';
+    if (total >= 100) return 'ダイヤモンド';
+    if (total >= 50) return 'サファイア';
+    if (total >= 30) return 'プラチナ';
+    if (total >= 15) return 'クリスタル';
+    if (total >= 5) return 'ブロンズ';
+    return '一般会員';
   }
 
   int _getNextMilestone(int total) {
-    if (total < 10) return 10;
+    if (total < 5) return 5;
+    if (total < 15) return 15;
+    if (total < 30) return 30;
     if (total < 50) return 50;
     if (total < 100) return 100;
+    if (total < 200) return 200;
     if (total < 500) return 500;
     if (total < 1000) return 1000;
     return total;
@@ -259,7 +284,7 @@ class _QuizScreenState extends State<QuizScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: _buildQuizSection()),
-        Expanded(child: isLoggedIn ? _buildSugorokuSection() : _buildLoginPrompt()),
+        Expanded(child: isLoggedIn ? _buildProgressSection() : _buildLoginPrompt()),
       ],
     );
   }
@@ -275,11 +300,32 @@ class _QuizScreenState extends State<QuizScreen> {
           children: [
             const Icon(Icons.flight_takeoff, size: 48, color: Color(0xFF8B3A8B)),
             const SizedBox(height: 12),
-            const Text('修行の記録を残そう！', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text('修行ロードを進めよう！', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text('ログインするとクイズの正解記録が保存され、\n称号を獲得できます', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
             const SizedBox(height: 16),
-            const Text('👆 右上のログインボタンから', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AuthScreen(
+                      onAuthSuccess: () {
+                        Navigator.pop(context);
+                        _fetchUserProgress();
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.login),
+              label: const Text('ログイン / 新規登録'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple[700],
+                foregroundColor: Colors.white,
+              ),
+            ),
           ],
         ),
       ),
@@ -367,7 +413,7 @@ class _QuizScreenState extends State<QuizScreen> {
               Icon(isCorrect! ? Icons.check_circle : Icons.cancel, color: isCorrect! ? Colors.green : Colors.red, size: 18),
               const SizedBox(width: 4),
               Text(isCorrect! ? '正解！' : '不正解', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isCorrect! ? Colors.green : Colors.red)),
-              if (isCorrect! && isLoggedIn && !alreadyAnsweredToday) const Text(' +1マス！', style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.bold)),
+              if (isCorrect! && isLoggedIn && !alreadyAnsweredToday) const Text(' +1問！', style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.bold)),
             ],
           ),
           if (explanation.isNotEmpty) ...[
@@ -379,7 +425,7 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildSugorokuSection() {
+  Widget _buildProgressSection() {
     final currentPos = totalCorrect % 10;
     final lap = (totalCorrect ~/ 10) + 1;
     final title = _getTitle(totalCorrect);
@@ -397,11 +443,11 @@ class _QuizScreenState extends State<QuizScreen> {
               gradient: const LinearGradient(colors: [Color(0xFF9C27B0), Color(0xFF7B1FA2)]),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text('🛫 $title', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+            child: Text('✈️ $title', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 8),
           
-          Text('累計: $totalCorrectマス | 第${lap}周', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text('修行ロード: $totalCorrect問正解 | 第${lap}周', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           
           Container(
@@ -442,7 +488,7 @@ class _QuizScreenState extends State<QuizScreen> {
           const SizedBox(height: 8),
           
           Text(
-            totalCorrect >= 1000 ? '最高称号達成！' : '次の称号「${_getTitle(nextMilestone)}」まで: あと${remaining}マス',
+            totalCorrect >= 1000 ? '🎉 最高称号達成！' : '次の称号「${_getTitle(nextMilestone)}」まで: あと${remaining}問',
             style: TextStyle(fontSize: 10, color: Colors.grey[600]),
           ),
         ],
