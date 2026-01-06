@@ -112,6 +112,14 @@ class _QuizScreenState extends State<QuizScreen> {
           : null,
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('やめる')),
+          if (!isLoggedIn)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, false);
+                Navigator.push(context, MaterialPageRoute(builder: (context) => AuthScreen(onAuthSuccess: () { Navigator.pop(context); _fetchUserProgress(); setState(() {}); })));
+              },
+              child: const Text('ログイン', style: TextStyle(color: Colors.purple)),
+            ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B3A8B), foregroundColor: Colors.white),

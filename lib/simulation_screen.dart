@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'dart:html' as html;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'auth_screen.dart';
 
 class SimulationScreen extends StatefulWidget {
   const SimulationScreen({super.key});
@@ -308,8 +312,24 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   void _onJALShoppingMilePremiumChanged(bool? v) { setState(() => jalShoppingMilePremium = v ?? false); }
 
   Future<void> _saveItinerary() async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('旅程を保存するにはログインが必要です'), backgroundColor: Colors.orange)); return; }
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null || user.isAnonymous) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('ログインが必要です'),
+            content: const Text('旅程を保存するにはログインしてください。'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル')),
+              ElevatedButton(onPressed: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (context) => AuthScreen(onAuthSuccess: () { Navigator.pop(context); setState(() {}); }))); }, child: const Text('ログイン')),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+    final userId = user.id;
     final validLegs = legs.where((leg) => leg['calculatedFOP'] != null).toList();
     if (validLegs.isEmpty) { setState(() => errorMessage = '保存するレグがありません'); return; }
     setState(() => isLoading = true);
@@ -322,6 +342,64 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       setState(() { isLoading = false; errorMessage = null; });
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('「$title」を保存しました'), backgroundColor: Colors.green));
     } catch (e) { setState(() { isLoading = false; errorMessage = '保存に失敗しました: $e'; }); }
+  }
+
+  void _downloadCsv() {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null || user.isAnonymous) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('ログインが必要です'),
+            content: const Text('CSVをダウンロードするにはログインしてください。'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル')),
+              ElevatedButton(onPressed: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (context) => AuthScreen(onAuthSuccess: () { Navigator.pop(context); setState(() {}); }))); }, child: const Text('ログイン')),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+    final validLegs = legs.where((leg) => leg['calculatedFOP'] != null).toList();
+    if (validLegs.isEmpty) { setState(() => errorMessage = 'ダウンロードするレグがありません'); return; }
+    
+    final csvRows = <String>[];
+    csvRows.add('日付,航空会社,便名,出発地,到着地,出発時刻,到着時刻,運賃種別,座席クラス,運賃,FOP/PP,マイル,LSP');
+    for (var leg in validLegs) {
+      final legId = leg['id'] as int;
+      final airline = leg['airline'] as String;
+      csvRows.add([
+        dateControllers[legId]?.text ?? '',
+        airline,
+        flightNumberControllers[legId]?.text ?? '',
+        leg['departureAirport'],
+        leg['arrivalAirport'],
+        departureTimeControllers[legId]?.text ?? '',
+        arrivalTimeControllers[legId]?.text ?? '',
+        '"${leg['fareType']}"',
+        leg['seatClass'],
+        fareAmountControllers[legId]?.text ?? '0',
+        '${leg['calculatedFOP'] ?? 0}',
+        '${leg['calculatedMiles'] ?? 0}',
+        airline == 'JAL' ? '${leg['calculatedLSP'] ?? 0}' : '-',
+      ].join(','));
+    }
+    csvRows.add('');
+    csvRows.add('合計,,,,,,,,,${ jalFare + anaFare },FOP:$jalFOP / PP:$anaPP,${jalMiles + anaMiles},$jalTotalLSP');
+    
+    final csvContent = csvRows.join('\n');
+    final bom = [0xEF, 0xBB, 0xBF];
+    final bytes = Uint8List.fromList([...bom, ...utf8.encode(csvContent)]);
+    final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', 'flight_simulation_${DateTime.now().toIso8601String().substring(0, 10)}.csv')
+      ..click();
+    html.Url.revokeObjectUrl(url);
+    
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CSVをダウンロードしました'), backgroundColor: Colors.green));
   }
 
   String _formatNumber(int number) => number == 0 ? '0' : number.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
@@ -392,6 +470,8 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
         _buildMiniStat('総額', anaFare > 0 ? '¥${_formatNumber(anaFare)}' : '-', Colors.blue), _buildMiniStat('単価', anaUnitPrice != '-' ? '¥$anaUnitPrice' : '-', Colors.blue),
         Container(width: 1, height: 36, color: Colors.grey[300]),
         ElevatedButton.icon(onPressed: _saveItinerary, icon: const Icon(Icons.save, size: 16), label: const Text('保存'), style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), textStyle: const TextStyle(fontSize: 11))),
+        const SizedBox(width: 8),
+        ElevatedButton.icon(onPressed: _downloadCsv, icon: const Icon(Icons.download, size: 16), label: const Text('CSV'), style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), textStyle: const TextStyle(fontSize: 11))),
       ]),
     );
   }
@@ -444,7 +524,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       if (fop != null) ...[const SizedBox(height: 8), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: airlineColor, borderRadius: BorderRadius.circular(8)),
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Row(children: [Text('${_formatNumber(fop)} ${airline == "JAL" ? "FOP" : "PP"}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(width: 10), Text('${_formatNumber(miles ?? 0)}マイル', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11)), if (airline == 'JAL' && lsp != null) ...[const SizedBox(width: 6), Text('${lsp}LSP', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11))]]), if (fare > 0) Text('¥$unitPrice/${airline == "JAL" ? "FOP" : "PP"}', style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 11))]))],
       const SizedBox(height: 6),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Row(children: [TextButton(onPressed: () => _clearLeg(index, legId), child: Text('クリア', style: TextStyle(color: Colors.grey[600], fontSize: 12))), if (legs.length > 1) TextButton(onPressed: () => _removeLeg(index), child: const Text('削除', style: TextStyle(color: Colors.red, fontSize: 12)))]), Row(children: [TextButton(onPressed: _addLeg, child: Text('+ 追加', style: TextStyle(color: Colors.green[700], fontSize: 12))), TextButton(onPressed: _saveItinerary, child: Text('保存', style: TextStyle(color: Colors.purple[700], fontSize: 12)))])]),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Row(children: [TextButton(onPressed: () => _clearLeg(index, legId), child: Text('クリア', style: TextStyle(color: Colors.grey[600], fontSize: 12))), if (legs.length > 1) TextButton(onPressed: () => _removeLeg(index), child: const Text('削除', style: TextStyle(color: Colors.red, fontSize: 12)))]), Row(children: [TextButton(onPressed: _addLeg, child: Text('+ 追加', style: TextStyle(color: Colors.green[700], fontSize: 12))), TextButton(onPressed: _saveItinerary, child: Text('保存', style: TextStyle(color: Colors.purple[700], fontSize: 12))), TextButton(onPressed: _downloadCsv, child: Text('CSV', style: TextStyle(color: Colors.teal[700], fontSize: 12)))])]),
     ]));
   }
 

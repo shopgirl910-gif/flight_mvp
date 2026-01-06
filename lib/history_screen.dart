@@ -18,6 +18,12 @@ class HistoryScreenState extends State<HistoryScreen> {
   void initState() {
     super.initState();
     _loadItineraries();
+    // ログイン状態の変化を監視
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (mounted) {
+        _loadItineraries();
+      }
+    });
   }
 
   // 外部から呼び出し可能なリフレッシュメソッド
@@ -28,10 +34,10 @@ class HistoryScreenState extends State<HistoryScreen> {
   Future<void> _loadItineraries() async {
     setState(() => isLoading = true);
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final user = Supabase.instance.client.auth.currentUser;
       
-      // ログインしていない場合は空リスト
-      if (userId == null) {
+      // ログインしていない or 匿名ユーザーの場合は空リスト
+      if (user == null || user.isAnonymous) {
         setState(() {
           itineraries = [];
           isLoading = false;
@@ -43,7 +49,7 @@ class HistoryScreenState extends State<HistoryScreen> {
       final response = await Supabase.instance.client
           .from('saved_itineraries')
           .select()
-          .eq('user_id', userId)
+          .eq('user_id', user.id)
           .order('created_at', ascending: false);
       
       setState(() {
@@ -126,7 +132,8 @@ class HistoryScreenState extends State<HistoryScreen> {
     }
 
     if (itineraries.isEmpty) {
-      final isLoggedIn = Supabase.instance.client.auth.currentUser != null;
+      final user = Supabase.instance.client.auth.currentUser;
+      final isLoggedIn = user != null && !user.isAnonymous;
       return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(isLoggedIn ? Icons.history : Icons.login, size: 64, color: Colors.grey[400]),
