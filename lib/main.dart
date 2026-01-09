@@ -4,13 +4,16 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'simulation_screen.dart';
 import 'history_screen.dart';
 import 'quiz_screen.dart';
+import 'checkin_screen.dart';
+import 'auth_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
     url: 'https://ipxlsygkxgmramrjazhj.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlweGxzeWdreGdtcmFtcmphemhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0Njk4MDgsImV4cCI6MjA4MDA0NTgwOH0.ZFr2MgXRA2Lx1xaDWqAPOSxf6N4kVtTq2IRbdlJrnjw',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlweGxzeWdreGdtcmFtcmphemhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0Njk4MDgsImV4cCI6MjA4MDA0NTgwOH0.ZFr2MgXRA2Lx1xaDWqAPOSxf6N4kVtTq2IRbdlJrnjw',
   );
 
   runApp(const MyApp());
@@ -23,18 +26,13 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MRP - Mileage Run Planner',
-      theme: ThemeData(
-        primarySwatch: Colors.purple,
-      ),
+      theme: ThemeData(primarySwatch: Colors.purple),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('ja'),
-        Locale('en'),
-      ],
+      supportedLocales: const [Locale('ja'), Locale('en')],
       home: const MainScreen(),
     );
   }
@@ -49,13 +47,44 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  
+  @override
+  void initState() {
+    super.initState();
+    _ensureSignedIn();
+    // ログイン状態の変化を監視
+    Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+      if (mounted) setState(() {});
+    });
+  }
 
-  final List<String> _tabLabels = ['Simulate', '履歴', 'クイズ'];
+  Future<void> _ensureSignedIn() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      await Supabase.instance.client.auth.signInAnonymously();
+    }
+  }
+
+  bool get _isLoggedIn {
+    final user = Supabase.instance.client.auth.currentUser;
+    return user != null && !user.isAnonymous;
+  }
+
+  String get _displayName {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null || user.isAnonymous) return 'guest';
+    final email = user.email ?? '';
+    if (email.length > 15) return '${email.substring(0, 12)}...';
+    return email;
+  }
+
+  final List<String> _tabLabels = ['Simulate', '履歴', 'クイズ', 'チェックイン'];
 
   final List<Widget> _screens = [
     const SimulationScreen(),
     const HistoryScreen(),
     const QuizScreen(),
+    const CheckinScreen(),
   ];
 
   @override
@@ -65,6 +94,50 @@ class _MainScreenState extends State<MainScreen> {
         title: const Text('MRP - Mileage Run Planner'),
         backgroundColor: Colors.purple[700],
         foregroundColor: Colors.white,
+        actions: [
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AuthScreen(
+                    onAuthSuccess: () {
+                      Navigator.pop(context);
+                      setState(() {}); // 画面を更新
+                    },
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: _isLoggedIn ? Colors.white.withOpacity(0.2) : Colors.orange.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isLoggedIn ? Icons.person : Icons.person_outline,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _displayName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(50),
           child: Container(
@@ -77,12 +150,15 @@ class _MainScreenState extends State<MainScreen> {
                     onTap: () => setState(() => _selectedIndex = index),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: isSelected ? Colors.white : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
-                        border: isSelected 
-                            ? null 
+                        border: isSelected
+                            ? null
                             : Border.all(color: Colors.white38, width: 1),
                       ),
                       child: Text(
@@ -90,7 +166,9 @@ class _MainScreenState extends State<MainScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: isSelected ? Colors.purple[700] : Colors.white,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           fontSize: 14,
                         ),
                       ),
@@ -102,10 +180,7 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _screens),
     );
   }
 }
