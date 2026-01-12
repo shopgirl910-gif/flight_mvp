@@ -139,48 +139,20 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-          // ログイン/ログアウトボタン
+          // ログインボタン
           GestureDetector(
             onTap: () {
-              if (_isLoggedIn) {
-                // ログアウト確認ダイアログ
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('ログアウト'),
-                    content: const Text('ログアウトしますか？'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('キャンセル'),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          Navigator.pop(context);
-                          await Supabase.instance.client.auth.signOut();
-                          // 匿名ユーザーとして再ログイン
-                          await Supabase.instance.client.auth.signInAnonymously();
-                          setState(() {});
-                        },
-                        child: const Text('ログアウト', style: TextStyle(color: Colors.red)),
-                      ),
-                    ],
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AuthScreen(
+                    onAuthSuccess: () {
+                      Navigator.pop(context);
+                      setState(() {}); // 画面を更新
+                    },
                   ),
-                );
-              } else {
-                // ログイン画面へ
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AuthScreen(
-                      onAuthSuccess: () {
-                        Navigator.pop(context);
-                        setState(() {});
-                      },
-                    ),
-                  ),
-                );
-              }
+                ),
+              );
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

@@ -263,23 +263,36 @@ class HistoryScreenState extends State<HistoryScreen> {
     final dep = leg['departure_airport'] as String? ?? '';
     final arr = leg['arrival_airport'] as String? ?? '';
     final flightNumber = leg['flight_number'] as String? ?? '';
+    final date = leg['date'] as String? ?? '';
     final fop = leg['fop'] as int? ?? 0;
+    final miles = leg['miles'] as int? ?? 0;
     final airlineColor = airline == 'JAL' ? Colors.red : Colors.blue;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
           decoration: BoxDecoration(color: airlineColor, borderRadius: BorderRadius.circular(4)),
           child: Text(airline, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
         ),
-        const SizedBox(width: 8),
-        Text('$flightNumber', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-        const SizedBox(width: 8),
-        Text('$dep → $arr', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-        const Spacer(),
-        Text('${airline == "JAL" ? "FOP" : "PP"}: $fop', style: TextStyle(fontSize: 11, color: airlineColor)),
+        const SizedBox(width: 6),
+        Text(flightNumber, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text('$dep → $arr', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text('${airline == "JAL" ? "FOP" : "PP"}: ${_formatNumber(fop)}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: airlineColor)),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              if (date.isNotEmpty) Text(date, style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+              if (date.isNotEmpty && miles > 0) const SizedBox(width: 6),
+              if (miles > 0) Text('${_formatNumber(miles)}M', style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+            ]),
+          ],
+        ),
       ]),
     );
   }

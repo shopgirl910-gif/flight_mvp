@@ -45,7 +45,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
   Set<String> expandedRegions = {};
 
   // チェックイン可能距離（メートル）
-  static const double checkinRadius = 3000;
+  double _getCheckinRadius(String airportCode) {
+    // 大空港は3km、それ以外は1.5km
+    const largeAirports = ['HND', 'KIX'];
+    return largeAirports.contains(airportCode) ? 3000 : 1500;
+  }
 
   @override
   void initState() {
@@ -189,10 +193,12 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
   Future<void> _checkin() async {
     if (nearestAirport == null || distanceToNearest == null) return;
-    if (distanceToNearest! > checkinRadius) {
+    final airportCode = nearestAirport!['code'] as String;
+    final radius = _getCheckinRadius(airportCode);
+    if (distanceToNearest! > radius) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('空港から${(distanceToNearest! / 1000).toStringAsFixed(1)}km離れています（${(checkinRadius / 1000).toStringAsFixed(0)}km以内でチェックイン可能）'),
+          content: Text('空港から${(distanceToNearest! / 1000).toStringAsFixed(1)}km離れています（${(radius / 1000).toStringAsFixed(1)}km以内でチェックイン可能）'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -244,8 +250,6 @@ class _CheckinScreenState extends State<CheckinScreen> {
       );
       return;
     }
-    
-    final airportCode = nearestAirport!['code'] as String;
     
     try {
       await Supabase.instance.client.from('airport_checkins').upsert({
@@ -352,9 +356,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
   }
 
   Widget _buildCheckinCard() {
+    final airportCode = nearestAirport?['code'] as String? ?? '';
+    final radius = _getCheckinRadius(airportCode);
     final canCheckin = nearestAirport != null && 
                        distanceToNearest != null && 
-                       distanceToNearest! <= checkinRadius;
+                       distanceToNearest! <= radius;
     final needsLogin = _isAnonymousUser;
     
     return Container(
@@ -394,13 +400,6 @@ class _CheckinScreenState extends State<CheckinScreen> {
               '${nearestAirport!['name_ja']}空港 (${nearestAirport!['code']})',
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 4),
-            Text(
-              distanceToNearest != null
-                  ? '現在地から ${(distanceToNearest! / 1000).toStringAsFixed(1)} km'
-                  : '距離計算中...',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
@@ -410,7 +409,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                 label: Text(
                   canCheckin 
                     ? (needsLogin ? 'ログインが必要です' : 'チェックイン')
-                    : '${(checkinRadius / 1000).toStringAsFixed(0)}km以内で可能'
+                    : '${(radius / 1000).toStringAsFixed(1)}km以内で可能'
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: canCheckin ? (needsLogin ? Colors.orange : Colors.green) : Colors.grey,

@@ -32,10 +32,11 @@ dependencies:
     sdk: flutter
   flutter_localizations: 
     sdk: flutter
+  intl: any          # ← この行を追加
   supabase_flutter: ^2.0.0  # ← この行を追加
 
   # The following adds the Cupertino Icons font to your application.
-  # Use with the CuprtinoIcons class for iOS style icons.
+  # Use withS the CuprtinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   csv: ^6.0.0
   universal_html: ^2.3.0
@@ -57,6 +58,7 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true     # ← この行を追加
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

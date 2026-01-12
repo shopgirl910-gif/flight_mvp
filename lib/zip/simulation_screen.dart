@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'auth_screen.dart';
-import 'l10n/app_localizations.dart';
 
 class SimulationScreen extends StatefulWidget {
   const SimulationScreen({super.key});
@@ -446,7 +445,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   }
 
   Widget _buildBottomActionBar() {
-    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -461,7 +459,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
               child: ElevatedButton.icon(
                 onPressed: _addLeg,
                 icon: const Icon(Icons.add, size: 18),
-                label: Text(l10n.addLeg),
+                label: const Text('レグ追加'),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green[600], foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10)),
               ),
             ),
@@ -470,7 +468,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
               child: ElevatedButton.icon(
                 onPressed: _saveItinerary,
                 icon: const Icon(Icons.save, size: 18),
-                label: Text(l10n.save),
+                label: const Text('保存'),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10)),
               ),
             ),
@@ -479,7 +477,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
               child: ElevatedButton.icon(
                 onPressed: _downloadCsv,
                 icon: const Icon(Icons.download, size: 18),
-                label: Text(l10n.csv),
+                label: const Text('CSV'),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10)),
               ),
             ),
@@ -499,7 +497,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   }
 
   Widget _buildMobileSummarySection() {
-    final l10n = AppLocalizations.of(context)!;
     final hasJAL = legs.any((l) => l['airline'] == 'JAL'), hasANA = legs.any((l) => l['airline'] == 'ANA');
     final totalFop = jalFOP + anaPP;
     final totalLegs = jalCount + anaCount;
@@ -516,23 +513,23 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
         child: Column(children: [
           Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(l10n.total, style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.8))),
+              Text('合計', style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.8))),
               Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 if (hasJAL) ...[
                   Text('${_formatNumber(jalFOP)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-                  Text(' ${l10n.fop}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                  const Text(' FOP', style: TextStyle(fontSize: 12, color: Colors.white70)),
                 ],
                 if (hasJAL && hasANA) const Text('  ', style: TextStyle(fontSize: 12)),
                 if (hasANA) ...[
                   Text('${_formatNumber(anaPP)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-                  Text(' ${l10n.pp}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                  const Text(' PP', style: TextStyle(fontSize: 12, color: Colors.white70)),
                 ],
               ]),
             ])),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(l10n.nLegs(totalLegs), style: const TextStyle(fontSize: 14, color: Colors.white)),
+              Text('$totalLegs レグ', style: const TextStyle(fontSize: 14, color: Colors.white)),
               if (jalUnitPrice != '-' || anaUnitPrice != '-')
-                Text(l10n.costPerPoint(jalUnitPrice != '-' ? jalUnitPrice : anaUnitPrice), style: TextStyle(fontSize: 12, color: Colors.yellow[200])),
+                Text('¥${jalUnitPrice != '-' ? jalUnitPrice : anaUnitPrice}/P', style: TextStyle(fontSize: 12, color: Colors.yellow[200])),
             ]),
           ]),
           const SizedBox(height: 8),
@@ -548,7 +545,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Icon(Icons.settings, size: 16, color: Colors.white.withOpacity(0.9)),
                 const SizedBox(width: 6),
-                Text(l10n.cardStatusSettings, style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9))),
+                Text('カード・ステータス設定', style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9))),
                 const SizedBox(width: 4),
                 Icon(_isSettingsExpanded ? Icons.expand_less : Icons.expand_more, size: 18, color: Colors.white.withOpacity(0.9)),
               ]),
@@ -567,7 +564,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   }
 
   Widget _buildMobileSettingsPanel() {
-    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 8),
@@ -582,25 +578,25 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
           Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
             child: const Text('JAL', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
           const SizedBox(width: 8),
-          GestureDetector(onTap: _openHapitas, child: Text(l10n.cardNotIssued, style: TextStyle(fontSize: 10, color: Colors.red.withOpacity(0.7), decoration: TextDecoration.underline))),
+          GestureDetector(onTap: _openHapitas, child: Text('💡カード未発行の方', style: TextStyle(fontSize: 10, color: Colors.red.withOpacity(0.7), decoration: TextDecoration.underline))),
         ]),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: _buildMobileSettingDropdown(l10n.card, selectedJALCard, jalCardTypes, Colors.red, _onJALCardChanged)),
+          Expanded(child: _buildMobileSettingDropdown('カード', selectedJALCard, jalCardTypes, Colors.red, _onJALCardChanged)),
           const SizedBox(width: 8),
-          Expanded(child: _buildMobileSettingDropdown(l10n.status, selectedJALStatus, jalStatusTypes, Colors.red, _onJALStatusChanged)),
+          Expanded(child: _buildMobileSettingDropdown('ステータス', selectedJALStatus, jalStatusTypes, Colors.red, _onJALStatusChanged)),
         ]),
         const SizedBox(height: 6),
         Row(children: [
           Expanded(child: Row(children: [
             SizedBox(width: 20, height: 20, child: Checkbox(value: jalTourPremium, onChanged: _onJALTourPremiumChanged, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap)),
             const SizedBox(width: 4),
-            Text(l10n.tourPremium, style: const TextStyle(fontSize: 11)),
+            const Text('ツアープレミアム', style: TextStyle(fontSize: 11)),
           ])),
           Expanded(child: Row(children: [
             SizedBox(width: 20, height: 20, child: Checkbox(value: isAutoShoppingMilePremium || jalShoppingMilePremium, onChanged: isAutoShoppingMilePremium ? null : _onJALShoppingMilePremiumChanged, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap)),
             const SizedBox(width: 4),
-            Text(l10n.shoppingMileP, style: TextStyle(fontSize: 11, color: isAutoShoppingMilePremium ? Colors.grey : Colors.black)),
+            Text('ショッピングマイルP', style: TextStyle(fontSize: 11, color: isAutoShoppingMilePremium ? Colors.grey : Colors.black)),
           ])),
         ]),
         const SizedBox(height: 12),
@@ -609,20 +605,19 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
           Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(4)),
             child: const Text('ANA', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
           const SizedBox(width: 8),
-          GestureDetector(onTap: _openHapitas, child: Text(l10n.cardNotIssued, style: TextStyle(fontSize: 10, color: Colors.blue.withOpacity(0.7), decoration: TextDecoration.underline))),
+          GestureDetector(onTap: _openHapitas, child: Text('💡カード未発行の方', style: TextStyle(fontSize: 10, color: Colors.blue.withOpacity(0.7), decoration: TextDecoration.underline))),
         ]),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: _buildMobileSettingDropdown(l10n.card, selectedANACard, anaCardTypes, Colors.blue, _onANACardChanged)),
+          Expanded(child: _buildMobileSettingDropdown('カード', selectedANACard, anaCardTypes, Colors.blue, _onANACardChanged)),
           const SizedBox(width: 8),
-          Expanded(child: _buildMobileSettingDropdown(l10n.status, selectedANAStatus, anaStatusTypes, Colors.blue, _onANAStatusChanged)),
+          Expanded(child: _buildMobileSettingDropdown('ステータス', selectedANAStatus, anaStatusTypes, Colors.blue, _onANAStatusChanged)),
         ]),
       ]),
     );
   }
 
   Widget _buildMobileSettingDropdown(String label, String? value, List<String> items, Color color, void Function(String?) onChanged) {
-    final l10n = AppLocalizations.of(context)!;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)),
       const SizedBox(height: 2),
@@ -634,7 +629,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
           isExpanded: true,
           underline: const SizedBox(),
           icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.grey[600]),
-          hint: Padding(padding: const EdgeInsets.only(left: 8), child: Text(l10n.select, style: TextStyle(fontSize: 11, color: Colors.grey[500]))),
+          hint: Padding(padding: const EdgeInsets.only(left: 8), child: Text('選択', style: TextStyle(fontSize: 11, color: Colors.grey[500]))),
           selectedItemBuilder: (c) => items.map((e) => Padding(padding: const EdgeInsets.only(left: 8), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis)))).toList(),
           items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 11)))).toList(),
           onChanged: onChanged,
@@ -644,7 +639,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   }
 
   Widget _buildDesktopSummaryBar() {
-    final l10n = AppLocalizations.of(context)!;
     final hasJAL = legs.any((l) => l['airline'] == 'JAL'), hasANA = legs.any((l) => l['airline'] == 'ANA');
     
     return Container(
@@ -661,15 +655,15 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
               Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
                 child: const Text('JAL', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
               const SizedBox(width: 8),
-              _buildMiniStat(l10n.fop, _formatNumber(jalFOP), Colors.red),
+              _buildMiniStat('FOP', _formatNumber(jalFOP), Colors.red),
               const SizedBox(width: 8),
-              _buildMiniStat(l10n.miles, _formatNumber(jalMiles), Colors.red),
+              _buildMiniStat('マイル', _formatNumber(jalMiles), Colors.red),
               const SizedBox(width: 8),
-              _buildMiniStat(l10n.lsp, '${_formatNumber(jalFlightLSP + jalShoppingLSP)}', Colors.red),
+              _buildMiniStat('LSP', '${_formatNumber(jalFlightLSP + jalShoppingLSP)}', Colors.red),
               const SizedBox(width: 8),
-              _buildMiniStat(l10n.legs, '$jalCount', Colors.red),
-              if (jalFare > 0) ...[const SizedBox(width: 8), _buildMiniStat(l10n.totalFare, '¥${_formatNumber(jalFare)}', Colors.red)],
-              if (jalUnitPrice != '-') ...[const SizedBox(width: 8), _buildMiniStat(l10n.unitPrice, '¥$jalUnitPrice', Colors.red)],
+              _buildMiniStat('レグ', '$jalCount', Colors.red),
+              if (jalFare > 0) ...[const SizedBox(width: 8), _buildMiniStat('総額', '¥${_formatNumber(jalFare)}', Colors.red)],
+              if (jalUnitPrice != '-') ...[const SizedBox(width: 8), _buildMiniStat('単価', '¥$jalUnitPrice', Colors.red)],
             ],
             if (hasJAL && hasANA) Container(width: 1, height: 30, margin: const EdgeInsets.symmetric(horizontal: 12), color: Colors.grey[300]),
             // ANAサマリー
@@ -677,13 +671,13 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
               Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(4)),
                 child: const Text('ANA', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
               const SizedBox(width: 8),
-              _buildMiniStat(l10n.pp, _formatNumber(anaPP), Colors.blue),
+              _buildMiniStat('PP', _formatNumber(anaPP), Colors.blue),
               const SizedBox(width: 8),
-              _buildMiniStat(l10n.miles, _formatNumber(anaMiles), Colors.blue),
+              _buildMiniStat('マイル', _formatNumber(anaMiles), Colors.blue),
               const SizedBox(width: 8),
-              _buildMiniStat(l10n.legs, '$anaCount', Colors.blue),
-              if (anaFare > 0) ...[const SizedBox(width: 8), _buildMiniStat(l10n.totalFare, '¥${_formatNumber(anaFare)}', Colors.blue)],
-              if (anaUnitPrice != '-') ...[const SizedBox(width: 8), _buildMiniStat(l10n.unitPrice, '¥$anaUnitPrice', Colors.blue)],
+              _buildMiniStat('レグ', '$anaCount', Colors.blue),
+              if (anaFare > 0) ...[const SizedBox(width: 8), _buildMiniStat('総額', '¥${_formatNumber(anaFare)}', Colors.blue)],
+              if (anaUnitPrice != '-') ...[const SizedBox(width: 8), _buildMiniStat('単価', '¥$anaUnitPrice', Colors.blue)],
             ],
             const Spacer(),
             // 設定展開ボタン
@@ -695,7 +689,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.settings, size: 14, color: Colors.purple[700]),
                   const SizedBox(width: 4),
-                  Text(l10n.cardStatusSettings, style: TextStyle(fontSize: 11, color: Colors.purple[700])),
+                  Text('カード設定', style: TextStyle(fontSize: 11, color: Colors.purple[700])),
                   const SizedBox(width: 2),
                   Icon(_isSettingsExpanded ? Icons.expand_less : Icons.expand_more, size: 16, color: Colors.purple[700]),
                 ]),
@@ -703,9 +697,9 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
             ),
             const SizedBox(width: 8),
             // 保存・CSVボタン
-            ElevatedButton.icon(onPressed: _saveItinerary, icon: const Icon(Icons.save, size: 14), label: Text(l10n.save), style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), textStyle: const TextStyle(fontSize: 11))),
+            ElevatedButton.icon(onPressed: _saveItinerary, icon: const Icon(Icons.save, size: 14), label: const Text('保存'), style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), textStyle: const TextStyle(fontSize: 11))),
             const SizedBox(width: 6),
-            ElevatedButton.icon(onPressed: _downloadCsv, icon: const Icon(Icons.download, size: 14), label: Text(l10n.csv), style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), textStyle: const TextStyle(fontSize: 11))),
+            ElevatedButton.icon(onPressed: _downloadCsv, icon: const Icon(Icons.download, size: 14), label: const Text('CSV'), style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), textStyle: const TextStyle(fontSize: 11))),
           ]),
         ),
         // 設定パネル（展開時）
@@ -716,23 +710,23 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
             child: Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
               // JAL設定
               SizedBox(width: 150, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [Text('JAL ${l10n.card}', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.red)), const SizedBox(width: 4), GestureDetector(onTap: _openHapitas, child: Text(l10n.cardNotIssued, style: TextStyle(fontSize: 9, color: Colors.red.withOpacity(0.7), decoration: TextDecoration.underline)))]),
+                Row(children: [Text('JALカード', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.red)), const SizedBox(width: 4), GestureDetector(onTap: _openHapitas, child: Text('💡カード未発行の方', style: TextStyle(fontSize: 9, color: Colors.red.withOpacity(0.7), decoration: TextDecoration.underline)))]),
                 const SizedBox(height: 2), Container(height: 26, decoration: BoxDecoration(border: Border.all(color: Colors.red.withOpacity(0.3)), borderRadius: BorderRadius.circular(4)),
-                  child: DropdownButton<String>(value: selectedJALCard, isExpanded: true, underline: const SizedBox(), icon: Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey[600]), menuWidth: 250, hint: Padding(padding: const EdgeInsets.only(left: 4), child: Text(l10n.select, style: TextStyle(fontSize: 10, color: Colors.grey[600]))), selectedItemBuilder: (c) => jalCardTypes.map((e) => Padding(padding: const EdgeInsets.only(left: 4), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(), items: jalCardTypes.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(), onChanged: _onJALCardChanged)),
+                  child: DropdownButton<String>(value: selectedJALCard, isExpanded: true, underline: const SizedBox(), icon: Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey[600]), menuWidth: 250, hint: Padding(padding: const EdgeInsets.only(left: 4), child: Text('選択', style: TextStyle(fontSize: 10, color: Colors.grey[600]))), selectedItemBuilder: (c) => jalCardTypes.map((e) => Padding(padding: const EdgeInsets.only(left: 4), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(), items: jalCardTypes.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(), onChanged: _onJALCardChanged)),
               ])),
               Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(mainAxisSize: MainAxisSize.min, children: [SizedBox(width: 18, height: 18, child: Checkbox(value: jalTourPremium, onChanged: _onJALTourPremiumChanged, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap)), const SizedBox(width: 4), Text(l10n.tourPremium, style: const TextStyle(fontSize: 9, color: Colors.red))]),
-                Row(mainAxisSize: MainAxisSize.min, children: [SizedBox(width: 18, height: 18, child: Checkbox(value: isAutoShoppingMilePremium || jalShoppingMilePremium, onChanged: isAutoShoppingMilePremium ? null : _onJALShoppingMilePremiumChanged, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap)), const SizedBox(width: 4), Text(l10n.shoppingMileP, style: TextStyle(fontSize: 9, color: isAutoShoppingMilePremium ? Colors.grey : Colors.red))]),
+                Row(mainAxisSize: MainAxisSize.min, children: [SizedBox(width: 18, height: 18, child: Checkbox(value: jalTourPremium, onChanged: _onJALTourPremiumChanged, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap)), const SizedBox(width: 4), const Text('ツアープレミアム', style: TextStyle(fontSize: 9, color: Colors.red))]),
+                Row(mainAxisSize: MainAxisSize.min, children: [SizedBox(width: 18, height: 18, child: Checkbox(value: isAutoShoppingMilePremium || jalShoppingMilePremium, onChanged: isAutoShoppingMilePremium ? null : _onJALShoppingMilePremiumChanged, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap)), const SizedBox(width: 4), Text('ショッピングマイルP', style: TextStyle(fontSize: 9, color: isAutoShoppingMilePremium ? Colors.grey : Colors.red))]),
               ]),
-              _buildCompactDropdown('JAL ${l10n.status}', 120, selectedJALStatus, jalStatusTypes, Colors.red, _onJALStatusChanged),
+              _buildCompactDropdown('JALステータス', 120, selectedJALStatus, jalStatusTypes, Colors.red, _onJALStatusChanged),
               Container(width: 1, height: 36, color: Colors.grey[300]),
               // ANA設定
               SizedBox(width: 150, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [Text('ANA ${l10n.card}', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blue)), const SizedBox(width: 4), GestureDetector(onTap: _openHapitas, child: Text(l10n.cardNotIssued, style: TextStyle(fontSize: 9, color: Colors.blue.withOpacity(0.7), decoration: TextDecoration.underline)))]),
+                Row(children: [Text('ANAカード', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blue)), const SizedBox(width: 4), GestureDetector(onTap: _openHapitas, child: Text('💡カード未発行の方', style: TextStyle(fontSize: 9, color: Colors.blue.withOpacity(0.7), decoration: TextDecoration.underline)))]),
                 const SizedBox(height: 2), Container(height: 26, decoration: BoxDecoration(border: Border.all(color: Colors.blue.withOpacity(0.3)), borderRadius: BorderRadius.circular(4)),
-                  child: DropdownButton<String>(value: selectedANACard, isExpanded: true, underline: const SizedBox(), icon: Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey[600]), menuWidth: 250, hint: Padding(padding: const EdgeInsets.only(left: 4), child: Text(l10n.select, style: TextStyle(fontSize: 10, color: Colors.grey[600]))), selectedItemBuilder: (c) => anaCardTypes.map((e) => Padding(padding: const EdgeInsets.only(left: 4), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(), items: anaCardTypes.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(), onChanged: _onANACardChanged)),
+                  child: DropdownButton<String>(value: selectedANACard, isExpanded: true, underline: const SizedBox(), icon: Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey[600]), menuWidth: 250, hint: Padding(padding: const EdgeInsets.only(left: 4), child: Text('選択', style: TextStyle(fontSize: 10, color: Colors.grey[600]))), selectedItemBuilder: (c) => anaCardTypes.map((e) => Padding(padding: const EdgeInsets.only(left: 4), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(), items: anaCardTypes.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(), onChanged: _onANACardChanged)),
               ])),
-              _buildCompactDropdown('ANA ${l10n.status}', 140, selectedANAStatus, anaStatusTypes, Colors.blue, _onANAStatusChanged),
+              _buildCompactDropdown('ANAステータス', 140, selectedANAStatus, anaStatusTypes, Colors.blue, _onANAStatusChanged),
             ]),
           ),
         ],
@@ -741,7 +735,6 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   }
 
   Widget _buildMobileSummaryCard(String airline, Color color) {
-    final l10n = AppLocalizations.of(context)!;
     final isJAL = airline == 'JAL';
     final fop = isJAL ? jalFOP : anaPP;
     final miles = isJAL ? jalMiles : anaMiles;
@@ -766,17 +759,17 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
               child: Text(airline, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(width: 10),
-            Text(l10n.nLegs(count), style: TextStyle(fontSize: 12, color: color)),
+            Text('$count レグ', style: TextStyle(fontSize: 12, color: color)),
             const Spacer(),
             Text('${_formatNumber(fop)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-            Text(' ${isJAL ? l10n.fop : l10n.pp}', style: TextStyle(fontSize: 11, color: color.withOpacity(0.7))),
+            Text(' ${isJAL ? "FOP" : "PP"}', style: TextStyle(fontSize: 11, color: color.withOpacity(0.7))),
           ]),
           const SizedBox(height: 6),
           Row(children: [
-            Text('${_formatNumber(miles)} ${l10n.miles}', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            Text('${_formatNumber(miles)} マイル', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
             if (isJAL) ...[
               const SizedBox(width: 12),
-              Text('${_formatNumber(jalFlightLSP + jalShoppingLSP)} ${l10n.lsp}', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+              Text('${_formatNumber(jalFlightLSP + jalShoppingLSP)} LSP', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
             ],
             const Spacer(),
             if (fare > 0) ...[
@@ -787,7 +780,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(color: Colors.yellow[100], borderRadius: BorderRadius.circular(4)),
-                child: Text('¥$unitPrice/${isJAL ? l10n.fop : l10n.pp}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)),
+                child: Text('¥$unitPrice/${isJAL ? "FOP" : "PP"}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)),
               ),
           ]),
         ],

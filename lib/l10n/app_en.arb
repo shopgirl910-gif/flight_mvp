@@ -1,0 +1,84 @@
+{
+  "@@locale": "en",
+  "appTitle": "MRP - Mileage Run Planner",
+  "tabSimulate": "Simulate",
+  "tabLog": "Flight Log",
+  "tabQuiz": "Quiz",
+  "tabCheckin": "Check-in",
+  "guest": "guest",
+  "login": "Login",
+  "logout": "Logout",
+  "logoutConfirm": "Are you sure you want to logout?",
+  "cancel": "Cancel",
+  "save": "Save",
+  "delete": "Delete",
+  "clear": "Clear",
+  "add": "Add",
+  "addLeg": "Add Leg",
+  "csv": "CSV",
+  "share": "Share",
+  "select": "Select",
+  "loginRequired": "Login Required",
+  "loginToSave": "Please login to save your itinerary.",
+  "loginToDownload": "Please login to download CSV.",
+  "fop": "FOP",
+  "pp": "PP",
+  "miles": "Miles",
+  "lsp": "LSP",
+  "legs": "Legs",
+  "leg": "Leg",
+  "totalFare": "Total",
+  "unitPrice": "Cost/Point",
+  "total": "Total",
+  "airline": "Airline",
+  "flightNumber": "Flight",
+  "departure": "Departure",
+  "arrival": "Arrival",
+  "departureAirport": "From",
+  "arrivalAirport": "To",
+  "departureTime": "Dep Time",
+  "arrivalTime": "Arr Time",
+  "fareType": "Fare Type",
+  "seatClass": "Class",
+  "fareAmount": "Fare",
+  "fareAmountYen": "Fare(¥)",
+  "date": "Date",
+  "noLegsToSave": "No legs to save",
+  "noLegsToDownload": "No legs to download",
+  "savedSuccess": "Saved \"{title}\"",
+  "@savedSuccess": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+  "csvDownloaded": "CSV downloaded",
+  "cardStatusSettings": "Card & Status Settings",
+  "card": "Card",
+  "status": "Status",
+  "cardNotIssued": "💡No card yet?",
+  "tourPremium": "Tour Premium",
+  "shoppingMileP": "Shopping Mile P",
+  "flightNotFound": "Flight {flightNumber} not found",
+  "@flightNotFound": {
+    "placeholders": {
+      "flightNumber": {"type": "String"}
+    }
+  },
+  "enterFlightNumber": "Enter flight number",
+  "saveFailed": "Save failed",
+  "scheduleWarning": "⚠️ Schedule changes in some periods",
+  "nLegs": "{count} Legs",
+  "@nLegs": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "costPerPoint": "¥{price}/P",
+  "@costPerPoint": {
+    "placeholders": {
+      "price": {"type": "String"}
+    }
+  },
+  "notCalculated": "Not calculated",
+  "routeNotSet": "Route not set"
+}

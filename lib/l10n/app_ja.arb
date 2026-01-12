@@ -1,0 +1,84 @@
+{
+  "@@locale": "ja",
+  "appTitle": "MRP - Mileage Run Planner",
+  "tabSimulate": "シミュレート",
+  "tabLog": "修行ログ",
+  "tabQuiz": "クイズ",
+  "tabCheckin": "チェックイン",
+  "guest": "guest",
+  "login": "ログイン",
+  "logout": "ログアウト",
+  "logoutConfirm": "ログアウトしますか？",
+  "cancel": "キャンセル",
+  "save": "保存",
+  "delete": "削除",
+  "clear": "クリア",
+  "add": "追加",
+  "addLeg": "レグ追加",
+  "csv": "CSV",
+  "share": "シェア",
+  "select": "選択",
+  "loginRequired": "ログインが必要です",
+  "loginToSave": "旅程を保存するにはログインしてください。",
+  "loginToDownload": "CSVをダウンロードするにはログインしてください。",
+  "fop": "FOP",
+  "pp": "PP",
+  "miles": "マイル",
+  "lsp": "LSP",
+  "legs": "レグ",
+  "leg": "レグ",
+  "totalFare": "総額",
+  "unitPrice": "単価",
+  "total": "合計",
+  "airline": "航空会社",
+  "flightNumber": "便名",
+  "departure": "出発",
+  "arrival": "到着",
+  "departureAirport": "出発地",
+  "arrivalAirport": "到着地",
+  "departureTime": "出発時刻",
+  "arrivalTime": "到着時刻",
+  "fareType": "運賃種別",
+  "seatClass": "座席クラス",
+  "fareAmount": "運賃",
+  "fareAmountYen": "運賃(円)",
+  "date": "日付",
+  "noLegsToSave": "保存するレグがありません",
+  "noLegsToDownload": "ダウンロードするレグがありません",
+  "savedSuccess": "「{title}」を保存しました",
+  "@savedSuccess": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+  "csvDownloaded": "CSVをダウンロードしました",
+  "cardStatusSettings": "カード・ステータス設定",
+  "card": "カード",
+  "status": "ステータス",
+  "cardNotIssued": "💡カード未発行の方",
+  "tourPremium": "ツアープレミアム",
+  "shoppingMileP": "ショッピングマイルP",
+  "flightNotFound": "{flightNumber}便が見つかりません",
+  "@flightNotFound": {
+    "placeholders": {
+      "flightNumber": {"type": "String"}
+    }
+  },
+  "enterFlightNumber": "便名を入力してください",
+  "saveFailed": "保存に失敗しました",
+  "scheduleWarning": "⚠️ 一部期間で時刻変更あり",
+  "nLegs": "{count} レグ",
+  "@nLegs": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "costPerPoint": "¥{price}/P",
+  "@costPerPoint": {
+    "placeholders": {
+      "price": {"type": "String"}
+    }
+  },
+  "notCalculated": "未計算",
+  "routeNotSet": "区間未設定"
+}
