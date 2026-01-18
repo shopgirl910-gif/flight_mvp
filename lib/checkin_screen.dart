@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:math';
 import 'auth_screen.dart';
+import 'l10n/app_localizations.dart';
 
 class CheckinScreen extends StatefulWidget {
   const CheckinScreen({super.key});
@@ -24,25 +25,43 @@ class _CheckinScreenState extends State<CheckinScreen> {
   // 展開中の都道府県
   Set<String> expandedPrefectures = {};
   
+  // 地方キー（多言語対応用）
+  static const List<String> regionKeys = [
+    'hokkaido', 'tohoku', 'kanto', 'chubu', 'kansai', 'chugoku', 'shikoku', 'kyushu', 'okinawa',
+  ];
+  
   // 地方→都道府県のマッピング
   static const Map<String, List<String>> regionPrefectures = {
-    '北海道': ['北海道'],
-    '東北': ['青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'],
-    '関東': ['東京都', '千葉県'],
-    '中部': ['新潟県', '長野県', '静岡県', '愛知県', '石川県', '富山県'],
-    '関西': ['大阪府', '兵庫県', '和歌山県'],
-    '中国': ['鳥取県', '島根県', '岡山県', '広島県', '山口県'],
-    '四国': ['香川県', '愛媛県', '高知県', '徳島県'],
-    '九州': ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県'],
-    '沖縄': ['沖縄県'],
+    'hokkaido': ['北海道'],
+    'tohoku': ['青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'],
+    'kanto': ['東京都', '千葉県'],
+    'chubu': ['新潟県', '長野県', '静岡県', '愛知県', '石川県', '富山県'],
+    'kansai': ['大阪府', '兵庫県', '和歌山県'],
+    'chugoku': ['鳥取県', '島根県', '岡山県', '広島県', '山口県'],
+    'shikoku': ['香川県', '愛媛県', '高知県', '徳島県'],
+    'kyushu': ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県'],
+    'okinawa': ['沖縄県'],
   };
-
-  static const List<String> regionOrder = [
-    '北海道', '東北', '関東', '中部', '関西', '中国', '四国', '九州', '沖縄',
-  ];
   
   // 展開中の地方
   Set<String> expandedRegions = {};
+
+  // 地方名を取得（多言語対応）
+  String _getRegionName(String key) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (key) {
+      case 'hokkaido': return l10n.regionHokkaido;
+      case 'tohoku': return l10n.regionTohoku;
+      case 'kanto': return l10n.regionKanto;
+      case 'chubu': return l10n.regionChubu;
+      case 'kansai': return l10n.regionKansai;
+      case 'chugoku': return l10n.regionChugoku;
+      case 'shikoku': return l10n.regionShikoku;
+      case 'kyushu': return l10n.regionKyushu;
+      case 'okinawa': return l10n.regionOkinawa;
+      default: return key;
+    }
+  }
 
   // チェックイン可能距離（メートル）
   double _getCheckinRadius(String airportCode) {
@@ -66,7 +85,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
       ]);
       await _getCurrentLocation();
     } catch (e) {
-      setState(() => errorMessage = 'データ読み込みエラー: $e');
+      final l10n = AppLocalizations.of(context)!;
+      setState(() => errorMessage = '${l10n.dataLoadError}: $e');
     } finally {
       setState(() => isLoading = false);
     }
@@ -75,7 +95,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
   Future<void> _loadAirports() async {
     final response = await Supabase.instance.client
         .from('airports')
-        .select('code, name_ja, prefecture, latitude, longitude')
+        .select('code, name_ja, name_en, prefecture, latitude, longitude')
         .eq('is_active', true)
         .not('prefecture', 'is', null);
     
@@ -112,18 +132,19 @@ class _CheckinScreenState extends State<CheckinScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       // 位置情報の許可確認
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          setState(() => errorMessage = '位置情報の許可が必要です');
+          setState(() => errorMessage = l10n.locationPermissionRequired);
           return;
         }
       }
       if (permission == LocationPermission.deniedForever) {
-        setState(() => errorMessage = '設定から位置情報を許可してください');
+        setState(() => errorMessage = l10n.enableLocationInSettings);
         return;
       }
 
@@ -136,7 +157,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
       // 最寄り空港を検索
       _findNearestAirport();
     } catch (e) {
-      setState(() => errorMessage = '位置情報取得エラー: $e');
+      setState(() => errorMessage = '${l10n.locationError}: $e');
     }
   }
 
@@ -191,14 +212,28 @@ class _CheckinScreenState extends State<CheckinScreen> {
     return user == null || user.isAnonymous;
   }
 
+  // 空港名を取得（多言語対応）
+  String _getAirportName(Map<String, dynamic> airport) {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    if (isJa) {
+      return airport['name_ja'] as String? ?? airport['code'] as String;
+    } else {
+      return airport['name_en'] as String? ?? airport['name_ja'] as String? ?? airport['code'] as String;
+    }
+  }
+
   Future<void> _checkin() async {
+    final l10n = AppLocalizations.of(context)!;
     if (nearestAirport == null || distanceToNearest == null) return;
     final airportCode = nearestAirport!['code'] as String;
     final radius = _getCheckinRadius(airportCode);
     if (distanceToNearest! > radius) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('空港から${(distanceToNearest! / 1000).toStringAsFixed(1)}km離れています（${(radius / 1000).toStringAsFixed(1)}km以内でチェックイン可能）'),
+          content: Text(l10n.tooFarFromAirport(
+            (distanceToNearest! / 1000).toStringAsFixed(1),
+            (radius / 1000).toStringAsFixed(1),
+          )),
           backgroundColor: Colors.orange,
         ),
       );
@@ -210,17 +245,17 @@ class _CheckinScreenState extends State<CheckinScreen> {
       final shouldLogin = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('ログインが必要です'),
-          content: const Text('チェックイン記録を保存するにはログインが必要です。\nログイン画面に移動しますか？'),
+          title: Text(l10n.loginRequired),
+          content: Text(l10n.loginRequiredForCheckin),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('キャンセル'),
+              child: Text(l10n.cancel),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.purple[700], foregroundColor: Colors.white),
-              child: const Text('ログインする'),
+              child: Text(l10n.goToLogin),
             ),
           ],
         ),
@@ -246,7 +281,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ログインが必要です'), backgroundColor: Colors.orange),
+        SnackBar(content: Text(l10n.loginRequired), backgroundColor: Colors.orange),
       );
       return;
     }
@@ -265,7 +300,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${nearestAirport!['name_ja']}空港にチェックインしました！'),
+            content: Text(l10n.checkinSuccess(_getAirportName(nearestAirport!))),
             backgroundColor: Colors.green,
           ),
         );
@@ -273,7 +308,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('チェックインエラー: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('${l10n.checkinError}: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -314,6 +349,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
   }
 
   Widget _buildProgressHeader(int checked, int total, double percent) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -330,7 +366,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('空港スタンプラリー', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(l10n.airportStampRally, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(16)),
@@ -349,13 +385,14 @@ class _CheckinScreenState extends State<CheckinScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text('${percent.toStringAsFixed(1)}% 制覇', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14)),
+          Text(l10n.conqueredPercent(percent.toStringAsFixed(1)), style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14)),
         ],
       ),
     );
   }
 
   Widget _buildCheckinCard() {
+    final l10n = AppLocalizations.of(context)!;
     final airportCode = nearestAirport?['code'] as String? ?? '';
     final radius = _getCheckinRadius(airportCode);
     final canCheckin = nearestAirport != null && 
@@ -385,8 +422,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
               const SizedBox(width: 8),
               Text(
                 canCheckin 
-                  ? (needsLogin ? 'ログインしてチェックイン' : 'チェックイン可能！') 
-                  : '最寄り空港',
+                  ? (needsLogin ? l10n.loginToCheckin : l10n.checkinAvailable) 
+                  : l10n.nearestAirport,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: canCheckin ? (needsLogin ? Colors.orange[700] : Colors.green[700]) : Colors.grey[700],
@@ -397,8 +434,15 @@ class _CheckinScreenState extends State<CheckinScreen> {
           const SizedBox(height: 12),
           if (nearestAirport != null) ...[
             Text(
-              '${nearestAirport!['name_ja']}空港 (${nearestAirport!['code']})',
+              '${_getAirportName(nearestAirport!)} (${nearestAirport!['code']})',
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              distanceToNearest != null
+                  ? l10n.distanceFromHere((distanceToNearest! / 1000).toStringAsFixed(1))
+                  : l10n.calculatingDistance,
+              style: TextStyle(color: Colors.grey[600]),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -408,8 +452,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
                 icon: Icon(needsLogin ? Icons.login : Icons.check_circle),
                 label: Text(
                   canCheckin 
-                    ? (needsLogin ? 'ログインが必要です' : 'チェックイン')
-                    : '${(radius / 1000).toStringAsFixed(1)}km以内で可能'
+                    ? (needsLogin ? l10n.loginRequired : l10n.checkin)
+                    : l10n.checkinWithinRadius((radius / 1000).toStringAsFixed(1))
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: canCheckin ? (needsLogin ? Colors.orange : Colors.green) : Colors.grey,
@@ -419,12 +463,12 @@ class _CheckinScreenState extends State<CheckinScreen> {
               ),
             ),
           ] else ...[
-            const Text('位置情報を取得中...'),
+            Text(l10n.gettingLocation),
             const SizedBox(height: 8),
             TextButton.icon(
               onPressed: _getCurrentLocation,
               icon: const Icon(Icons.refresh),
-              label: const Text('再取得'),
+              label: Text(l10n.retry),
             ),
           ],
         ],
@@ -433,10 +477,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
   }
 
   List<Widget> _buildRegionList() {
+    final l10n = AppLocalizations.of(context)!;
     final widgets = <Widget>[];
     
-    for (var region in regionOrder) {
-      final prefectures = regionPrefectures[region] ?? [];
+    for (var regionKey in regionKeys) {
+      final prefectures = regionPrefectures[regionKey] ?? [];
       if (prefectures.isEmpty) continue;
       
       // 地方内の全空港数とチェック済み数を計算
@@ -450,8 +495,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
       
       if (totalInRegion == 0) continue;
       
-      final isRegionExpanded = expandedRegions.contains(region);
+      final isRegionExpanded = expandedRegions.contains(regionKey);
       final regionProgress = checkedInRegion / totalInRegion;
+      final regionName = _getRegionName(regionKey);
       
       widgets.add(
         Container(
@@ -468,9 +514,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
                 onTap: () {
                   setState(() {
                     if (isRegionExpanded) {
-                      expandedRegions.remove(region);
+                      expandedRegions.remove(regionKey);
                     } else {
-                      expandedRegions.add(region);
+                      expandedRegions.add(regionKey);
                     }
                   });
                 },
@@ -512,11 +558,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              region,
+                              regionName,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                             Text(
-                              '$checkedInRegion / $totalInRegion 空港',
+                              l10n.nAirports(totalInRegion),
                               style: TextStyle(color: Colors.grey[600], fontSize: 12),
                             ),
                           ],
@@ -529,7 +575,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                             color: Colors.amber,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Text('制覇！', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          child: Text(l10n.conquered, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
                       const SizedBox(width: 8),
                       Icon(
@@ -671,7 +717,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
-                                      '${airport['name_ja']} (${airport['code']})',
+                                      '${_getAirportName(airport)} (${airport['code']})',
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: isChecked ? Colors.black : Colors.grey[600],

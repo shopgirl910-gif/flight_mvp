@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'l10n/app_localizations.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -66,14 +67,15 @@ class HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _deleteItinerary(String id) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('削除確認'),
-        content: const Text('この旅程を削除しますか？'),
+        title: Text(l10n.deleteConfirm),
+        content: Text(l10n.deleteItineraryConfirm),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('キャンセル')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('削除', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.cancel)),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.delete, style: const TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -84,13 +86,13 @@ class HistoryScreenState extends State<HistoryScreen> {
         _loadItineraries();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('削除しました'), backgroundColor: Colors.green),
+            SnackBar(content: Text(l10n.deleted), backgroundColor: Colors.green),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('削除に失敗しました: $e'), backgroundColor: Colors.red),
+            SnackBar(content: Text(l10n.deleteFailed(e.toString())), backgroundColor: Colors.red),
           );
         }
       }
@@ -117,6 +119,8 @@ class HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -126,7 +130,7 @@ class HistoryScreenState extends State<HistoryScreen> {
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Text(errorMessage!, style: const TextStyle(color: Colors.red)),
           const SizedBox(height: 16),
-          ElevatedButton(onPressed: _loadItineraries, child: const Text('再読み込み')),
+          ElevatedButton(onPressed: _loadItineraries, child: Text(l10n.reload)),
         ]),
       );
     }
@@ -139,12 +143,12 @@ class HistoryScreenState extends State<HistoryScreen> {
           Icon(isLoggedIn ? Icons.history : Icons.login, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            isLoggedIn ? '保存された旅程がありません' : '旅程を保存するにはログインが必要です',
+            isLoggedIn ? l10n.noSavedItineraries : l10n.loginRequiredToSaveItineraries,
             style: TextStyle(fontSize: 16, color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
           Text(
-            isLoggedIn ? 'Simulateタブで旅程を作成し、保存してください' : '右上のログインボタンからログインしてください',
+            isLoggedIn ? l10n.createItineraryInSimulateTab : l10n.loginFromTopRight,
             style: TextStyle(fontSize: 12, color: Colors.grey[500]),
           ),
         ]),
@@ -167,8 +171,9 @@ class HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildItineraryCard(Map<String, dynamic> itinerary, bool isMobile) {
+    final l10n = AppLocalizations.of(context)!;
     final id = itinerary['id'] as String;
-    final title = itinerary['title'] as String? ?? '無題';
+    final title = itinerary['title'] as String? ?? l10n.untitled;
     final totalFop = itinerary['total_fop'] as int? ?? 0;
     final totalPp = itinerary['total_pp'] as int? ?? 0;
     final totalMiles = itinerary['total_miles'] as int? ?? 0;
@@ -209,7 +214,7 @@ class HistoryScreenState extends State<HistoryScreen> {
                 onPressed: () => _deleteItinerary(id),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                tooltip: '削除',
+                tooltip: l10n.delete,
               ),
             ]),
           ),
@@ -222,11 +227,11 @@ class HistoryScreenState extends State<HistoryScreen> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               // 統計チップ
               Wrap(spacing: 8, runSpacing: 6, children: [
-                if (totalFop > 0) _buildStatChip('FOP', _formatNumber(totalFop), Colors.red),
-                if (totalPp > 0) _buildStatChip('PP', _formatNumber(totalPp), Colors.blue),
-                if (totalMiles > 0) _buildStatChip('マイル', _formatNumber(totalMiles), Colors.orange),
-                if (totalLsp > 0) _buildStatChip('LSP', _formatNumber(totalLsp), Colors.purple),
-                if (totalFare > 0) _buildStatChip('総額', '¥${_formatNumber(totalFare)}', Colors.green),
+                if (totalFop > 0) _buildStatChip(l10n.fop, _formatNumber(totalFop), Colors.red),
+                if (totalPp > 0) _buildStatChip(l10n.pp, _formatNumber(totalPp), Colors.blue),
+                if (totalMiles > 0) _buildStatChip(l10n.miles, _formatNumber(totalMiles), Colors.orange),
+                if (totalLsp > 0) _buildStatChip(l10n.lsp, _formatNumber(totalLsp), Colors.purple),
+                if (totalFare > 0) _buildStatChip(l10n.totalFare, '¥${_formatNumber(totalFare)}', Colors.green),
               ]),
               const SizedBox(height: 12),
               // レグ一覧
@@ -298,7 +303,8 @@ class HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _showItineraryDetail(Map<String, dynamic> itinerary) {
-    final title = itinerary['title'] as String? ?? '無題';
+    final l10n = AppLocalizations.of(context)!;
+    final title = itinerary['title'] as String? ?? l10n.untitled;
     final legs = itinerary['legs'] as List<dynamic>? ?? [];
     final jalCard = itinerary['jal_card'] as String?;
     final anaCard = itinerary['ana_card'] as String?;
@@ -324,10 +330,10 @@ class HistoryScreenState extends State<HistoryScreen> {
             Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             // カード・ステータス情報
-            if (jalCard != null && jalCard != '-') Text('JALカード: $jalCard', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-            if (jalStatus != null && jalStatus != '-') Text('JALステータス: $jalStatus', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-            if (anaCard != null && anaCard != '-') Text('ANAカード: $anaCard', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-            if (anaStatus != null && anaStatus != '-') Text('ANAステータス: $anaStatus', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            if (jalCard != null && jalCard != '-') Text('${l10n.jalCard}: $jalCard', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            if (jalStatus != null && jalStatus != '-') Text('${l10n.jalStatus}: $jalStatus', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            if (anaCard != null && anaCard != '-') Text('${l10n.anaCard}: $anaCard', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            if (anaStatus != null && anaStatus != '-') Text('${l10n.anaStatus}: $anaStatus', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
             const SizedBox(height: 16),
             const Divider(),
             // レグ一覧
@@ -345,6 +351,7 @@ class HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildDetailLegCard(Map<String, dynamic> leg, int index) {
+    final l10n = AppLocalizations.of(context)!;
     final airline = leg['airline'] as String? ?? '';
     final date = leg['date'] as String? ?? '';
     final flightNumber = leg['flight_number'] as String? ?? '';
@@ -398,12 +405,12 @@ class HistoryScreenState extends State<HistoryScreen> {
           const SizedBox(height: 8),
           // ポイント
           Row(children: [
-            _buildStatChip(airline == 'JAL' ? 'FOP' : 'PP', _formatNumber(fop), airlineColor),
+            _buildStatChip(airline == 'JAL' ? l10n.fop : l10n.pp, _formatNumber(fop), airlineColor),
             const SizedBox(width: 8),
-            _buildStatChip('マイル', _formatNumber(miles), Colors.orange),
+            _buildStatChip(l10n.miles, _formatNumber(miles), Colors.orange),
             if (airline == 'JAL' && lsp > 0) ...[
               const SizedBox(width: 8),
-              _buildStatChip('LSP', _formatNumber(lsp), Colors.purple),
+              _buildStatChip(l10n.lsp, _formatNumber(lsp), Colors.purple),
             ],
           ]),
         ]),

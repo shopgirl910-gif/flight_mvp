@@ -2,10 +2,26 @@ import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'auth_screen.dart';
 import 'l10n/app_localizations.dart';
+
+// ========================================
+// シミュレーション画面 設計ルール
+// ========================================
+// 【到着空港選択の重要ルール】
+// - 到着空港は出発地から就航している空港のみ表示する
+// - _fetchAvailableFlightsでSupabaseから取得したデータを使用
+// - フォールバックで全空港を表示してはいけない（過去バグの原因）
+// - 関連関数: _buildDesktopDestinationDropdown, _buildMobileDestinationSelector
+//
+// 【多言語化の重要ルール】
+// - 空港名・カード種類・運賃種類は内部キーと表示名を分離
+// - _getAirportName(), _getJalCardName()等のメソッドで言語切替
+// - 計算ロジックには日本語キー（運賃1等）を使用（互換性維持）
+// ========================================
 
 class SimulationScreen extends StatefulWidget {
   const SimulationScreen({super.key});
@@ -47,25 +63,155 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   bool jalTourPremium = false;
   bool jalShoppingMilePremium = false;
 
-  final List<String> jalCardTypes = ['JMB会員', 'JALカード普通会員', 'JALカードCLUB-A会員', 'JALカードCLUB-Aゴールド会員', 'JALカードプラチナ会員', 'JALグローバルクラブ会員(日本)', 'JALグローバルクラブ会員(海外)', 'JALカードNAVI会員', 'JAL CLUB EST 普通会員', 'JAL CLUB EST CLUB-A会員', 'JAL CLUB EST CLUB-A GOLD会員', 'JAL CLUB EST プラチナ会員'];
-  final List<String> anaCardTypes = ['-', 'AMCカード(提携カード含む)', 'ANAカード 一般', 'ANAカード 学生用', 'ANAカード ワイド', 'ANAカード ゴールド', 'ANAカード プレミアム', 'SFC 一般', 'SFC ゴールド', 'SFC プレミアム'];
-  final List<String> jalStatusTypes = ['-', 'JMBダイヤモンド', 'JMBサファイア', 'JMBクリスタル'];
-  final List<String> anaStatusTypes = ['-', 'ダイヤモンド(1年目)', 'ダイヤモンド(継続2年以上)', 'プラチナ(1年目)', 'プラチナ(継続2年以上)', 'ブロンズ(1年目)', 'ブロンズ(継続2年以上)'];
+  // カード種類（キー）
+  final List<String> jalCardKeys = ['jmb', 'jal_regular', 'jal_club_a', 'jal_club_a_gold', 'jal_platinum', 'jgc_japan', 'jgc_overseas', 'jal_navi', 'jal_est_regular', 'jal_est_club_a', 'jal_est_gold', 'jal_est_platinum'];
+  final List<String> anaCardKeys = ['-', 'amc', 'ana_regular', 'ana_student', 'ana_wide', 'ana_gold', 'ana_premium', 'sfc_regular', 'sfc_gold', 'sfc_premium'];
+  final List<String> jalStatusKeys = ['-', 'diamond', 'sapphire', 'crystal'];
+  final List<String> anaStatusKeys = ['-', 'diamond_1', 'diamond_2', 'platinum_1', 'platinum_2', 'bronze_1', 'bronze_2'];
+  
+  // カード種類表示名（日本語）
+  final Map<String, String> jalCardNamesJa = {'jmb': 'JMB会員', 'jal_regular': 'JALカード普通会員', 'jal_club_a': 'JALカードCLUB-A会員', 'jal_club_a_gold': 'JALカードCLUB-Aゴールド会員', 'jal_platinum': 'JALカードプラチナ会員', 'jgc_japan': 'JALグローバルクラブ会員(日本)', 'jgc_overseas': 'JALグローバルクラブ会員(海外)', 'jal_navi': 'JALカードNAVI会員', 'jal_est_regular': 'JAL CLUB EST 普通会員', 'jal_est_club_a': 'JAL CLUB EST CLUB-A会員', 'jal_est_gold': 'JAL CLUB EST CLUB-A GOLD会員', 'jal_est_platinum': 'JAL CLUB EST プラチナ会員'};
+  final Map<String, String> jalCardNamesEn = {'jmb': 'JMB Member', 'jal_regular': 'JAL Card Regular', 'jal_club_a': 'JAL Card CLUB-A', 'jal_club_a_gold': 'JAL Card CLUB-A Gold', 'jal_platinum': 'JAL Card Platinum', 'jgc_japan': 'JGC Member (Japan)', 'jgc_overseas': 'JGC Member (Overseas)', 'jal_navi': 'JAL Card NAVI', 'jal_est_regular': 'JAL CLUB EST Regular', 'jal_est_club_a': 'JAL CLUB EST CLUB-A', 'jal_est_gold': 'JAL CLUB EST CLUB-A Gold', 'jal_est_platinum': 'JAL CLUB EST Platinum'};
+  final Map<String, String> anaCardNamesJa = {'-': '-', 'amc': 'AMCカード(提携カード含む)', 'ana_regular': 'ANAカード 一般', 'ana_student': 'ANAカード 学生用', 'ana_wide': 'ANAカード ワイド', 'ana_gold': 'ANAカード ゴールド', 'ana_premium': 'ANAカード プレミアム', 'sfc_regular': 'SFC 一般', 'sfc_gold': 'SFC ゴールド', 'sfc_premium': 'SFC プレミアム'};
+  final Map<String, String> anaCardNamesEn = {'-': '-', 'amc': 'AMC Card (incl. Partner)', 'ana_regular': 'ANA Card Regular', 'ana_student': 'ANA Card Student', 'ana_wide': 'ANA Card Wide', 'ana_gold': 'ANA Card Gold', 'ana_premium': 'ANA Card Premium', 'sfc_regular': 'SFC Regular', 'sfc_gold': 'SFC Gold', 'sfc_premium': 'SFC Premium'};
+  final Map<String, String> jalStatusNamesJa = {'-': '-', 'diamond': 'JMBダイヤモンド', 'sapphire': 'JMBサファイア', 'crystal': 'JMBクリスタル'};
+  final Map<String, String> jalStatusNamesEn = {'-': '-', 'diamond': 'JMB Diamond', 'sapphire': 'JMB Sapphire', 'crystal': 'JMB Crystal'};
+  final Map<String, String> anaStatusNamesJa = {'-': '-', 'diamond_1': 'ダイヤモンド(1年目)', 'diamond_2': 'ダイヤモンド(継続2年以上)', 'platinum_1': 'プラチナ(1年目)', 'platinum_2': 'プラチナ(継続2年以上)', 'bronze_1': 'ブロンズ(1年目)', 'bronze_2': 'ブロンズ(継続2年以上)'};
+  final Map<String, String> anaStatusNamesEn = {'-': '-', 'diamond_1': 'Diamond (1st Year)', 'diamond_2': 'Diamond (2+ Years)', 'platinum_1': 'Platinum (1st Year)', 'platinum_2': 'Platinum (2+ Years)', 'bronze_1': 'Bronze (1st Year)', 'bronze_2': 'Bronze (2+ Years)'};
+
+  // 空港名（日英）
+  final Map<String, String> airportNamesJa = {'HND': '羽田', 'NRT': '成田', 'KIX': '関西', 'ITM': '伊丹', 'NGO': '中部', 'CTS': '新千歳', 'FUK': '福岡', 'OKA': '那覇', 'NGS': '長崎', 'KMJ': '熊本', 'OIT': '大分', 'MYJ': '松山', 'HIJ': '広島', 'TAK': '高松', 'KCZ': '高知', 'TKS': '徳島', 'KOJ': '鹿児島', 'SDJ': '仙台', 'AOJ': '青森', 'AKJ': '旭川', 'AXT': '秋田', 'GAJ': '山形', 'KIJ': '新潟', 'TOY': '富山', 'KMQ': '小松', 'FSZ': '静岡', 'MMB': '女満別', 'OBO': '帯広', 'KUH': '釧路', 'HKD': '函館', 'ISG': '石垣', 'MMY': '宮古', 'UBJ': '山口宇部', 'IWK': '岩国', 'OKJ': '岡山', 'TTJ': '鳥取', 'YGJ': '米子', 'IZO': '出雲', 'NKM': '県営名古屋', 'UKB': '神戸', 'HSG': '佐賀', 'KMI': '宮崎', 'ASJ': '奄美', 'TKN': '徳之島', 'OKI': '隠岐', 'FKS': '福島', 'HNA': '花巻', 'MSJ': '三沢', 'ONJ': '大館能代', 'SHM': '南紀白浜', 'NTQ': '能登', 'KKJ': '北九州', 'TNE': '種子島', 'KUM': '屋久島', 'RNJ': '与論', 'OGN': '与那国', 'HAC': '八丈島', 'MBE': '紋別', 'SHB': '中標津', 'WKJ': '稚内', 'OKD': '丘珠', 'IKI': '壱岐', 'TSJ': '対馬', 'FUJ': '五島福江', 'OIR': '奥尻', 'SYO': '庄内', 'MMJ': '松本', 'AXJ': '天草', 'TJH': '但馬', 'KKX': '喜界', 'UEO': '久米島', 'KTD': '北大東', 'MMD': '南大東', 'AGJ': '粟国', 'KJP': '慶良間', 'TRA': '多良間', 'HTR': '波照間', 'SHI': '下地島', 'IEJ': '伊江島'};
+  final Map<String, String> airportNamesEn = {'HND': 'Haneda', 'NRT': 'Narita', 'KIX': 'Kansai', 'ITM': 'Itami', 'NGO': 'Chubu', 'CTS': 'New Chitose', 'FUK': 'Fukuoka', 'OKA': 'Naha', 'NGS': 'Nagasaki', 'KMJ': 'Kumamoto', 'OIT': 'Oita', 'MYJ': 'Matsuyama', 'HIJ': 'Hiroshima', 'TAK': 'Takamatsu', 'KCZ': 'Kochi', 'TKS': 'Tokushima', 'KOJ': 'Kagoshima', 'SDJ': 'Sendai', 'AOJ': 'Aomori', 'AKJ': 'Asahikawa', 'AXT': 'Akita', 'GAJ': 'Yamagata', 'KIJ': 'Niigata', 'TOY': 'Toyama', 'KMQ': 'Komatsu', 'FSZ': 'Shizuoka', 'MMB': 'Memanbetsu', 'OBO': 'Obihiro', 'KUH': 'Kushiro', 'HKD': 'Hakodate', 'ISG': 'Ishigaki', 'MMY': 'Miyako', 'UBJ': 'Yamaguchi Ube', 'IWK': 'Iwakuni', 'OKJ': 'Okayama', 'TTJ': 'Tottori', 'YGJ': 'Yonago', 'IZO': 'Izumo', 'NKM': 'Nagoya Komaki', 'UKB': 'Kobe', 'HSG': 'Saga', 'KMI': 'Miyazaki', 'ASJ': 'Amami', 'TKN': 'Tokunoshima', 'OKI': 'Oki', 'FKS': 'Fukushima', 'HNA': 'Hanamaki', 'MSJ': 'Misawa', 'ONJ': 'Odate Noshiro', 'SHM': 'Nanki Shirahama', 'NTQ': 'Noto', 'KKJ': 'Kitakyushu', 'TNE': 'Tanegashima', 'KUM': 'Yakushima', 'RNJ': 'Yoron', 'OGN': 'Yonaguni', 'HAC': 'Hachijojima', 'MBE': 'Monbetsu', 'SHB': 'Nakashibetsu', 'WKJ': 'Wakkanai', 'OKD': 'Okadama', 'IKI': 'Iki', 'TSJ': 'Tsushima', 'FUJ': 'Goto Fukue', 'OIR': 'Okushiri', 'SYO': 'Shonai', 'MMJ': 'Matsumoto', 'AXJ': 'Amakusa', 'TJH': 'Tajima', 'KKX': 'Kikai', 'UEO': 'Kumejima', 'KTD': 'Kitadaito', 'MMD': 'Minamidaito', 'AGJ': 'Aguni', 'KJP': 'Kerama', 'TRA': 'Tarama', 'HTR': 'Hateruma', 'SHI': 'Shimojishima', 'IEJ': 'Iejima'};
+  
+  // 運賃種類（キー）
+  final Map<String, List<String>> fareTypeKeys = {
+    'JAL': ['jal_fare1', 'jal_fare2', 'jal_fare3', 'jal_fare4', 'jal_fare5', 'jal_fare6'],
+    'ANA': ['ana_fare1', 'ana_fare2', 'ana_fare3', 'ana_fare4', 'ana_fare5', 'ana_fare6', 'ana_fare7', 'ana_fare8', 'ana_fare9', 'ana_fare10', 'ana_fare11', 'ana_fare12', 'ana_fare13'],
+  };
+  final Map<String, String> fareTypeNamesJa = {'jal_fare1': '運賃1 (100%) フレックス等', 'jal_fare2': '運賃2 (75%) 株主割引', 'jal_fare3': '運賃3 (75%) セイバー', 'jal_fare4': '運賃4 (75%) スペシャルセイバー', 'jal_fare5': '運賃5 (50%) 包括旅行運賃', 'jal_fare6': '運賃6 (50%) スカイメイト等', 'ana_fare1': '運賃1 (150%) プレミアム運賃', 'ana_fare2': '運賃2 (125%) プレミアム小児', 'ana_fare3': '運賃3 (100%) 片道・往復', 'ana_fare4': '運賃4 (100%) ビジネス', 'ana_fare5': '運賃5 (75%) 特割A', 'ana_fare6': '運賃6 (75%) 特割B', 'ana_fare7': '運賃7 (75%) 特割C', 'ana_fare8': '運賃8 (50%) いっしょにマイル割', 'ana_fare9': '運賃9 (150%) プレミアム株主', 'ana_fare10': '運賃10 (100%) 普通株主', 'ana_fare11': '運賃11 (70%) 特割プラス', 'ana_fare12': '運賃12 (50%) スマートシニア', 'ana_fare13': '運賃13 (30%) 個人包括'};
+  final Map<String, String> fareTypeNamesEn = {'jal_fare1': 'Fare1 (100%) Flex', 'jal_fare2': 'Fare2 (75%) Shareholder', 'jal_fare3': 'Fare3 (75%) Saver', 'jal_fare4': 'Fare4 (75%) Special Saver', 'jal_fare5': 'Fare5 (50%) Package Tour', 'jal_fare6': 'Fare6 (50%) Skymate', 'ana_fare1': 'Fare1 (150%) Premium', 'ana_fare2': 'Fare2 (125%) Premium Child', 'ana_fare3': 'Fare3 (100%) One-way/Round', 'ana_fare4': 'Fare4 (100%) Business', 'ana_fare5': 'Fare5 (75%) Value A', 'ana_fare6': 'Fare6 (75%) Value B', 'ana_fare7': 'Fare7 (75%) Value C', 'ana_fare8': 'Fare8 (50%) Together Miles', 'ana_fare9': 'Fare9 (150%) Premium SH', 'ana_fare10': 'Fare10 (100%) Regular SH', 'ana_fare11': 'Fare11 (70%) Value Plus', 'ana_fare12': 'Fare12 (50%) Smart Senior', 'ana_fare13': 'Fare13 (30%) Individual Pkg'};
+  
+  // 座席クラス（キー）
+  final Map<String, List<String>> seatClassKeys = {'JAL': ['economy', 'class_j', 'first'], 'ANA': ['economy', 'premium']};
+  final Map<String, String> seatClassNamesJa = {'economy': '普通席', 'class_j': 'クラスJ', 'first': 'ファーストクラス', 'premium': 'プレミアムクラス'};
+  final Map<String, String> seatClassNamesEn = {'economy': 'Economy', 'class_j': 'Class J', 'first': 'First Class', 'premium': 'Premium Class'};
+
+  // ANAプレミアム運賃キー（運賃1, 2, 9）
+  static const List<String> anaPremiumFareKeys = ['ana_fare1', 'ana_fare2', 'ana_fare9'];
+  
+  // ANAの運賃選択時に座席を自動設定
+  void _onAnaFareTypeChanged(int index, String fareKey) {
+    final isPremiumFare = anaPremiumFareKeys.contains(fareKey);
+    setState(() {
+      legs[index]['fareType'] = fareKey;
+      legs[index]['seatClass'] = isPremiumFare ? 'premium' : 'economy';
+    });
+    _calculateSingleLeg(index);
+  }
+  
+  // ANAの座席選択時に運賃をフィルタリング（必要に応じてリセット）
+  void _onAnaSeatClassChanged(int index, String seatKey) {
+    final currentFare = legs[index]['fareType'] as String;
+    final isPremiumSeat = seatKey == 'premium';
+    final isPremiumFare = anaPremiumFareKeys.contains(currentFare);
+    
+    setState(() {
+      legs[index]['seatClass'] = seatKey;
+      // 座席と運賃の整合性チェック
+      if (isPremiumSeat && !isPremiumFare && currentFare.isNotEmpty) {
+        legs[index]['fareType'] = ''; // リセット
+      } else if (!isPremiumSeat && isPremiumFare && currentFare.isNotEmpty) {
+        legs[index]['fareType'] = ''; // リセット
+      }
+    });
+    _calculateSingleLeg(index);
+  }
+  
+  // ANAの座席に応じた選択可能な運賃リストを取得
+  List<String> _getAnaAvailableFareTypes(String seatClass) {
+    final allKeys = fareTypeKeys['ANA']!;
+    if (seatClass.isEmpty) return allKeys; // 座席未選択時は全て表示
+    if (seatClass == 'premium') {
+      return allKeys.where((k) => anaPremiumFareKeys.contains(k)).toList();
+    } else if (seatClass == 'economy') {
+      return allKeys.where((k) => !anaPremiumFareKeys.contains(k)).toList();
+    }
+    return allKeys;
+  }
+  
+  // ANAの運賃に応じた選択可能な座席クラスリストを取得
+  List<String> _getAnaAvailableSeatClasses(String fareType) {
+    final allKeys = seatClassKeys['ANA']!;
+    if (fareType.isEmpty) return allKeys; // 運賃未選択時は全て表示
+    if (anaPremiumFareKeys.contains(fareType)) {
+      return ['premium'];
+    } else {
+      return ['economy'];
+    }
+  }
+
+  // 言語に応じた表示名取得メソッド
+  String _getAirportName(String code) {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    return isJa ? (airportNamesJa[code] ?? code) : (airportNamesEn[code] ?? code);
+  }
+  String _getJalCardName(String key) {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    return isJa ? (jalCardNamesJa[key] ?? key) : (jalCardNamesEn[key] ?? key);
+  }
+  String _getAnaCardName(String key) {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    return isJa ? (anaCardNamesJa[key] ?? key) : (anaCardNamesEn[key] ?? key);
+  }
+  String _getJalStatusName(String key) {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    return isJa ? (jalStatusNamesJa[key] ?? key) : (jalStatusNamesEn[key] ?? key);
+  }
+  String _getAnaStatusName(String key) {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    return isJa ? (anaStatusNamesJa[key] ?? key) : (anaStatusNamesEn[key] ?? key);
+  }
+  String _getFareTypeName(String key) {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    return isJa ? (fareTypeNamesJa[key] ?? key) : (fareTypeNamesEn[key] ?? key);
+  }
+  String _getSeatClassName(String key) {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    return isJa ? (seatClassNamesJa[key] ?? key) : (seatClassNamesEn[key] ?? key);
+  }
+
+  // 旧リスト（互換性のため残す）
+  List<String> get jalCardTypes => jalCardKeys.map((k) => _getJalCardName(k)).toList();
+  List<String> get anaCardTypes => anaCardKeys.map((k) => _getAnaCardName(k)).toList();
+  List<String> get jalStatusTypes => jalStatusKeys.map((k) => _getJalStatusName(k)).toList();
+  List<String> get anaStatusTypes => anaStatusKeys.map((k) => _getAnaStatusName(k)).toList();
   
   final List<String> majorAirports = ['HND', 'NRT', 'ITM', 'KIX', 'NGO', 'CTS', 'FUK', 'OKA'];
   static const String airportDivider = '---';
   final List<String> regionalAirports = ['WKJ', 'MBE', 'MMB', 'SHB', 'AKJ', 'OKD', 'OBO', 'KUH', 'HKD', 'OIR', 'AOJ', 'MSJ', 'HNA', 'AXT', 'ONJ', 'SYO', 'GAJ', 'SDJ', 'FKS', 'HAC', 'NKM', 'FSZ', 'MMJ', 'NTQ', 'TOY', 'KMQ', 'SHM', 'UKB', 'TJH', 'TTJ', 'YGJ', 'OKI', 'IZO', 'OKJ', 'HIJ', 'IWK', 'UBJ', 'TKS', 'TAK', 'KCZ', 'MYJ', 'KKJ', 'HSG', 'NGS', 'KMJ', 'OIT', 'KMI', 'KOJ', 'AXJ', 'IKI', 'TSJ', 'FUJ', 'TNE', 'KUM', 'ASJ', 'KKX', 'TKN', 'RNJ', 'OGN', 'MMY', 'ISG', 'UEO', 'KTD', 'MMD', 'TRA', 'AGJ', 'KJP', 'HTR', 'SHI', 'IEJ'];
   List<String> get airports => [...majorAirports, airportDivider, ...regionalAirports];
   
-  final Map<String, String> airportNames = {'HND': '羽田', 'NRT': '成田', 'KIX': '関西', 'ITM': '伊丹', 'NGO': '中部', 'CTS': '新千歳', 'FUK': '福岡', 'OKA': '那覇', 'NGS': '長崎', 'KMJ': '熊本', 'OIT': '大分', 'MYJ': '松山', 'HIJ': '広島', 'TAK': '高松', 'KCZ': '高知', 'TKS': '徳島', 'KOJ': '鹿児島', 'SDJ': '仙台', 'AOJ': '青森', 'AKJ': '旭川', 'AXT': '秋田', 'GAJ': '山形', 'KIJ': '新潟', 'TOY': '富山', 'KMQ': '小松', 'FSZ': '静岡', 'MMB': '女満別', 'OBO': '帯広', 'KUH': '釧路', 'HKD': '函館', 'ISG': '石垣', 'MMY': '宮古', 'UBJ': '山口宇部', 'IWK': '岩国', 'OKJ': '岡山', 'TTJ': '鳥取', 'YGJ': '米子', 'IZO': '出雲', 'NKM': '県営名古屋', 'UKB': '神戸', 'HSG': '佐賀', 'KMI': '宮崎', 'ASJ': '奄美', 'TKN': '徳之島', 'OKI': '隠岐', 'FKS': '福島', 'HNA': '花巻', 'MSJ': '三沢', 'ONJ': '大館能代', 'SHM': '南紀白浜', 'NTQ': '能登', 'KKJ': '北九州', 'TNE': '種子島', 'KUM': '屋久島', 'RNJ': '与論', 'OGN': '与那国', 'HAC': '八丈島', 'MBE': '紋別', 'SHB': '中標津', 'WKJ': '稚内', 'OKD': '丘珠', 'IKI': '壱岐', 'TSJ': '対馬', 'FUJ': '五島福江', 'OIR': '奥尻', 'SYO': '庄内', 'MMJ': '松本', 'AXJ': '天草', 'TJH': '但馬', 'KKX': '喜界', 'UEO': '久米島', 'KTD': '北大東', 'MMD': '南大東', 'AGJ': '粟国', 'KJP': '慶良間', 'TRA': '多良間', 'HTR': '波照間', 'SHI': '下地島', 'IEJ': '伊江島'};
+  // 旧マップ（互換性のため残す - 言語対応版に置き換え）
+  Map<String, String> get airportNames {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    return isJa ? airportNamesJa : airportNamesEn;
+  }
   final List<String> airlines = ['JAL', 'ANA'];
-  final Map<String, List<String>> fareTypesByAirline = {
-    'JAL': ['運賃1 (100%) フレックス等', '運賃2 (75%) 株主割引', '運賃3 (75%) セイバー', '運賃4 (75%) スペシャルセイバー', '運賃5 (50%) 包括旅行運賃', '運賃6 (50%) スカイメイト等'],
-    'ANA': ['運賃1 (150%) プレミアム運賃', '運賃2 (125%) プレミアム小児', '運賃3 (100%) 片道・往復', '運賃4 (100%) ビジネス', '運賃5 (75%) 特割A', '運賃6 (75%) 特割B', '運賃7 (75%) 特割C', '運賃8 (50%) いっしょにマイル割', '運賃9 (150%) プレミアム株主', '運賃10 (100%) 普通株主', '運賃11 (70%) 特割プラス', '運賃12 (50%) スマートシニア', '運賃13 (30%) 個人包括'],
-  };
-  final Map<String, List<String>> seatClassesByAirline = {'JAL': ['普通席', 'クラスJ', 'ファーストクラス'], 'ANA': ['普通席', 'プレミアムクラス']};
-  final Map<String, int> jalBonusFOP = {'運賃1': 400, '運賃2': 400, '運賃3': 200, '運賃4': 200, '運賃5': 0, '運賃6': 0};
-  final Map<String, int> anaBonusPoint = {'運賃1': 400, '運賃2': 400, '運賃3': 400, '運賃4': 0, '運賃5': 400, '運賃6': 200, '運賃7': 0, '運賃8': 0, '運賃9': 0, '運賃10': 0, '運賃11': 0, '運賃12': 0, '運賃13': 0};
+  Map<String, List<String>> get fareTypesByAirline {
+    final keys = fareTypeKeys;
+    return {
+      'JAL': keys['JAL']!.map((k) => _getFareTypeName(k)).toList(),
+      'ANA': keys['ANA']!.map((k) => _getFareTypeName(k)).toList(),
+    };
+  }
+  Map<String, List<String>> get seatClassesByAirline {
+    return {
+      'JAL': seatClassKeys['JAL']!.map((k) => _getSeatClassName(k)).toList(),
+      'ANA': seatClassKeys['ANA']!.map((k) => _getSeatClassName(k)).toList(),
+    };
+  }
+  final Map<String, int> jalBonusFOP = {'運賃1': 400, '運賃2': 400, '運賃3': 200, '運賃4': 200, '運賃5': 0, '運賃6': 0, 'jal_fare1': 400, 'jal_fare2': 400, 'jal_fare3': 200, 'jal_fare4': 200, 'jal_fare5': 0, 'jal_fare6': 0, 'Fare1': 400, 'Fare2': 400, 'Fare3': 200, 'Fare4': 200, 'Fare5': 0, 'Fare6': 0};
+  final Map<String, int> anaBonusPoint = {'運賃1': 400, '運賃2': 400, '運賃3': 400, '運賃4': 0, '運賃5': 400, '運賃6': 200, '運賃7': 0, '運賃8': 0, '運賃9': 0, '運賃10': 0, '運賃11': 0, '運賃12': 0, '運賃13': 0, 'ana_fare1': 400, 'ana_fare2': 400, 'ana_fare3': 400, 'ana_fare4': 0, 'ana_fare5': 400, 'ana_fare6': 200, 'ana_fare7': 0, 'ana_fare8': 0, 'ana_fare9': 0, 'ana_fare10': 0, 'ana_fare11': 0, 'ana_fare12': 0, 'ana_fare13': 0, 'Fare1': 400, 'Fare2': 400, 'Fare3': 400, 'Fare4': 0, 'Fare5': 400, 'Fare6': 200, 'Fare7': 0, 'Fare8': 0, 'Fare9': 0, 'Fare10': 0, 'Fare11': 0, 'Fare12': 0, 'Fare13': 0};
 
   static const String _hapitasUrl = 'https://px.a8.net/svt/ejp?a8mat=45KL8I+5JG97E+1LP8+CALN5';
   Future<void> _openHapitas() async { final uri = Uri.parse(_hapitasUrl); if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication); }
@@ -342,7 +488,10 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       final legsJson = validLegs.map((leg) { final legId = leg['id'] as int; return {'airline': leg['airline'], 'date': dateControllers[legId]?.text ?? '', 'flight_number': flightNumberControllers[legId]?.text ?? '', 'departure_airport': leg['departureAirport'], 'arrival_airport': leg['arrivalAirport'], 'departure_time': departureTimeControllers[legId]?.text ?? '', 'arrival_time': arrivalTimeControllers[legId]?.text ?? '', 'fare_type': leg['fareType'], 'seat_class': leg['seatClass'], 'fare_amount': int.tryParse(fareAmountControllers[legId]?.text ?? '') ?? 0, 'fop': leg['calculatedFOP'], 'miles': leg['calculatedMiles'], 'lsp': leg['calculatedLSP']}; }).toList();
       await Supabase.instance.client.from('saved_itineraries').insert({'user_id': userId, 'title': title, 'legs': legsJson, 'total_fop': jalFOP, 'total_pp': anaPP, 'total_miles': jalMiles + anaMiles, 'total_lsp': jalTotalLSP, 'total_fare': jalFare + anaFare, 'jal_card': selectedJALCard, 'ana_card': selectedANACard, 'jal_status': selectedJALStatus, 'ana_status': selectedANAStatus, 'jal_tour_premium': jalTourPremium, 'jal_shopping_mile_premium': jalShoppingMilePremium});
       setState(() { isLoading = false; errorMessage = null; });
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('「$title」を保存しました'), backgroundColor: Colors.green));
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.addedToLog(title)), backgroundColor: Colors.green));
+      }
     } catch (e) { setState(() { isLoading = false; errorMessage = '保存に失敗しました: $e'; }); }
   }
 
@@ -469,8 +618,8 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: _saveItinerary,
-                icon: const Icon(Icons.save, size: 18),
-                label: Text(l10n.save),
+                icon: const Icon(Icons.add_chart, size: 18),
+                label: Text(l10n.addToLog),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10)),
               ),
             ),
@@ -532,7 +681,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text(l10n.nLegs(totalLegs), style: const TextStyle(fontSize: 14, color: Colors.white)),
               if (jalUnitPrice != '-' || anaUnitPrice != '-')
-                Text(l10n.costPerPoint(jalUnitPrice != '-' ? jalUnitPrice : anaUnitPrice), style: TextStyle(fontSize: 12, color: Colors.yellow[200])),
+                Text('${l10n.costPerPoint}: ¥${jalUnitPrice != '-' ? jalUnitPrice : anaUnitPrice}', style: TextStyle(fontSize: 12, color: Colors.yellow[200])),
             ]),
           ]),
           const SizedBox(height: 8),
@@ -703,7 +852,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
             ),
             const SizedBox(width: 8),
             // 保存・CSVボタン
-            ElevatedButton.icon(onPressed: _saveItinerary, icon: const Icon(Icons.save, size: 14), label: Text(l10n.save), style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), textStyle: const TextStyle(fontSize: 11))),
+            ElevatedButton.icon(onPressed: _saveItinerary, icon: const Icon(Icons.add_chart, size: 14), label: Text(l10n.addToLog), style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), textStyle: const TextStyle(fontSize: 11))),
             const SizedBox(width: 6),
             ElevatedButton.icon(onPressed: _downloadCsv, icon: const Icon(Icons.download, size: 14), label: Text(l10n.csv), style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), textStyle: const TextStyle(fontSize: 11))),
           ]),
@@ -856,7 +1005,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
                       Text('${_formatNumber(fop)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: airlineColor)),
                       Text(' ${airline == "JAL" ? "FOP" : "PP"}', style: TextStyle(fontSize: 10, color: airlineColor)),
                     ] else
-                      Text('未計算', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                      Text(AppLocalizations.of(context)!.notCalculated, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
                     const Spacer(),
                     if (depTime.isNotEmpty && arrTime.isNotEmpty)
                       Text('$depTime → $arrTime', style: TextStyle(fontSize: 12, color: Colors.grey[600], fontFamily: 'monospace')),
@@ -881,7 +1030,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
                         Text(' ${airportNames[arr]}', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
                     ],
                     if (dep.isEmpty && arr.isEmpty)
-                      Text('区間未設定', style: TextStyle(fontSize: 14, color: Colors.grey[500])),
+                      Text(AppLocalizations.of(context)!.routeNotSet, style: TextStyle(fontSize: 14, color: Colors.grey[500])),
                   ]),
                   // 3行目: 便名、運賃種別、座席、単価（計算済みの場合）
                   if (fop != null) ...[
@@ -930,24 +1079,45 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   }
 
   Widget _buildMobileExpandedContent(Map<String, dynamic> leg, int legId, int index, int? fop, int? miles, int? lsp, String airline) {
+    final l10n = AppLocalizations.of(context)!;
     final airlineColor = airline == 'JAL' ? Colors.red : Colors.blue, fare = int.tryParse(fareAmountControllers[legId]?.text ?? '') ?? 0;
     final unitPrice = (fare > 0 && fop != null && fop > 0) ? (fare / fop).toStringAsFixed(1) : '-';
     return Container(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [Expanded(child: _buildMobileDropdown('航空会社', leg['airline'] as String, airlines, (v) { if (v != null && v != leg['airline']) { _clearFlightInfo(index, legId); setState(() { legs[index]['airline'] = v; legs[index]['fareType'] = ''; legs[index]['seatClass'] = ''; }); } }, color: airlineColor)), const SizedBox(width: 8), Expanded(flex: 2, child: _buildMobileDatePicker('日付', dateControllers[legId]!, context, index)), const SizedBox(width: 8), SizedBox(width: 60, child: _buildMobileTextField('便名', flightNumberControllers[legId]!, '', onSubmit: (_) => _autoFillFromFlightNumber(index)))]),
+      Row(children: [Expanded(child: _buildMobileAirlineDropdown(l10n.airline, leg['airline'] as String, (v) { if (v != null && v != leg['airline']) { _clearFlightInfo(index, legId); setState(() { legs[index]['airline'] = v; legs[index]['fareType'] = ''; legs[index]['seatClass'] = ''; }); } })), const SizedBox(width: 8), Expanded(flex: 2, child: _buildMobileDatePicker(l10n.date, dateControllers[legId]!, context, index)), const SizedBox(width: 8), SizedBox(width: 60, child: _buildMobileTextField(l10n.flightNumber, flightNumberControllers[legId]!, '', onSubmit: (_) => _autoFillFromFlightNumber(index)))]),
       const SizedBox(height: 6),
-      Row(children: [Expanded(child: _buildMobileAirportSelector('出発', departureAirportControllers[legId]!, departureAirportFocusNodes[legId]!, airlineAirports[airline] ?? airports, (v) { if (v != null) { _clearFlightInfo(index, legId); departureAirportControllers[legId]?.text = v; setState(() => legs[index]['departureAirport'] = v); _fetchAvailableFlights(index); } })), Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Icon(Icons.arrow_forward, color: Colors.grey[400], size: 20)), Expanded(child: _buildMobileDestinationSelector(leg, legId, index))]),
+      Row(children: [Expanded(child: _buildMobileAirportSelector(l10n.departure, departureAirportControllers[legId]!, departureAirportFocusNodes[legId]!, airlineAirports[airline] ?? airports, (v) { if (v != null) { _clearFlightInfo(index, legId); departureAirportControllers[legId]?.text = v; setState(() => legs[index]['departureAirport'] = v); _fetchAvailableFlights(index); } })), Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Icon(Icons.arrow_forward, color: Colors.grey[400], size: 20)), Expanded(child: _buildMobileDestinationSelector(leg, legId, index))]),
       const SizedBox(height: 6),
-      Row(children: [Expanded(child: _buildMobileFlightTimeDropdown(leg, legId, index)), const SizedBox(width: 8), Expanded(child: _buildMobileTextField('到着時刻', arrivalTimeControllers[legId]!, 'HH:MM'))]),
+      Row(children: [Expanded(child: _buildMobileFlightTimeDropdown(leg, legId, index)), const SizedBox(width: 8), Expanded(child: _buildMobileTextField(l10n.arrivalTime, arrivalTimeControllers[legId]!, 'HH:MM'))]),
       const SizedBox(height: 6),
-      _buildMobileDropdown('運賃種別', leg['fareType'] as String, fareTypesByAirline[airline] ?? [], (v) { if (v != null) { setState(() => legs[index]['fareType'] = v); _calculateSingleLeg(index); } }),
+      // ANAの場合は座席に応じて運賃をフィルタリング
+      _buildMobileDropdown(l10n.fareType, leg['fareType'] as String, 
+        airline == 'ANA' ? _getAnaAvailableFareTypes(leg['seatClass'] as String).map((k) => _getFareTypeName(k)).toList() : fareTypesByAirline[airline] ?? [], 
+        (v) { if (v != null) { 
+          if (airline == 'ANA') {
+            final key = fareTypeKeys['ANA']!.firstWhere((k) => _getFareTypeName(k) == v, orElse: () => '');
+            if (key.isNotEmpty) _onAnaFareTypeChanged(index, key);
+          } else {
+            setState(() => legs[index]['fareType'] = v); _calculateSingleLeg(index);
+          }
+        } }),
       const SizedBox(height: 6),
-      Row(children: [Expanded(child: _buildMobileDropdown('座席クラス', leg['seatClass'] as String, seatClassesByAirline[airline] ?? [], (v) { if (v != null) { setState(() => legs[index]['seatClass'] = v); _calculateSingleLeg(index); } })), const SizedBox(width: 8), Expanded(child: _buildMobileTextField('運賃(円)', fareAmountControllers[legId]!, '15000', onChanged: (_) => setState(() {})))]),
+      // ANAの場合は運賃に応じて座席をフィルタリング
+      Row(children: [Expanded(child: _buildMobileDropdown(l10n.seatClass, leg['seatClass'] as String, 
+        airline == 'ANA' ? _getAnaAvailableSeatClasses(leg['fareType'] as String).map((k) => _getSeatClassName(k)).toList() : seatClassesByAirline[airline] ?? [], 
+        (v) { if (v != null) { 
+        if (airline == 'ANA') {
+          final key = seatClassKeys['ANA']!.firstWhere((k) => _getSeatClassName(k) == v, orElse: () => '');
+          if (key.isNotEmpty) _onAnaSeatClassChanged(index, key);
+        } else {
+          setState(() => legs[index]['seatClass'] = v); _calculateSingleLeg(index);
+        }
+      } })), const SizedBox(width: 8), Expanded(child: _buildMobileTextField(l10n.fareAmountYen, fareAmountControllers[legId]!, '', onChanged: (_) => setState(() {}), isNumeric: true))]),
       if (fop != null) ...[const SizedBox(height: 8), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: airlineColor, borderRadius: BorderRadius.circular(8)),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Row(children: [Text('${_formatNumber(fop)} ${airline == "JAL" ? "FOP" : "PP"}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(width: 10), Text('${_formatNumber(miles ?? 0)}マイル', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11)), if (airline == 'JAL' && lsp != null) ...[const SizedBox(width: 6), Text('${lsp}LSP', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11))]]), if (fare > 0) Text('¥$unitPrice/${airline == "JAL" ? "FOP" : "PP"}', style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 11))]))],
+        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Row(children: [Text('${_formatNumber(fop)} ${airline == "JAL" ? "FOP" : "PP"}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(width: 10), Text('${_formatNumber(miles ?? 0)}${l10n.miles}', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11)), if (airline == 'JAL' && lsp != null) ...[const SizedBox(width: 6), Text('${lsp}LSP', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11))]]), if (fare > 0) Text('¥$unitPrice/${airline == "JAL" ? "FOP" : "PP"}', style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 11))]))],
       const SizedBox(height: 6),
       Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-        TextButton(onPressed: () => _clearLeg(index, legId), child: Text('クリア', style: TextStyle(color: Colors.grey[600], fontSize: 12))),
-        if (legs.length > 1) TextButton(onPressed: () => _removeLeg(index), child: const Text('削除', style: TextStyle(color: Colors.red, fontSize: 12))),
+        TextButton(onPressed: () => _clearLeg(index, legId), child: Text(l10n.clear, style: TextStyle(color: Colors.grey[600], fontSize: 12))),
+        if (legs.length > 1) TextButton(onPressed: () => _removeLeg(index), child: Text(l10n.delete, style: TextStyle(color: Colors.red, fontSize: 12))),
       ]),
     ]));
   }
@@ -959,22 +1129,40 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
         child: DropdownButton<String>(value: currentValue, isExpanded: true, underline: const SizedBox(), icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.grey[600]), hint: Padding(padding: const EdgeInsets.only(left: 8), child: Text('選択', style: TextStyle(fontSize: 12, color: Colors.grey[500]))), selectedItemBuilder: (c) => items.map((e) => Padding(padding: const EdgeInsets.only(left: 8), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: TextStyle(fontSize: 12, color: color ?? Colors.black, fontWeight: color != null ? FontWeight.bold : FontWeight.normal), overflow: TextOverflow.ellipsis)))).toList(), items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: 12, color: color ?? Colors.black)))).toList(), onChanged: onChanged))]);
   }
 
+  // 航空会社用ドロップダウン（JAL=赤、ANA=青）
+  Widget _buildMobileAirlineDropdown(String label, String value, void Function(String?) onChanged) {
+    final currentValue = value.isEmpty ? null : value;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700])), const SizedBox(height: 2),
+      Container(height: 36, decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!), borderRadius: BorderRadius.circular(6)),
+        child: DropdownButton<String>(value: currentValue, isExpanded: true, underline: const SizedBox(), icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.grey[600]), hint: Padding(padding: const EdgeInsets.only(left: 8), child: Text('選択', style: TextStyle(fontSize: 12, color: Colors.grey[500]))), 
+          selectedItemBuilder: (c) => airlines.map((e) => Padding(padding: const EdgeInsets.only(left: 8), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: TextStyle(fontSize: 12, color: e == 'JAL' ? Colors.red : Colors.blue, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)))).toList(), 
+          items: airlines.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: 12, color: e == 'JAL' ? Colors.red : Colors.blue, fontWeight: FontWeight.bold)))).toList(), 
+          onChanged: onChanged))]);
+  }
+
   Widget _buildMobileAirportSelector(String label, TextEditingController controller, FocusNode focusNode, List<String> items, void Function(String?) onChanged) {
     final airportList = items.where((e) => e != airportDivider).toList();
     final effectiveList = airportList.isNotEmpty ? airportList : [...majorAirports, ...regionalAirports];
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700])), const SizedBox(height: 2), _buildMobileAirportAutocomplete(controller: controller, focusNode: focusNode, airportList: effectiveList, onSelected: (code) => onChanged(code))]);
   }
 
+  // ========================================
+  // 到着空港選択ウィジェット（モバイル版）
+  // 重要: 出発地から就航している空港のみ表示する
+  // availableDestinationsは_fetchAvailableFlightsで設定される
+  // フォールバックで全空港を表示してはいけない（バグの原因）
+  // ========================================
   Widget _buildMobileDestinationSelector(Map<String, dynamic> leg, int legId, int index) {
+    final l10n = AppLocalizations.of(context)!;
     final destinations = (availableDestinations[legId] ?? []).where((e) => e != airportDivider).toList();
-    final sortedDestinations = _getSortedAirportList(destinations);
+    final sortedDestinations = _getSortedAirportList(destinations).where((e) => e != airportDivider).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('到着', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700])), 
+      Text(l10n.arrival, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700])), 
       const SizedBox(height: 2), 
       _buildMobileAirportAutocomplete(
         controller: arrivalAirportControllers[legId]!,
         focusNode: arrivalAirportFocusNodes[legId]!,
-        airportList: sortedDestinations.where((e) => e != airportDivider).toList(),
+        airportList: sortedDestinations, // 就航空港のみ。全空港にしないこと！
         onSelected: (code) {
           arrivalAirportControllers[legId]?.text = code;
           setState(() => legs[index]['arrivalAirport'] = code);
@@ -990,24 +1178,25 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       optionsBuilder: (textEditingValue) { final input = textEditingValue.text.toUpperCase(); if (input.isEmpty) return _getSortedAirportList(airportList).where((e) => e != airportDivider); return airportList.where((code) { final name = airportNames[code] ?? ''; return code.contains(input) || name.contains(input); }); },
       displayStringForOption: (code) => code,
       fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!), borderRadius: BorderRadius.circular(6), color: Colors.grey[50]),
-        child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [TextFormField(controller: textController, focusNode: focusNode, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold), textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(hintText: '選択', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.zero), onFieldSubmitted: (value) { final code = value.toUpperCase(); if (airportNames.containsKey(code)) onSelected(code); }), if (textController.text.isNotEmpty && airportNames[textController.text.toUpperCase()] != null) Text(airportNames[textController.text.toUpperCase()]!, style: TextStyle(fontSize: 10, color: Colors.grey[600]))])), Icon(Icons.arrow_drop_down, size: 20, color: Colors.grey[600])])),
+        child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [TextFormField(controller: textController, focusNode: focusNode, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold), textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(hintText: '選択', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.zero), onFieldSubmitted: (value) { final code = value.toUpperCase(); if (airportList.contains(code)) onSelected(code); }), if (textController.text.isNotEmpty && airportList.contains(textController.text.toUpperCase())) Text(airportNames[textController.text.toUpperCase()] ?? '', style: TextStyle(fontSize: 10, color: Colors.grey[600]))])), Icon(Icons.arrow_drop_down, size: 20, color: Colors.grey[600])])),
       optionsViewBuilder: (context, onAutoSelected, options) { final sortedOptions = _getSortedAirportList(options.toList()); return Align(alignment: Alignment.topLeft, child: Material(elevation: 4, child: ConstrainedBox(constraints: const BoxConstraints(maxHeight: 250, maxWidth: 200), child: ListView.builder(padding: EdgeInsets.zero, shrinkWrap: true, itemCount: sortedOptions.length, itemBuilder: (context, i) { final code = sortedOptions[i]; if (code == airportDivider) return Container(height: 1, color: Colors.grey[300], margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8)); return InkWell(onTap: () => onAutoSelected(code), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), child: Row(children: [Text(code, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), const SizedBox(width: 8), Text(airportNames[code] ?? '', style: TextStyle(fontSize: 12, color: Colors.grey[600]))]))); })))); },
       onSelected: onSelected);
   }
 
   Widget _buildMobileFlightTimeDropdown(Map<String, dynamic> leg, int legId, int index) {
+    final l10n = AppLocalizations.of(context)!;
     final flights = availableFlights[legId] ?? [], currentTime = departureTimeControllers[legId]?.text ?? '';
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('出発時刻', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700])), const SizedBox(height: 2),
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l10n.departureTime, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700])), const SizedBox(height: 2),
       Container(height: 36, decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!), borderRadius: BorderRadius.circular(6)),
         child: DropdownButton<String>(value: null, isExpanded: true, underline: const SizedBox(), icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.grey[600]), hint: Padding(padding: const EdgeInsets.only(left: 8), child: Text(currentTime.isEmpty ? '選択' : currentTime, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: currentTime.isEmpty ? Colors.grey[500] : Colors.black))),
           items: [const DropdownMenuItem(value: '__clear__', child: Text('-', style: TextStyle(fontSize: 12))), ...flights.map((flight) { String depTime = flight['departure_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); final arrCode = flight['arrival_code'] ?? ''; return DropdownMenuItem(value: '${flight['id']}', child: Text('${airportNames[arrCode] ?? arrCode} $depTime', style: const TextStyle(fontSize: 12))); })],
           onChanged: (value) { if (value == null) return; if (value == '__clear__') { _clearFlightInfo(index, legId); return; } final flight = flights.firstWhere((f) => f['id'].toString() == value, orElse: () => {}); if (flight.isNotEmpty) { String depTime = flight['departure_time'] ?? '', arrTime = flight['arrival_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); if (arrTime.length > 5) arrTime = arrTime.substring(0, 5); departureTimeControllers[legId]?.text = depTime; arrivalTimeControllers[legId]?.text = arrTime; flightNumberControllers[legId]?.text = flight['flight_number'] ?? ''; setState(() => legs[index]['arrivalAirport'] = flight['arrival_code'] ?? ''); arrivalAirportControllers[legId]?.text = flight['arrival_code'] ?? ''; if (index + 1 < legs.length) _fetchAvailableFlights(index + 1); _calculateSingleLeg(index); } }))]);
   }
 
-  Widget _buildMobileTextField(String label, TextEditingController controller, String hint, {void Function(String)? onChanged, void Function(String)? onSubmit}) {
+  Widget _buildMobileTextField(String label, TextEditingController controller, String hint, {void Function(String)? onChanged, void Function(String)? onSubmit, bool isNumeric = false}) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700])), const SizedBox(height: 2),
       Container(height: 36, decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!), borderRadius: BorderRadius.circular(6)),
-        child: Focus(onFocusChange: (hasFocus) { if (!hasFocus && onSubmit != null && controller.text.isNotEmpty) onSubmit(controller.text); }, child: TextFormField(controller: controller, style: const TextStyle(fontSize: 12), decoration: InputDecoration(hintText: hint, isDense: true, border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10)), onChanged: onChanged, onFieldSubmitted: onSubmit)))]);
+        child: Focus(onFocusChange: (hasFocus) { if (!hasFocus && onSubmit != null && controller.text.isNotEmpty) onSubmit(controller.text); }, child: TextFormField(controller: controller, style: const TextStyle(fontSize: 12), keyboardType: isNumeric ? TextInputType.number : TextInputType.text, inputFormatters: isNumeric ? [FilteringTextInputFormatter.digitsOnly] : null, decoration: InputDecoration(hintText: hint, isDense: true, border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10)), onChanged: onChanged, onFieldSubmitted: onSubmit)))]);
   }
 
   Widget _buildMobileDatePicker(String label, TextEditingController controller, BuildContext context, int index) {
@@ -1018,18 +1207,19 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
   }
 
   Widget _buildDesktopLegCard(BuildContext context, Map<String, dynamic> leg, int index) {
+    final l10n = AppLocalizations.of(context)!;
     final legId = leg['id'] as int, airline = leg['airline'] as String, fop = leg['calculatedFOP'] as int?, miles = leg['calculatedMiles'] as int?, lsp = leg['calculatedLSP'] as int?;
     final airlineColor = airline == 'JAL' ? Colors.red : Colors.blue, warning = legWarnings[legId];
     return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: airlineColor.withOpacity(0.3)), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [if (warning != null) Expanded(child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.orange[100], borderRadius: BorderRadius.circular(4)), child: Text(warning, style: TextStyle(fontSize: 11, color: Colors.orange[800])))) else const Spacer(), TextButton.icon(onPressed: _addLeg, icon: const Icon(Icons.add, size: 16), label: const Text('レグ追加'), style: TextButton.styleFrom(foregroundColor: Colors.grey[600], textStyle: const TextStyle(fontSize: 12))), TextButton(onPressed: () => _clearLeg(index, legId), child: Text('クリア', style: TextStyle(color: Colors.grey[600], fontSize: 12))), if (legs.length > 1) IconButton(icon: Icon(Icons.delete_outline, size: 18, color: Colors.grey[600]), onPressed: () => _removeLeg(index), padding: EdgeInsets.zero, constraints: const BoxConstraints(), tooltip: '削除')]),
+        Row(children: [if (warning != null) Expanded(child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.orange[100], borderRadius: BorderRadius.circular(4)), child: Text(warning, style: TextStyle(fontSize: 11, color: Colors.orange[800])))) else const Spacer(), TextButton.icon(onPressed: _addLeg, icon: const Icon(Icons.add, size: 16), label: Text(l10n.addLeg), style: TextButton.styleFrom(foregroundColor: Colors.grey[600], textStyle: const TextStyle(fontSize: 12))), TextButton(onPressed: () => _clearLeg(index, legId), child: Text(l10n.clear, style: TextStyle(color: Colors.grey[600], fontSize: 12))), if (legs.length > 1) IconButton(icon: Icon(Icons.delete_outline, size: 18, color: Colors.grey[600]), onPressed: () => _removeLeg(index), padding: EdgeInsets.zero, constraints: const BoxConstraints(), tooltip: l10n.delete)]),
         const SizedBox(height: 4),
         SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
-          _buildDesktopAirlineDropdown(leg, legId, index), const SizedBox(width: 8), _buildDesktopDatePicker('日付', 130, dateControllers[legId]!, context, index), const SizedBox(width: 8), _buildDesktopFlightNumberField(legId, index), const SizedBox(width: 8),
+          _buildDesktopAirlineDropdown(leg, legId, index), const SizedBox(width: 8), _buildDesktopDatePicker(l10n.date, 130, dateControllers[legId]!, context, index), const SizedBox(width: 8), _buildDesktopFlightNumberField(legId, index), const SizedBox(width: 8),
           _buildDesktopDepartureDropdown(leg, legId, index), const SizedBox(width: 4), Icon(Icons.arrow_forward, size: 16, color: Colors.grey[400]), const SizedBox(width: 4), _buildDesktopDestinationDropdown(leg, legId, index), const SizedBox(width: 8),
           _buildDesktopFlightTimeDropdown(leg, legId, index), const SizedBox(width: 4), _buildDesktopArrivalTimeField(legId), const SizedBox(width: 8),
           _buildDesktopFareTypeDropdown(leg, legId, index), const SizedBox(width: 8), _buildDesktopSeatClassDropdown(leg, legId, index), const SizedBox(width: 8),
-          _buildDesktopTextField('運賃', 70, fareAmountControllers[legId]!, '15000', onChanged: (_) => setState(() {})), const SizedBox(width: 8),
+          _buildDesktopTextField(l10n.fareAmount, 70, fareAmountControllers[legId]!, '', onChanged: (_) => setState(() {}), isNumeric: true), const SizedBox(width: 8),
           if (fop != null) _buildDesktopPointsDisplay(airline, fop, miles, lsp, legId),
         ]))]));
   }
@@ -1043,26 +1233,32 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
 
   Widget _buildDesktopAirlineDropdown(Map<String, dynamic> leg, int legId, int index) {
     final airline = leg['airline'] as String;
-    return SizedBox(width: 60, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('航空会社', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+    return SizedBox(width: 60, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppLocalizations.of(context)!.airline, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
         child: DropdownButton<String>(value: airline.isEmpty ? null : airline, isExpanded: true, underline: const SizedBox(), hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 12))), selectedItemBuilder: (c) => airlines.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: TextStyle(fontSize: 12, color: e == 'JAL' ? Colors.red : Colors.blue, fontWeight: FontWeight.bold))))).toList(), items: airlines.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: 12, color: e == 'JAL' ? Colors.red : Colors.blue, fontWeight: FontWeight.bold)))).toList(), onChanged: (v) { if (v != null && v != airline) { _clearFlightInfo(index, legId); setState(() { legs[index]['airline'] = v; legs[index]['fareType'] = ''; legs[index]['seatClass'] = ''; }); } }))]));
   }
 
   Widget _buildDesktopDepartureDropdown(Map<String, dynamic> leg, int legId, int index) {
     final airline = leg['airline'] as String, airportList = (airlineAirports[airline] ?? [...majorAirports, ...regionalAirports]).where((e) => e != airportDivider).toList();
-    return SizedBox(width: 85, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('出発地', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4), _buildAirportAutocomplete(controller: departureAirportControllers[legId]!, focusNode: departureAirportFocusNodes[legId]!, airportList: airportList, onSelected: (code) { _clearFlightInfo(index, legId); departureAirportControllers[legId]?.text = code; setState(() => legs[index]['departureAirport'] = code); _fetchAvailableFlights(index); })]));
+    return SizedBox(width: 85, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppLocalizations.of(context)!.departureAirport, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4), _buildAirportAutocomplete(controller: departureAirportControllers[legId]!, focusNode: departureAirportFocusNodes[legId]!, airportList: airportList, onSelected: (code) { _clearFlightInfo(index, legId); departureAirportControllers[legId]?.text = code; setState(() => legs[index]['departureAirport'] = code); _fetchAvailableFlights(index); })]));
   }
 
+  // ========================================
+  // 到着空港選択ウィジェット
+  // 重要: 出発地から就航している空港のみ表示する
+  // availableDestinationsは_fetchAvailableFlightsで設定される
+  // フォールバックで全空港を表示してはいけない（バグの原因）
+  // ========================================
   Widget _buildDesktopDestinationDropdown(Map<String, dynamic> leg, int legId, int index) {
     final destinations = (availableDestinations[legId] ?? []).where((e) => e != airportDivider).toList();
     final sortedDestinations = _getSortedAirportList(destinations).where((e) => e != airportDivider).toList();
     return SizedBox(width: 85, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('到着地', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), 
+      Text(AppLocalizations.of(context)!.arrivalAirport, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), 
       const SizedBox(height: 4), 
       _buildAirportAutocomplete(
         controller: arrivalAirportControllers[legId]!,
         focusNode: arrivalAirportFocusNodes[legId]!,
-        airportList: sortedDestinations,
+        airportList: sortedDestinations, // 就航空港のみ。全空港にしないこと！
         onSelected: (code) {
           arrivalAirportControllers[legId]?.text = code;
           setState(() => legs[index]['arrivalAirport'] = code);
@@ -1077,41 +1273,71 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     return RawAutocomplete<String>(textEditingController: controller, focusNode: focusNode,
       optionsBuilder: (textEditingValue) { final input = textEditingValue.text.toUpperCase(); if (input.isEmpty) return _getSortedAirportList(airportList).where((e) => e != airportDivider); return airportList.where((code) { final name = airportNames[code] ?? ''; return code.contains(input) || name.contains(input); }); },
       displayStringForOption: (code) => code,
-      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) => Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)), child: TextFormField(controller: textController, focusNode: focusNode, style: const TextStyle(fontSize: 12), textCapitalization: TextCapitalization.characters, decoration: InputDecoration(hintText: '選択', isDense: true, border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8), suffixIcon: Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey[600])), onFieldSubmitted: (value) { final code = value.toUpperCase(); if (airportNames.containsKey(code)) onSelected(code); })),
+      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) => Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)), child: TextFormField(controller: textController, focusNode: focusNode, style: const TextStyle(fontSize: 12), textCapitalization: TextCapitalization.characters, decoration: InputDecoration(hintText: '選択', isDense: true, border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8), suffixIcon: Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey[600])), onFieldSubmitted: (value) { final code = value.toUpperCase(); if (airportList.contains(code)) onSelected(code); })),
       optionsViewBuilder: (context, onAutoSelected, options) { final sortedOptions = _getSortedAirportList(options.toList()); return Align(alignment: Alignment.topLeft, child: Material(elevation: 4, child: ConstrainedBox(constraints: const BoxConstraints(maxHeight: 250, maxWidth: 160), child: ListView.builder(padding: EdgeInsets.zero, shrinkWrap: true, itemCount: sortedOptions.length, itemBuilder: (context, i) { final code = sortedOptions[i]; if (code == airportDivider) return Container(height: 1, color: Colors.grey[300], margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8)); return InkWell(onTap: () => onAutoSelected(code), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), child: Text('$code ${airportNames[code] ?? ''}', style: const TextStyle(fontSize: 12)))); })))); },
       onSelected: onSelected);
   }
 
   Widget _buildDesktopFlightTimeDropdown(Map<String, dynamic> leg, int legId, int index) {
     final flights = availableFlights[legId] ?? [], airline = leg['airline'] as String, currentTime = departureTimeControllers[legId]?.text ?? '';
-    return SizedBox(width: 70, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('出発時刻', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+    return SizedBox(width: 70, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppLocalizations.of(context)!.departureTime, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
         child: DropdownButton<String>(key: ValueKey('flight_time_${legId}_$airline'), value: null, isExpanded: true, underline: const SizedBox(), menuWidth: 150, hint: Padding(padding: const EdgeInsets.only(left: 6), child: Text(currentTime.isEmpty ? '選択' : currentTime, style: const TextStyle(fontSize: 12))),
           items: [const DropdownMenuItem(value: '__clear__', child: Text('-', style: TextStyle(fontSize: 12))), ...flights.map((flight) { String depTime = flight['departure_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); final arrCode = flight['arrival_code'] ?? ''; return DropdownMenuItem(value: '${flight['id']}', child: Text('${airportNames[arrCode] ?? arrCode} $depTime', style: const TextStyle(fontSize: 12))); })],
           onChanged: (value) { if (value == null) return; if (value == '__clear__') { _clearFlightInfo(index, legId); return; } final flight = flights.firstWhere((f) => f['id'].toString() == value, orElse: () => {}); if (flight.isNotEmpty) { String depTime = flight['departure_time'] ?? '', arrTime = flight['arrival_time'] ?? ''; if (depTime.length > 5) depTime = depTime.substring(0, 5); if (arrTime.length > 5) arrTime = arrTime.substring(0, 5); departureTimeControllers[legId]?.text = depTime; arrivalTimeControllers[legId]?.text = arrTime; flightNumberControllers[legId]?.text = flight['flight_number'] ?? ''; setState(() => legs[index]['arrivalAirport'] = flight['arrival_code'] ?? ''); arrivalAirportControllers[legId]?.text = flight['arrival_code'] ?? ''; if (index + 1 < legs.length) _fetchAvailableFlights(index + 1); _calculateSingleLeg(index); } }))]));
   }
 
-  Widget _buildDesktopArrivalTimeField(int legId) => SizedBox(width: 65, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('到着時刻', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)), child: TextFormField(controller: arrivalTimeControllers[legId], style: const TextStyle(fontSize: 12), decoration: const InputDecoration(hintText: 'HH:MM', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8))))]));
+  Widget _buildDesktopArrivalTimeField(int legId) => SizedBox(width: 65, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppLocalizations.of(context)!.arrivalTime, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)), child: TextFormField(controller: arrivalTimeControllers[legId], style: const TextStyle(fontSize: 12), decoration: const InputDecoration(hintText: 'HH:MM', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8))))]));
 
   Widget _buildDesktopFareTypeDropdown(Map<String, dynamic> leg, int legId, int index) {
-    final airline = leg['airline'] as String, fareType = leg['fareType'] as String, fareTypes = fareTypesByAirline[airline] ?? [];
-    final currentValue = fareType.isEmpty || !fareTypes.contains(fareType) ? null : fareType;
-    return SizedBox(width: 150, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('運賃種別', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+    final airline = leg['airline'] as String, fareType = leg['fareType'] as String;
+    final seatClass = leg['seatClass'] as String;
+    // ANAの場合は座席に応じて運賃をフィルタリング
+    final fareTypes = airline == 'ANA' 
+        ? _getAnaAvailableFareTypes(seatClass).map((k) => _getFareTypeName(k)).toList()
+        : fareTypesByAirline[airline] ?? [];
+    final displayFareType = fareType.isNotEmpty ? _getFareTypeName(fareType) : '';
+    final currentValue = displayFareType.isEmpty || !fareTypes.contains(displayFareType) ? null : displayFareType;
+    return SizedBox(width: 150, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppLocalizations.of(context)!.fareType, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 250, hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 10))), selectedItemBuilder: (c) => fareTypes.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(), items: fareTypes.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(), onChanged: (v) { if (v != null) { setState(() => legs[index]['fareType'] = v); _calculateSingleLeg(index); } }))]));
+        child: DropdownButton<String>(value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 250, hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 10))), selectedItemBuilder: (c) => fareTypes.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(), items: fareTypes.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(), onChanged: (v) { 
+          if (v != null) { 
+            if (airline == 'ANA') {
+              final key = fareTypeKeys['ANA']!.firstWhere((k) => _getFareTypeName(k) == v, orElse: () => '');
+              if (key.isNotEmpty) _onAnaFareTypeChanged(index, key);
+            } else {
+              setState(() => legs[index]['fareType'] = v); _calculateSingleLeg(index);
+            }
+          } 
+        }))]));
   }
 
   Widget _buildDesktopSeatClassDropdown(Map<String, dynamic> leg, int legId, int index) {
-    final airline = leg['airline'] as String, seatClass = leg['seatClass'] as String, seatClasses = seatClassesByAirline[airline] ?? [];
-    final currentValue = seatClass.isEmpty || !seatClasses.contains(seatClass) ? null : seatClass;
-    return SizedBox(width: 100, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('座席クラス', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
+    final airline = leg['airline'] as String, seatClass = leg['seatClass'] as String;
+    final fareType = leg['fareType'] as String;
+    // ANAの場合は運賃に応じて座席をフィルタリング
+    final seatClasses = airline == 'ANA' 
+        ? _getAnaAvailableSeatClasses(fareType).map((k) => _getSeatClassName(k)).toList()
+        : seatClassesByAirline[airline] ?? [];
+    final displaySeatClass = seatClass.isNotEmpty ? _getSeatClassName(seatClass) : '';
+    final currentValue = displaySeatClass.isEmpty || !seatClasses.contains(displaySeatClass) ? null : displaySeatClass;
+    return SizedBox(width: 100, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppLocalizations.of(context)!.seatClass, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4),
       Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)),
-        child: DropdownButton<String>(value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 150, hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 10))), selectedItemBuilder: (c) => seatClasses.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(), items: seatClasses.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(), onChanged: (v) { if (v != null) { setState(() => legs[index]['seatClass'] = v); _calculateSingleLeg(index); } }))]));
+        child: DropdownButton<String>(value: currentValue, isExpanded: true, underline: const SizedBox(), menuWidth: 150, hint: const Padding(padding: EdgeInsets.only(left: 6), child: Text('選択', style: TextStyle(fontSize: 10))), selectedItemBuilder: (c) => seatClasses.map((e) => Padding(padding: const EdgeInsets.only(left: 6), child: Align(alignment: Alignment.centerLeft, child: Text(e, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)))).toList(), items: seatClasses.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 10)))).toList(), onChanged: (v) { 
+          if (v != null) { 
+            if (airline == 'ANA') {
+              final key = seatClassKeys['ANA']!.firstWhere((k) => _getSeatClassName(k) == v, orElse: () => '');
+              if (key.isNotEmpty) _onAnaSeatClassChanged(index, key);
+            } else {
+              setState(() => legs[index]['seatClass'] = v); _calculateSingleLeg(index);
+            }
+          } 
+        }))]));
   }
 
-  Widget _buildDesktopTextField(String label, double width, TextEditingController controller, String hint, {void Function(String)? onChanged}) => SizedBox(width: width, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)), child: TextFormField(controller: controller, style: const TextStyle(fontSize: 12), decoration: InputDecoration(hintText: hint, isDense: true, border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8)), onChanged: onChanged))]));
+  Widget _buildDesktopTextField(String label, double width, TextEditingController controller, String hint, {void Function(String)? onChanged, bool isNumeric = false}) => SizedBox(width: width, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)), child: TextFormField(controller: controller, style: const TextStyle(fontSize: 12), keyboardType: isNumeric ? TextInputType.number : TextInputType.text, inputFormatters: isNumeric ? [FilteringTextInputFormatter.digitsOnly] : null, decoration: InputDecoration(hintText: hint, isDense: true, border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8)), onChanged: onChanged))]));
 
-  Widget _buildDesktopFlightNumberField(int legId, int index) => SizedBox(width: 60, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('便名', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)), child: Focus(onFocusChange: (hasFocus) { if (!hasFocus) { final flightNumber = flightNumberControllers[legId]?.text ?? ''; if (flightNumber.isNotEmpty) _autoFillFromFlightNumber(index); } }, child: TextFormField(controller: flightNumberControllers[legId], style: const TextStyle(fontSize: 12), decoration: const InputDecoration(hintText: '', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8)), onFieldSubmitted: (_) => _autoFillFromFlightNumber(index))))]));
+  Widget _buildDesktopFlightNumberField(int legId, int index) => SizedBox(width: 60, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppLocalizations.of(context)!.flightNumber, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)), child: Focus(onFocusChange: (hasFocus) { if (!hasFocus) { final flightNumber = flightNumberControllers[legId]?.text ?? ''; if (flightNumber.isNotEmpty) _autoFillFromFlightNumber(index); } }, child: TextFormField(controller: flightNumberControllers[legId], style: const TextStyle(fontSize: 12), decoration: const InputDecoration(hintText: '', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8)), onFieldSubmitted: (_) => _autoFillFromFlightNumber(index))))]));
 
   Widget _buildDesktopDatePicker(String label, double width, TextEditingController controller, BuildContext context, int index) => SizedBox(width: width, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Container(height: 32, decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(4)), child: TextFormField(controller: controller, readOnly: true, style: const TextStyle(fontSize: 12), decoration: const InputDecoration(hintText: '選択', isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8), suffixIcon: Icon(Icons.calendar_today, size: 14)), onTap: () async { final now = DateTime.now(); final picked = await showDatePicker(context: context, initialDate: _parseDate(controller.text) ?? now, firstDate: DateTime(2020), lastDate: DateTime(2030), locale: const Locale('ja')); if (picked != null) { controller.text = '${picked.year}/${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}'; setState(() {}); _fetchAvailableFlights(index); } }))]));
 }

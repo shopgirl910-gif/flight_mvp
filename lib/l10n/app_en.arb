@@ -8,41 +8,51 @@
   "guest": "guest",
   "login": "Login",
   "logout": "Logout",
-  "logoutConfirm": "Are you sure you want to logout?",
   "cancel": "Cancel",
   "save": "Save",
   "delete": "Delete",
   "clear": "Clear",
   "add": "Add",
-  "addLeg": "Add Leg",
   "csv": "CSV",
   "share": "Share",
-  "select": "Select",
+  "addToLog": "Add to Log",
+  "addedToLog": "Added \"{title}\" to Flight Log",
+  "@addedToLog": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
   "loginRequired": "Login Required",
-  "loginToSave": "Please login to save your itinerary.",
+  "loginToSave": "Please login to save itineraries.",
   "loginToDownload": "Please login to download CSV.",
   "fop": "FOP",
   "pp": "PP",
-  "miles": "Miles",
+  "miles": " miles",
   "lsp": "LSP",
   "legs": "Legs",
-  "leg": "Leg",
-  "totalFare": "Total",
-  "unitPrice": "Cost/Point",
   "total": "Total",
+  "totalFare": "Total",
+  "unitPrice": "Cost",
+  "costPerPoint": "Cost/Pt",
   "airline": "Airline",
-  "flightNumber": "Flight",
-  "departure": "Departure",
-  "arrival": "Arrival",
+  "flightNumber": "Flight#",
+  "departure": "From",
+  "arrival": "To",
   "departureAirport": "From",
   "arrivalAirport": "To",
   "departureTime": "Dep Time",
   "arrivalTime": "Arr Time",
   "fareType": "Fare Type",
-  "seatClass": "Class",
+  "seatClass": "Seat Class",
   "fareAmount": "Fare",
   "fareAmountYen": "Fare(¥)",
   "date": "Date",
+  "select": "Select",
+  "card": "Card",
+  "status": "Status",
+  "shoppingMileP": "Shopping Mile P",
+  "notCalculated": "Not calculated",
+  "routeNotSet": "Route not set",
   "noLegsToSave": "No legs to save",
   "noLegsToDownload": "No legs to download",
   "savedSuccess": "Saved \"{title}\"",
@@ -52,33 +62,105 @@
     }
   },
   "csvDownloaded": "CSV downloaded",
-  "cardStatusSettings": "Card & Status Settings",
-  "card": "Card",
-  "status": "Status",
-  "cardNotIssued": "💡No card yet?",
-  "tourPremium": "Tour Premium",
-  "shoppingMileP": "Shopping Mile P",
-  "flightNotFound": "Flight {flightNumber} not found",
-  "@flightNotFound": {
-    "placeholders": {
-      "flightNumber": {"type": "String"}
-    }
-  },
-  "enterFlightNumber": "Enter flight number",
-  "saveFailed": "Save failed",
-  "scheduleWarning": "⚠️ Schedule changes in some periods",
-  "nLegs": "{count} Legs",
+  "nLegs": "{count} legs",
   "@nLegs": {
     "placeholders": {
       "count": {"type": "int"}
     }
   },
-  "costPerPoint": "¥{price}/P",
-  "@costPerPoint": {
+  "addLeg": "Add Leg",
+  "tourPremium": "Tour Premium",
+  "shoppingMilePremium": "Shopping Mile P",
+  "cardNotIssued": "💡No card yet?",
+  "cardStatusSettings": "⚙ Card/Status Settings",
+  "jalCard": "JAL Card",
+  "anaCard": "ANA Card",
+  "jalStatus": "JAL Status",
+  "anaStatus": "ANA Status",
+
+  "deleteConfirm": "Confirm Delete",
+  "deleteItineraryConfirm": "Delete this itinerary?",
+  "deleted": "Deleted",
+  "deleteFailed": "Delete failed: {error}",
+  "@deleteFailed": {
     "placeholders": {
-      "price": {"type": "String"}
+      "error": {"type": "String"}
     }
   },
-  "notCalculated": "Not calculated",
-  "routeNotSet": "Route not set"
+  "dataLoadFailed": "Failed to load data: {error}",
+  "@dataLoadFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "reload": "Reload",
+  "noSavedItineraries": "No saved itineraries",
+  "loginRequiredToSaveItineraries": "Login required to save itineraries",
+  "createItineraryInSimulateTab": "Create an itinerary in Simulate tab and save it",
+  "loginFromTopRight": "Login from the button at top right",
+  "untitled": "Untitled",
+
+  "airportStampRally": "Airport Stamp Rally",
+  "conquered": "Complete!",
+  "conqueredPercent": "{percent}% Complete",
+  "@conqueredPercent": {
+    "placeholders": {
+      "percent": {"type": "String"}
+    }
+  },
+  "checkinAvailable": "Check-in Available!",
+  "loginToCheckin": "Login to Check-in",
+  "nearestAirport": "Nearest Airport",
+  "checkin": "Check-in",
+  "checkinWithinRadius": "Within {radius}km",
+  "@checkinWithinRadius": {
+    "placeholders": {
+      "radius": {"type": "String"}
+    }
+  },
+  "distanceFromHere": "{distance} km from here",
+  "@distanceFromHere": {
+    "placeholders": {
+      "distance": {"type": "String"}
+    }
+  },
+  "calculatingDistance": "Calculating distance...",
+  "gettingLocation": "Getting location...",
+  "retry": "Retry",
+  "locationPermissionRequired": "Location permission required",
+  "enableLocationInSettings": "Please enable location in settings",
+  "locationError": "Location error",
+  "dataLoadError": "Data load error",
+  "checkinError": "Check-in error",
+  "tooFarFromAirport": "You are {distance}km from the airport (must be within {radius}km)",
+  "@tooFarFromAirport": {
+    "placeholders": {
+      "distance": {"type": "String"},
+      "radius": {"type": "String"}
+    }
+  },
+  "checkinSuccess": "Checked in at {airport} Airport!",
+  "@checkinSuccess": {
+    "placeholders": {
+      "airport": {"type": "String"}
+    }
+  },
+  "loginRequiredForCheckin": "Login required to save check-in records.\nGo to login screen?",
+  "goToLogin": "Login",
+  "nAirports": "{count} airports",
+  "@nAirports": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "regionHokkaido": "Hokkaido",
+  "regionTohoku": "Tohoku",
+  "regionKanto": "Kanto",
+  "regionChubu": "Chubu",
+  "regionKansai": "Kansai",
+  "regionKinki": "Kinki",
+  "regionChugoku": "Chugoku",
+  "regionShikoku": "Shikoku",
+  "regionKyushu": "Kyushu",
+  "regionOkinawa": "Okinawa"
 }

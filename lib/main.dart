@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'simulation_screen.dart';
-import 'history_screen.dart';
+import 'flight_log_screen.dart';
 import 'quiz_screen.dart';
 import 'checkin_screen.dart';
 import 'auth_screen.dart';
@@ -104,13 +104,14 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     const SimulationScreen(),
-    const HistoryScreen(),
+    const FlightLogScreen(),
     const QuizScreen(),
     const CheckinScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final currentLocale = Localizations.localeOf(context);
     final isJapanese = currentLocale.languageCode == 'ja';
     
@@ -147,12 +148,12 @@ class _MainScreenState extends State<MainScreen> {
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('ログアウト'),
-                    content: const Text('ログアウトしますか？'),
+                    title: Text(l10n.logout),
+                    content: Text(isJapanese ? 'ログアウトしますか？' : 'Logout?'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('キャンセル'),
+                        child: Text(l10n.cancel),
                       ),
                       TextButton(
                         onPressed: () async {
@@ -162,7 +163,7 @@ class _MainScreenState extends State<MainScreen> {
                           await Supabase.instance.client.auth.signInAnonymously();
                           setState(() {});
                         },
-                        child: const Text('ログアウト', style: TextStyle(color: Colors.red)),
+                        child: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
                       ),
                     ],
                   ),

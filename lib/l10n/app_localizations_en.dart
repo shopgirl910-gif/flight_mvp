@@ -33,9 +33,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logout => 'Logout';
 
   @override
-  String get logoutConfirm => 'Are you sure you want to logout?';
-
-  @override
   String get cancel => 'Cancel';
 
   @override
@@ -51,22 +48,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get add => 'Add';
 
   @override
-  String get addLeg => 'Add Leg';
-
-  @override
   String get csv => 'CSV';
 
   @override
   String get share => 'Share';
 
   @override
-  String get select => 'Select';
+  String get addToLog => 'Add to Log';
+
+  @override
+  String addedToLog(String title) {
+    return 'Added \"$title\" to Flight Log';
+  }
 
   @override
   String get loginRequired => 'Login Required';
 
   @override
-  String get loginToSave => 'Please login to save your itinerary.';
+  String get loginToSave => 'Please login to save itineraries.';
 
   @override
   String get loginToDownload => 'Please login to download CSV.';
@@ -78,7 +77,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pp => 'PP';
 
   @override
-  String get miles => 'Miles';
+  String get miles => ' miles';
 
   @override
   String get lsp => 'LSP';
@@ -87,28 +86,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get legs => 'Legs';
 
   @override
-  String get leg => 'Leg';
+  String get total => 'Total';
 
   @override
   String get totalFare => 'Total';
 
   @override
-  String get unitPrice => 'Cost/Point';
+  String get unitPrice => 'Cost';
 
   @override
-  String get total => 'Total';
+  String get costPerPoint => 'Cost/Pt';
 
   @override
   String get airline => 'Airline';
 
   @override
-  String get flightNumber => 'Flight';
+  String get flightNumber => 'Flight#';
 
   @override
-  String get departure => 'Departure';
+  String get departure => 'From';
 
   @override
-  String get arrival => 'Arrival';
+  String get arrival => 'To';
 
   @override
   String get departureAirport => 'From';
@@ -126,7 +125,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fareType => 'Fare Type';
 
   @override
-  String get seatClass => 'Class';
+  String get seatClass => 'Seat Class';
 
   @override
   String get fareAmount => 'Fare';
@@ -136,6 +135,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get date => 'Date';
+
+  @override
+  String get select => 'Select';
+
+  @override
+  String get card => 'Card';
+
+  @override
+  String get status => 'Status';
+
+  @override
+  String get shoppingMileP => 'Shopping Mile P';
+
+  @override
+  String get notCalculated => 'Not calculated';
+
+  @override
+  String get routeNotSet => 'Route not set';
 
   @override
   String get noLegsToSave => 'No legs to save';
@@ -152,50 +169,179 @@ class AppLocalizationsEn extends AppLocalizations {
   String get csvDownloaded => 'CSV downloaded';
 
   @override
-  String get cardStatusSettings => 'Card & Status Settings';
+  String nLegs(int count) {
+    return '$count legs';
+  }
 
   @override
-  String get card => 'Card';
-
-  @override
-  String get status => 'Status';
-
-  @override
-  String get cardNotIssued => '💡No card yet?';
+  String get addLeg => 'Add Leg';
 
   @override
   String get tourPremium => 'Tour Premium';
 
   @override
-  String get shoppingMileP => 'Shopping Mile P';
+  String get shoppingMilePremium => 'Shopping Mile P';
 
   @override
-  String flightNotFound(String flightNumber) {
-    return 'Flight $flightNumber not found';
+  String get cardNotIssued => '💡No card yet?';
+
+  @override
+  String get cardStatusSettings => '⚙ Card/Status Settings';
+
+  @override
+  String get jalCard => 'JAL Card';
+
+  @override
+  String get anaCard => 'ANA Card';
+
+  @override
+  String get jalStatus => 'JAL Status';
+
+  @override
+  String get anaStatus => 'ANA Status';
+
+  @override
+  String get deleteConfirm => 'Confirm Delete';
+
+  @override
+  String get deleteItineraryConfirm => 'Delete this itinerary?';
+
+  @override
+  String get deleted => 'Deleted';
+
+  @override
+  String deleteFailed(String error) {
+    return 'Delete failed: $error';
   }
 
   @override
-  String get enterFlightNumber => 'Enter flight number';
-
-  @override
-  String get saveFailed => 'Save failed';
-
-  @override
-  String get scheduleWarning => '⚠️ Schedule changes in some periods';
-
-  @override
-  String nLegs(int count) {
-    return '$count Legs';
+  String dataLoadFailed(String error) {
+    return 'Failed to load data: $error';
   }
 
   @override
-  String costPerPoint(String price) {
-    return '¥$price/P';
+  String get reload => 'Reload';
+
+  @override
+  String get noSavedItineraries => 'No saved itineraries';
+
+  @override
+  String get loginRequiredToSaveItineraries => 'Login required to save itineraries';
+
+  @override
+  String get createItineraryInSimulateTab => 'Create an itinerary in Simulate tab and save it';
+
+  @override
+  String get loginFromTopRight => 'Login from the button at top right';
+
+  @override
+  String get untitled => 'Untitled';
+
+  @override
+  String get airportStampRally => 'Airport Stamp Rally';
+
+  @override
+  String get conquered => 'Complete!';
+
+  @override
+  String conqueredPercent(String percent) {
+    return '$percent% Complete';
   }
 
   @override
-  String get notCalculated => 'Not calculated';
+  String get checkinAvailable => 'Check-in Available!';
 
   @override
-  String get routeNotSet => 'Route not set';
+  String get loginToCheckin => 'Login to Check-in';
+
+  @override
+  String get nearestAirport => 'Nearest Airport';
+
+  @override
+  String get checkin => 'Check-in';
+
+  @override
+  String checkinWithinRadius(String radius) {
+    return 'Within ${radius}km';
+  }
+
+  @override
+  String distanceFromHere(String distance) {
+    return '$distance km from here';
+  }
+
+  @override
+  String get calculatingDistance => 'Calculating distance...';
+
+  @override
+  String get gettingLocation => 'Getting location...';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String get locationPermissionRequired => 'Location permission required';
+
+  @override
+  String get enableLocationInSettings => 'Please enable location in settings';
+
+  @override
+  String get locationError => 'Location error';
+
+  @override
+  String get dataLoadError => 'Data load error';
+
+  @override
+  String get checkinError => 'Check-in error';
+
+  @override
+  String tooFarFromAirport(String distance, String radius) {
+    return 'You are ${distance}km from the airport (must be within ${radius}km)';
+  }
+
+  @override
+  String checkinSuccess(String airport) {
+    return 'Checked in at $airport Airport!';
+  }
+
+  @override
+  String get loginRequiredForCheckin => 'Login required to save check-in records.\nGo to login screen?';
+
+  @override
+  String get goToLogin => 'Login';
+
+  @override
+  String nAirports(int count) {
+    return '$count airports';
+  }
+
+  @override
+  String get regionHokkaido => 'Hokkaido';
+
+  @override
+  String get regionTohoku => 'Tohoku';
+
+  @override
+  String get regionKanto => 'Kanto';
+
+  @override
+  String get regionChubu => 'Chubu';
+
+  @override
+  String get regionKansai => 'Kansai';
+
+  @override
+  String get regionKinki => 'Kinki';
+
+  @override
+  String get regionChugoku => 'Chugoku';
+
+  @override
+  String get regionShikoku => 'Shikoku';
+
+  @override
+  String get regionKyushu => 'Kyushu';
+
+  @override
+  String get regionOkinawa => 'Okinawa';
 }

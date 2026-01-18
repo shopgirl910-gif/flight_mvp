@@ -143,12 +143,6 @@ abstract class AppLocalizations {
   /// **'Logout'**
   String get logout;
 
-  /// No description provided for @logoutConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Are you sure you want to logout?'**
-  String get logoutConfirm;
-
   /// No description provided for @cancel.
   ///
   /// In en, this message translates to:
@@ -179,12 +173,6 @@ abstract class AppLocalizations {
   /// **'Add'**
   String get add;
 
-  /// No description provided for @addLeg.
-  ///
-  /// In en, this message translates to:
-  /// **'Add Leg'**
-  String get addLeg;
-
   /// No description provided for @csv.
   ///
   /// In en, this message translates to:
@@ -197,11 +185,17 @@ abstract class AppLocalizations {
   /// **'Share'**
   String get share;
 
-  /// No description provided for @select.
+  /// No description provided for @addToLog.
   ///
   /// In en, this message translates to:
-  /// **'Select'**
-  String get select;
+  /// **'Add to Log'**
+  String get addToLog;
+
+  /// No description provided for @addedToLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Added \"{title}\" to Flight Log'**
+  String addedToLog(String title);
 
   /// No description provided for @loginRequired.
   ///
@@ -212,7 +206,7 @@ abstract class AppLocalizations {
   /// No description provided for @loginToSave.
   ///
   /// In en, this message translates to:
-  /// **'Please login to save your itinerary.'**
+  /// **'Please login to save itineraries.'**
   String get loginToSave;
 
   /// No description provided for @loginToDownload.
@@ -236,7 +230,7 @@ abstract class AppLocalizations {
   /// No description provided for @miles.
   ///
   /// In en, this message translates to:
-  /// **'Miles'**
+  /// **' miles'**
   String get miles;
 
   /// No description provided for @lsp.
@@ -251,11 +245,11 @@ abstract class AppLocalizations {
   /// **'Legs'**
   String get legs;
 
-  /// No description provided for @leg.
+  /// No description provided for @total.
   ///
   /// In en, this message translates to:
-  /// **'Leg'**
-  String get leg;
+  /// **'Total'**
+  String get total;
 
   /// No description provided for @totalFare.
   ///
@@ -266,14 +260,14 @@ abstract class AppLocalizations {
   /// No description provided for @unitPrice.
   ///
   /// In en, this message translates to:
-  /// **'Cost/Point'**
+  /// **'Cost'**
   String get unitPrice;
 
-  /// No description provided for @total.
+  /// No description provided for @costPerPoint.
   ///
   /// In en, this message translates to:
-  /// **'Total'**
-  String get total;
+  /// **'Cost/Pt'**
+  String get costPerPoint;
 
   /// No description provided for @airline.
   ///
@@ -284,19 +278,19 @@ abstract class AppLocalizations {
   /// No description provided for @flightNumber.
   ///
   /// In en, this message translates to:
-  /// **'Flight'**
+  /// **'Flight#'**
   String get flightNumber;
 
   /// No description provided for @departure.
   ///
   /// In en, this message translates to:
-  /// **'Departure'**
+  /// **'From'**
   String get departure;
 
   /// No description provided for @arrival.
   ///
   /// In en, this message translates to:
-  /// **'Arrival'**
+  /// **'To'**
   String get arrival;
 
   /// No description provided for @departureAirport.
@@ -332,7 +326,7 @@ abstract class AppLocalizations {
   /// No description provided for @seatClass.
   ///
   /// In en, this message translates to:
-  /// **'Class'**
+  /// **'Seat Class'**
   String get seatClass;
 
   /// No description provided for @fareAmount.
@@ -352,6 +346,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Date'**
   String get date;
+
+  /// No description provided for @select.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get select;
+
+  /// No description provided for @card.
+  ///
+  /// In en, this message translates to:
+  /// **'Card'**
+  String get card;
+
+  /// No description provided for @status.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get status;
+
+  /// No description provided for @shoppingMileP.
+  ///
+  /// In en, this message translates to:
+  /// **'Shopping Mile P'**
+  String get shoppingMileP;
+
+  /// No description provided for @notCalculated.
+  ///
+  /// In en, this message translates to:
+  /// **'Not calculated'**
+  String get notCalculated;
+
+  /// No description provided for @routeNotSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Route not set'**
+  String get routeNotSet;
 
   /// No description provided for @noLegsToSave.
   ///
@@ -377,29 +407,17 @@ abstract class AppLocalizations {
   /// **'CSV downloaded'**
   String get csvDownloaded;
 
-  /// No description provided for @cardStatusSettings.
+  /// No description provided for @nLegs.
   ///
   /// In en, this message translates to:
-  /// **'Card & Status Settings'**
-  String get cardStatusSettings;
+  /// **'{count} legs'**
+  String nLegs(int count);
 
-  /// No description provided for @card.
+  /// No description provided for @addLeg.
   ///
   /// In en, this message translates to:
-  /// **'Card'**
-  String get card;
-
-  /// No description provided for @status.
-  ///
-  /// In en, this message translates to:
-  /// **'Status'**
-  String get status;
-
-  /// No description provided for @cardNotIssued.
-  ///
-  /// In en, this message translates to:
-  /// **'💡No card yet?'**
-  String get cardNotIssued;
+  /// **'Add Leg'**
+  String get addLeg;
 
   /// No description provided for @tourPremium.
   ///
@@ -407,59 +425,305 @@ abstract class AppLocalizations {
   /// **'Tour Premium'**
   String get tourPremium;
 
-  /// No description provided for @shoppingMileP.
+  /// No description provided for @shoppingMilePremium.
   ///
   /// In en, this message translates to:
   /// **'Shopping Mile P'**
-  String get shoppingMileP;
+  String get shoppingMilePremium;
 
-  /// No description provided for @flightNotFound.
+  /// No description provided for @cardNotIssued.
   ///
   /// In en, this message translates to:
-  /// **'Flight {flightNumber} not found'**
-  String flightNotFound(String flightNumber);
+  /// **'💡No card yet?'**
+  String get cardNotIssued;
 
-  /// No description provided for @enterFlightNumber.
+  /// No description provided for @cardStatusSettings.
   ///
   /// In en, this message translates to:
-  /// **'Enter flight number'**
-  String get enterFlightNumber;
+  /// **'⚙ Card/Status Settings'**
+  String get cardStatusSettings;
 
-  /// No description provided for @saveFailed.
+  /// No description provided for @jalCard.
   ///
   /// In en, this message translates to:
-  /// **'Save failed'**
-  String get saveFailed;
+  /// **'JAL Card'**
+  String get jalCard;
 
-  /// No description provided for @scheduleWarning.
+  /// No description provided for @anaCard.
   ///
   /// In en, this message translates to:
-  /// **'⚠️ Schedule changes in some periods'**
-  String get scheduleWarning;
+  /// **'ANA Card'**
+  String get anaCard;
 
-  /// No description provided for @nLegs.
+  /// No description provided for @jalStatus.
   ///
   /// In en, this message translates to:
-  /// **'{count} Legs'**
-  String nLegs(int count);
+  /// **'JAL Status'**
+  String get jalStatus;
 
-  /// No description provided for @costPerPoint.
+  /// No description provided for @anaStatus.
   ///
   /// In en, this message translates to:
-  /// **'¥{price}/P'**
-  String costPerPoint(String price);
+  /// **'ANA Status'**
+  String get anaStatus;
 
-  /// No description provided for @notCalculated.
+  /// No description provided for @deleteConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Not calculated'**
-  String get notCalculated;
+  /// **'Confirm Delete'**
+  String get deleteConfirm;
 
-  /// No description provided for @routeNotSet.
+  /// No description provided for @deleteItineraryConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Route not set'**
-  String get routeNotSet;
+  /// **'Delete this itinerary?'**
+  String get deleteItineraryConfirm;
+
+  /// No description provided for @deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get deleted;
+
+  /// No description provided for @deleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete failed: {error}'**
+  String deleteFailed(String error);
+
+  /// No description provided for @dataLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load data: {error}'**
+  String dataLoadFailed(String error);
+
+  /// No description provided for @reload.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get reload;
+
+  /// No description provided for @noSavedItineraries.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved itineraries'**
+  String get noSavedItineraries;
+
+  /// No description provided for @loginRequiredToSaveItineraries.
+  ///
+  /// In en, this message translates to:
+  /// **'Login required to save itineraries'**
+  String get loginRequiredToSaveItineraries;
+
+  /// No description provided for @createItineraryInSimulateTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Create an itinerary in Simulate tab and save it'**
+  String get createItineraryInSimulateTab;
+
+  /// No description provided for @loginFromTopRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Login from the button at top right'**
+  String get loginFromTopRight;
+
+  /// No description provided for @untitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled'**
+  String get untitled;
+
+  /// No description provided for @airportStampRally.
+  ///
+  /// In en, this message translates to:
+  /// **'Airport Stamp Rally'**
+  String get airportStampRally;
+
+  /// No description provided for @conquered.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete!'**
+  String get conquered;
+
+  /// No description provided for @conqueredPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% Complete'**
+  String conqueredPercent(String percent);
+
+  /// No description provided for @checkinAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in Available!'**
+  String get checkinAvailable;
+
+  /// No description provided for @loginToCheckin.
+  ///
+  /// In en, this message translates to:
+  /// **'Login to Check-in'**
+  String get loginToCheckin;
+
+  /// No description provided for @nearestAirport.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearest Airport'**
+  String get nearestAirport;
+
+  /// No description provided for @checkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in'**
+  String get checkin;
+
+  /// No description provided for @checkinWithinRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Within {radius}km'**
+  String checkinWithinRadius(String radius);
+
+  /// No description provided for @distanceFromHere.
+  ///
+  /// In en, this message translates to:
+  /// **'{distance} km from here'**
+  String distanceFromHere(String distance);
+
+  /// No description provided for @calculatingDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating distance...'**
+  String get calculatingDistance;
+
+  /// No description provided for @gettingLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Getting location...'**
+  String get gettingLocation;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// No description provided for @locationPermissionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission required'**
+  String get locationPermissionRequired;
+
+  /// No description provided for @enableLocationInSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enable location in settings'**
+  String get enableLocationInSettings;
+
+  /// No description provided for @locationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Location error'**
+  String get locationError;
+
+  /// No description provided for @dataLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Data load error'**
+  String get dataLoadError;
+
+  /// No description provided for @checkinError.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in error'**
+  String get checkinError;
+
+  /// No description provided for @tooFarFromAirport.
+  ///
+  /// In en, this message translates to:
+  /// **'You are {distance}km from the airport (must be within {radius}km)'**
+  String tooFarFromAirport(String distance, String radius);
+
+  /// No description provided for @checkinSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked in at {airport} Airport!'**
+  String checkinSuccess(String airport);
+
+  /// No description provided for @loginRequiredForCheckin.
+  ///
+  /// In en, this message translates to:
+  /// **'Login required to save check-in records.\nGo to login screen?'**
+  String get loginRequiredForCheckin;
+
+  /// No description provided for @goToLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Login'**
+  String get goToLogin;
+
+  /// No description provided for @nAirports.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} airports'**
+  String nAirports(int count);
+
+  /// No description provided for @regionHokkaido.
+  ///
+  /// In en, this message translates to:
+  /// **'Hokkaido'**
+  String get regionHokkaido;
+
+  /// No description provided for @regionTohoku.
+  ///
+  /// In en, this message translates to:
+  /// **'Tohoku'**
+  String get regionTohoku;
+
+  /// No description provided for @regionKanto.
+  ///
+  /// In en, this message translates to:
+  /// **'Kanto'**
+  String get regionKanto;
+
+  /// No description provided for @regionChubu.
+  ///
+  /// In en, this message translates to:
+  /// **'Chubu'**
+  String get regionChubu;
+
+  /// No description provided for @regionKansai.
+  ///
+  /// In en, this message translates to:
+  /// **'Kansai'**
+  String get regionKansai;
+
+  /// No description provided for @regionKinki.
+  ///
+  /// In en, this message translates to:
+  /// **'Kinki'**
+  String get regionKinki;
+
+  /// No description provided for @regionChugoku.
+  ///
+  /// In en, this message translates to:
+  /// **'Chugoku'**
+  String get regionChugoku;
+
+  /// No description provided for @regionShikoku.
+  ///
+  /// In en, this message translates to:
+  /// **'Shikoku'**
+  String get regionShikoku;
+
+  /// No description provided for @regionKyushu.
+  ///
+  /// In en, this message translates to:
+  /// **'Kyushu'**
+  String get regionKyushu;
+
+  /// No description provided for @regionOkinawa.
+  ///
+  /// In en, this message translates to:
+  /// **'Okinawa'**
+  String get regionOkinawa;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

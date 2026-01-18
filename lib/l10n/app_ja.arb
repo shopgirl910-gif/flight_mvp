@@ -8,16 +8,20 @@
   "guest": "guest",
   "login": "ログイン",
   "logout": "ログアウト",
-  "logoutConfirm": "ログアウトしますか？",
   "cancel": "キャンセル",
   "save": "保存",
   "delete": "削除",
   "clear": "クリア",
   "add": "追加",
-  "addLeg": "レグ追加",
   "csv": "CSV",
   "share": "シェア",
-  "select": "選択",
+  "addToLog": "ログに追加",
+  "addedToLog": "「{title}」を修行ログに追加しました",
+  "@addedToLog": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
   "loginRequired": "ログインが必要です",
   "loginToSave": "旅程を保存するにはログインしてください。",
   "loginToDownload": "CSVをダウンロードするにはログインしてください。",
@@ -26,10 +30,10 @@
   "miles": "マイル",
   "lsp": "LSP",
   "legs": "レグ",
-  "leg": "レグ",
+  "total": "合計",
   "totalFare": "総額",
   "unitPrice": "単価",
-  "total": "合計",
+  "costPerPoint": "単価",
   "airline": "航空会社",
   "flightNumber": "便名",
   "departure": "出発",
@@ -43,6 +47,12 @@
   "fareAmount": "運賃",
   "fareAmountYen": "運賃(円)",
   "date": "日付",
+  "select": "選択",
+  "card": "カード",
+  "status": "ステータス",
+  "shoppingMileP": "ショッピングマイルP",
+  "notCalculated": "未計算",
+  "routeNotSet": "区間未設定",
   "noLegsToSave": "保存するレグがありません",
   "noLegsToDownload": "ダウンロードするレグがありません",
   "savedSuccess": "「{title}」を保存しました",
@@ -52,33 +62,105 @@
     }
   },
   "csvDownloaded": "CSVをダウンロードしました",
-  "cardStatusSettings": "カード・ステータス設定",
-  "card": "カード",
-  "status": "ステータス",
-  "cardNotIssued": "💡カード未発行の方",
-  "tourPremium": "ツアープレミアム",
-  "shoppingMileP": "ショッピングマイルP",
-  "flightNotFound": "{flightNumber}便が見つかりません",
-  "@flightNotFound": {
-    "placeholders": {
-      "flightNumber": {"type": "String"}
-    }
-  },
-  "enterFlightNumber": "便名を入力してください",
-  "saveFailed": "保存に失敗しました",
-  "scheduleWarning": "⚠️ 一部期間で時刻変更あり",
   "nLegs": "{count} レグ",
   "@nLegs": {
     "placeholders": {
       "count": {"type": "int"}
     }
   },
-  "costPerPoint": "¥{price}/P",
-  "@costPerPoint": {
+  "addLeg": "レグ追加",
+  "tourPremium": "ツアープレミアム",
+  "shoppingMilePremium": "ショッピングマイルP",
+  "cardNotIssued": "💡カード未発行の方",
+  "cardStatusSettings": "⚙ カード/ステータス設定",
+  "jalCard": "JALカード",
+  "anaCard": "ANAカード",
+  "jalStatus": "JALステータス",
+  "anaStatus": "ANAステータス",
+
+  "deleteConfirm": "削除確認",
+  "deleteItineraryConfirm": "この旅程を削除しますか？",
+  "deleted": "削除しました",
+  "deleteFailed": "削除に失敗しました: {error}",
+  "@deleteFailed": {
     "placeholders": {
-      "price": {"type": "String"}
+      "error": {"type": "String"}
     }
   },
-  "notCalculated": "未計算",
-  "routeNotSet": "区間未設定"
+  "dataLoadFailed": "データの読み込みに失敗しました: {error}",
+  "@dataLoadFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "reload": "再読み込み",
+  "noSavedItineraries": "保存された旅程がありません",
+  "loginRequiredToSaveItineraries": "旅程を保存するにはログインが必要です",
+  "createItineraryInSimulateTab": "Simulateタブで旅程を作成し、保存してください",
+  "loginFromTopRight": "右上のログインボタンからログインしてください",
+  "untitled": "無題",
+
+  "airportStampRally": "空港スタンプラリー",
+  "conquered": "制覇！",
+  "conqueredPercent": "{percent}% 制覇",
+  "@conqueredPercent": {
+    "placeholders": {
+      "percent": {"type": "String"}
+    }
+  },
+  "checkinAvailable": "チェックイン可能！",
+  "loginToCheckin": "ログインしてチェックイン",
+  "nearestAirport": "最寄り空港",
+  "checkin": "チェックイン",
+  "checkinWithinRadius": "{radius}km以内で可能",
+  "@checkinWithinRadius": {
+    "placeholders": {
+      "radius": {"type": "String"}
+    }
+  },
+  "distanceFromHere": "現在地から {distance} km",
+  "@distanceFromHere": {
+    "placeholders": {
+      "distance": {"type": "String"}
+    }
+  },
+  "calculatingDistance": "距離計算中...",
+  "gettingLocation": "位置情報を取得中...",
+  "retry": "再取得",
+  "locationPermissionRequired": "位置情報の許可が必要です",
+  "enableLocationInSettings": "設定から位置情報を許可してください",
+  "locationError": "位置情報取得エラー",
+  "dataLoadError": "データ読み込みエラー",
+  "checkinError": "チェックインエラー",
+  "tooFarFromAirport": "空港から{distance}km離れています（{radius}km以内でチェックイン可能）",
+  "@tooFarFromAirport": {
+    "placeholders": {
+      "distance": {"type": "String"},
+      "radius": {"type": "String"}
+    }
+  },
+  "checkinSuccess": "{airport}空港にチェックインしました！",
+  "@checkinSuccess": {
+    "placeholders": {
+      "airport": {"type": "String"}
+    }
+  },
+  "loginRequiredForCheckin": "チェックイン記録を保存するにはログインが必要です。\nログイン画面に移動しますか？",
+  "goToLogin": "ログインする",
+  "nAirports": "{count} 空港",
+  "@nAirports": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "regionHokkaido": "北海道",
+  "regionTohoku": "東北",
+  "regionKanto": "関東",
+  "regionChubu": "中部",
+  "regionKansai": "関西",
+  "regionKinki": "近畿",
+  "regionChugoku": "中国",
+  "regionShikoku": "四国",
+  "regionKyushu": "九州",
+  "regionOkinawa": "沖縄"
 }
