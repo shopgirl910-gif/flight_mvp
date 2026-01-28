@@ -546,7 +546,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
     final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
     final url = html.Url.createObjectUrlFromBlob(blob);
     final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', 'flight_simulation_${DateTime.now().toIso8601String().substring(0, 10)}.csv')
+      ..setAttribute('download', 'flight_log_${DateTime.now().toIso8601String().substring(0, 10)}.csv')
       ..click();
     html.Url.revokeObjectUrl(url);
     
