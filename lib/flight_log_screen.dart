@@ -500,8 +500,8 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                 children: [
                   _buildStatItemInline('FOP', totalFOP),
                   _buildStatItemInline(l10n.miles, _jalMiles),
-                  if (totalLSP > 0) _buildStatItemInline('LSP', totalLSP),
                   _buildStatItemInline(l10n.legs, _jalLegs),
+                  if (totalLSP > 0) _buildStatItemInline('LSP', totalLSP),
                 ],
               ),
             ],
@@ -634,8 +634,8 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
             children: [
               _buildStatItem(pointLabel, points),
               _buildStatItem(l10n.miles, miles),
-              if (isJAL && lsp > 0) _buildStatItem('LSP', lsp),
               _buildStatItem(l10n.legs, legs),
+              if (isJAL && lsp > 0) _buildStatItem('LSP', lsp),
             ],
           ),
         ],
@@ -1197,6 +1197,8 @@ class _ShareDialogState extends State<_ShareDialog> {
   @override
   Widget build(BuildContext context) {
     final legs = widget.itinerary['legs'] as List<dynamic>? ?? [];
+    final shareTexts = _generateShareTexts();
+    final hasMultipleTweets = shareTexts.length > 1;
     
     return AlertDialog(
       title: const Row(
@@ -1220,6 +1222,7 @@ class _ShareDialogState extends State<_ShareDialog> {
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
+              onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
             // コメント入力
@@ -1232,6 +1235,7 @@ class _ShareDialogState extends State<_ShareDialog> {
                 isDense: true,
               ),
               maxLines: 2,
+              onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
             // 詳細表示チェック
@@ -1244,14 +1248,73 @@ class _ShareDialogState extends State<_ShareDialog> {
               contentPadding: EdgeInsets.zero,
               dense: true,
             ),
-            if (_showDetails && legs.length > 5)
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Text(
-                  '※ ${legs.length}レグは複数ツイートに分割されます',
-                  style: TextStyle(fontSize: 11, color: Colors.orange[700]),
-                ),
+            const SizedBox(height: 16),
+            // プレビューセクション
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
               ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.preview, size: 16, color: Colors.grey[600]),
+                      const SizedBox(width: 4),
+                      Text(
+                        'プレビュー${hasMultipleTweets ? "（${shareTexts.length}件に分割）" : ""}',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...shareTexts.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final text = entry.value;
+                    return Container(
+                      margin: EdgeInsets.only(top: index > 0 ? 8 : 0),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.blue[200]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (hasMultipleTweets)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                'ツイート ${index + 1}/${shareTexts.length}',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue[700]),
+                              ),
+                            ),
+                          Text(
+                            text,
+                            style: const TextStyle(fontSize: 11, height: 1.4),
+                          ),
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              '${text.length}/280文字',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: text.length > 280 ? Colors.red : Colors.grey[500],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -1263,7 +1326,7 @@ class _ShareDialogState extends State<_ShareDialog> {
         ElevatedButton.icon(
           onPressed: _share,
           icon: const Icon(Icons.send, size: 18),
-          label: const Text('シェア'),
+          label: Text(hasMultipleTweets ? 'シェア (1/${shareTexts.length})' : 'シェア'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue,
             foregroundColor: Colors.white,
