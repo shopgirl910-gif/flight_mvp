@@ -404,8 +404,17 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       if (routeData == null) return;
       final distance = routeData['distance_miles'] as int;
       double fareRate = 1.0;
-      final rateMatch = RegExp(r'\((\d+)%\)').firstMatch(fare);
-      if (rateMatch != null) fareRate = int.parse(rateMatch.group(1)!) / 100.0;
+      // 積算率をキーまたは表示名から取得
+      final fareRateMap = {
+        'jal_fare1': 1.0, 'jal_fare2': 0.75, 'jal_fare3': 0.75, 'jal_fare4': 0.75, 'jal_fare5': 0.50, 'jal_fare6': 0.50,
+        'ana_fare1': 1.5, 'ana_fare2': 1.25, 'ana_fare3': 1.0, 'ana_fare4': 1.0, 'ana_fare5': 0.75, 'ana_fare6': 0.75, 'ana_fare7': 0.75, 'ana_fare8': 0.50, 'ana_fare9': 1.5, 'ana_fare10': 1.0, 'ana_fare11': 0.70, 'ana_fare12': 0.50, 'ana_fare13': 0.30,
+      };
+      if (fareRateMap.containsKey(fare)) {
+        fareRate = fareRateMap[fare]!;
+      } else {
+        final rateMatch = RegExp(r'\((\d+)%\)').firstMatch(fare);
+        if (rateMatch != null) fareRate = int.parse(rateMatch.group(1)!) / 100.0;
+      }
       final fareNumber = fare.split(' ').first;
       int totalPoints = 0, totalMiles = 0, totalLSP = 0;
       if (airline == 'JAL') {
@@ -419,7 +428,7 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
         final flightMiles = (distance * (fareRate + seatBonusRate)).round();
         
         // ツアープレミアム判定（運賃4,5が対象）
-        final isTourPremiumTarget = jalTourPremium && (fareNumber == '運賃4' || fareNumber == '運賃5');
+        final isTourPremiumTarget = jalTourPremium && (fareNumber == '運賃4' || fareNumber == '運賃5' || fare == 'jal_fare4' || fare == 'jal_fare5');
         
         if (isTourPremiumTarget) {
           // ツアプレ適用時: フライトマイル + ツアプレボーナス + カードボーナス
@@ -441,11 +450,11 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
         // 適用ボーナス率：ゴールド/プレミアム系+ステータス保有時は+5%
         final hasStatus = statusBonusRate > 0.0;
         final appliedBonusRate = (isGoldPremium && hasStatus) ? statusBonusRate + 0.05 : (cardBonusRate > statusBonusRate ? cardBonusRate : statusBonusRate);
-        // 段階的切り捨て（公式計算方法に準拠）
+        // 段階的計算（公式計算方法に準拠）
         final flightMiles = (distance * fareRate).toInt();
-        final bonusMiles = (flightMiles * appliedBonusRate).toInt();
+        final bonusMiles = (flightMiles * appliedBonusRate).round();
         totalMiles = flightMiles + bonusMiles;
-        totalPoints = ((distance * fareRate * 2) + (anaBonusPoint[fareNumber] ?? 0)).toInt();
+        totalPoints = (flightMiles * 2 + (anaBonusPoint[fareNumber] ?? anaBonusPoint[fare] ?? 0)).toInt();
       }
       setState(() { legs[index]['calculatedFOP'] = totalPoints; legs[index]['calculatedMiles'] = totalMiles; legs[index]['calculatedLSP'] = totalLSP; });
     } catch (e) {}
@@ -1090,7 +1099,8 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
       Row(children: [Expanded(child: _buildMobileFlightTimeDropdown(leg, legId, index)), const SizedBox(width: 8), Expanded(child: _buildMobileTextField(l10n.arrivalTime, arrivalTimeControllers[legId]!, 'HH:MM'))]),
       const SizedBox(height: 6),
       // ANAの場合は座席に応じて運賃をフィルタリング
-      _buildMobileDropdown(l10n.fareType, leg['fareType'] as String, 
+      _buildMobileDropdown(l10n.fareType, 
+        airline == 'ANA' ? _getFareTypeName(leg['fareType'] as String) : leg['fareType'] as String,
         airline == 'ANA' ? _getAnaAvailableFareTypes(leg['seatClass'] as String).map((k) => _getFareTypeName(k)).toList() : fareTypesByAirline[airline] ?? [], 
         (v) { if (v != null) { 
           if (airline == 'ANA') {
@@ -1102,7 +1112,8 @@ class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepA
         } }),
       const SizedBox(height: 6),
       // ANAの場合は運賃に応じて座席をフィルタリング
-      Row(children: [Expanded(child: _buildMobileDropdown(l10n.seatClass, leg['seatClass'] as String, 
+      Row(children: [Expanded(child: _buildMobileDropdown(l10n.seatClass, 
+        airline == 'ANA' ? _getSeatClassName(leg['seatClass'] as String) : leg['seatClass'] as String,
         airline == 'ANA' ? _getAnaAvailableSeatClasses(leg['fareType'] as String).map((k) => _getSeatClassName(k)).toList() : seatClassesByAirline[airline] ?? [], 
         (v) { if (v != null) { 
         if (airline == 'ANA') {
