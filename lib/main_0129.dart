@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
-import 'simulation_screen_final.dart';
+import 'simulation_screen.dart';
 import 'flight_log_screen.dart';
 import 'quiz_screen.dart';
 import 'checkin_screen.dart';
 import 'auth_screen.dart';
-import 'profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,7 +66,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-
+  
   @override
   void initState() {
     super.initState();
@@ -110,138 +109,12 @@ class _MainScreenState extends State<MainScreen> {
     const CheckinScreen(),
   ];
 
-  void _showUserMenu(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final isJapanese = Localizations.localeOf(context).languageCode == 'ja';
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            // ユーザー情報
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.purple[100],
-                    child: Icon(Icons.person, color: Colors.purple[700]),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          Supabase.instance.client.auth.currentUser?.email ?? 'Guest',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        Text(
-                          _isLoggedIn 
-                              ? (isJapanese ? 'ログイン中' : 'Logged in')
-                              : (isJapanese ? 'ゲスト' : 'Guest'),
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-            // プロフィール設定
-            ListTile(
-              leading: const Icon(Icons.settings),
-              title: Text(isJapanese ? 'プロフィール設定' : 'Profile Settings'),
-              subtitle: Text(isJapanese ? 'カード・ステータス・LSP目標' : 'Card, Status, LSP Goal'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                );
-              },
-            ),
-            // ログアウト
-            if (_isLoggedIn)
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text(l10n.logout),
-                      content: Text(isJapanese ? 'ログアウトしますか？' : 'Logout?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: Text(l10n.cancel),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) {
-                    await Supabase.instance.client.auth.signOut();
-                    await Supabase.instance.client.auth.signInAnonymously();
-                    if (mounted) setState(() {});
-                  }
-                },
-              ),
-            // ログイン
-            if (!_isLoggedIn)
-              ListTile(
-                leading: Icon(Icons.login, color: Colors.purple[700]),
-                title: Text(
-                  isJapanese ? 'ログイン / 新規登録' : 'Login / Sign up',
-                  style: TextStyle(color: Colors.purple[700], fontWeight: FontWeight.bold),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AuthScreen(
-                        onAuthSuccess: () {
-                          Navigator.pop(context);
-                          setState(() {});
-                        },
-                      ),
-                    ),
-                  );
-                },
-              ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final currentLocale = Localizations.localeOf(context);
     final isJapanese = currentLocale.languageCode == 'ja';
-
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('MRP - Mileage Run Planner'),
@@ -267,9 +140,49 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-          // ユーザーメニューボタン
+          // ログイン/ログアウトボタン
           GestureDetector(
-            onTap: () => _showUserMenu(context),
+            onTap: () {
+              if (_isLoggedIn) {
+                // ログアウト確認ダイアログ
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(l10n.logout),
+                    content: Text(isJapanese ? 'ログアウトしますか？' : 'Logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(l10n.cancel),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          await Supabase.instance.client.auth.signOut();
+                          // 匿名ユーザーとして再ログイン
+                          await Supabase.instance.client.auth.signInAnonymously();
+                          setState(() {});
+                        },
+                        child: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                // ログイン画面へ
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AuthScreen(
+                      onAuthSuccess: () {
+                        Navigator.pop(context);
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                );
+              }
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               margin: const EdgeInsets.only(right: 12),
