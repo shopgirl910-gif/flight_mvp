@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'l10n/app_localizations.dart';
+import 'auth_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,8 +18,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? jalCard;
   String? jalStatus;
   bool jalTourPremium = false;
-  int currentLsp = 0;
-  int targetLsp = 1500;
   
   // ANA設定
   String? anaCard;
@@ -27,6 +26,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // 共通設定
   String? homeAirport;
   String defaultAirline = 'JAL';
+
+  // テキストコントローラー - JAL
+  final _currentLspController = TextEditingController();
+  final _targetLspController = TextEditingController();
+  final _currentFopController = TextEditingController();
+  final _targetFopController = TextEditingController();
+  final _currentJalMilesController = TextEditingController();
+  final _targetJalMilesController = TextEditingController();
+  
+  // テキストコントローラー - ANA
+  final _currentPpController = TextEditingController();
+  final _targetPpController = TextEditingController();
+  final _currentAnaMilesController = TextEditingController();
+  final _targetAnaMilesController = TextEditingController();
 
   // JALカード種別
   final List<String> jalCardKeys = ['-', 'jmb', 'jal_regular', 'jal_club_a', 'jal_club_a_gold', 'jal_platinum', 'jgc_japan', 'jgc_overseas', 'jal_navi', 'jal_est_regular', 'jal_est_club_a', 'jal_est_gold', 'jal_est_platinum'];
@@ -59,6 +72,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfile();
   }
 
+  @override
+  void dispose() {
+    _currentLspController.dispose();
+    _targetLspController.dispose();
+    _currentFopController.dispose();
+    _targetFopController.dispose();
+    _currentJalMilesController.dispose();
+    _targetJalMilesController.dispose();
+    _currentPpController.dispose();
+    _targetPpController.dispose();
+    _currentAnaMilesController.dispose();
+    _targetAnaMilesController.dispose();
+    super.dispose();
+  }
+
   bool get _isJapanese => Localizations.localeOf(context).languageCode == 'ja';
 
   String _getJalCardName(String key) => _isJapanese ? (jalCardNamesJa[key] ?? key) : (jalCardNamesEn[key] ?? key);
@@ -86,13 +114,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
           jalCard = response['jal_card'] as String?;
           jalStatus = response['jal_status'] as String?;
           jalTourPremium = response['jal_tour_premium'] as bool? ?? false;
-          currentLsp = response['current_lsp'] as int? ?? 0;
-          targetLsp = response['target_lsp'] as int? ?? 1500;
           anaCard = response['ana_card'] as String?;
           anaStatus = response['ana_status'] as String?;
           homeAirport = response['home_airport'] as String?;
           defaultAirline = response['default_airline'] as String? ?? 'JAL';
         });
+        
+        // テキストコントローラーに値を設定
+        _currentLspController.text = (response['current_lsp'] as int?)?.toString() ?? '';
+        _targetLspController.text = (response['target_lsp'] as int?)?.toString() ?? '';
+        _currentFopController.text = (response['current_fop'] as int?)?.toString() ?? '';
+        _targetFopController.text = (response['target_fop'] as int?)?.toString() ?? '';
+        _currentJalMilesController.text = (response['current_jal_miles'] as int?)?.toString() ?? '';
+        _targetJalMilesController.text = (response['target_jal_miles'] as int?)?.toString() ?? '';
+        _currentPpController.text = (response['current_pp'] as int?)?.toString() ?? '';
+        _targetPpController.text = (response['target_pp'] as int?)?.toString() ?? '';
+        _currentAnaMilesController.text = (response['current_ana_miles'] as int?)?.toString() ?? '';
+        _targetAnaMilesController.text = (response['target_ana_miles'] as int?)?.toString() ?? '';
       }
     } catch (e) {
       // エラー時はデフォルト値のまま
@@ -113,10 +151,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'jal_card': jalCard,
         'jal_status': jalStatus,
         'jal_tour_premium': jalTourPremium,
-        'current_lsp': currentLsp,
-        'target_lsp': targetLsp,
+        'current_lsp': int.tryParse(_currentLspController.text),
+        'target_lsp': int.tryParse(_targetLspController.text),
+        'current_fop': int.tryParse(_currentFopController.text),
+        'target_fop': int.tryParse(_targetFopController.text),
+        'current_jal_miles': int.tryParse(_currentJalMilesController.text),
+        'target_jal_miles': int.tryParse(_targetJalMilesController.text),
         'ana_card': anaCard,
         'ana_status': anaStatus,
+        'current_pp': int.tryParse(_currentPpController.text),
+        'target_pp': int.tryParse(_targetPpController.text),
+        'current_ana_miles': int.tryParse(_currentAnaMilesController.text),
+        'target_ana_miles': int.tryParse(_targetAnaMilesController.text),
         'home_airport': homeAirport,
         'default_airline': defaultAirline,
         'updated_at': DateTime.now().toIso8601String(),
@@ -129,7 +175,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true); // 保存成功を返す
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -148,6 +194,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final user = Supabase.instance.client.auth.currentUser;
+    final isAnonymous = user == null || user.isAnonymous;
+    
+    // 未ログインの場合はログイン促進画面を表示
+    if (isAnonymous) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(_isJapanese ? 'プロフィール設定' : 'Profile Settings'),
+          backgroundColor: Colors.purple[700],
+          foregroundColor: Colors.white,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.account_circle, size: 80, color: Colors.grey[400]),
+                const SizedBox(height: 24),
+                Text(
+                  _isJapanese ? 'ログインが必要です' : 'Login Required',
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _isJapanese 
+                      ? 'プロフィール設定を保存するには\nログインしてください'
+                      : 'Please log in to save\nyour profile settings',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context); // プロフィール画面を閉じる
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AuthScreen(
+                          onAuthSuccess: () {
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.login),
+                  label: Text(_isJapanese ? 'ログイン画面へ' : 'Go to Login'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     
     if (isLoading) {
       return Scaffold(
@@ -209,8 +315,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
             
-            // LSP設定
-            _buildLspSection(),
+            // JAL目標設定
+            _buildJalGoalsSection(),
             const SizedBox(height: 24),
 
             // ANA設定セクション
@@ -233,6 +339,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onChanged: (v) => setState(() => anaStatus = v),
               color: Colors.blue,
             ),
+            const SizedBox(height: 16),
+            
+            // ANA目標設定
+            _buildAnaGoalsSection(),
             const SizedBox(height: 24),
 
             // 共通設定セクション
@@ -368,10 +478,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLspSection() {
-    final remainingLsp = targetLsp - currentLsp;
-    final remainingLegs = remainingLsp > 0 ? (remainingLsp / 5).ceil() : 0;
+  Widget _buildGoalInput({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+  }) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          const SizedBox(height: 4),
+          Container(
+            height: 40,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: TextFormField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 12),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildGoalRow({
+    required String currentLabel,
+    required String targetLabel,
+    required TextEditingController currentController,
+    required TextEditingController targetController,
+    required String currentHint,
+    required String targetHint,
+  }) {
+    return Row(
+      children: [
+        _buildGoalInput(
+          label: currentLabel,
+          controller: currentController,
+          hint: currentHint,
+        ),
+        const SizedBox(width: 8),
+        const Padding(
+          padding: EdgeInsets.only(top: 16),
+          child: Icon(Icons.arrow_forward, size: 16, color: Colors.grey),
+        ),
+        const SizedBox(width: 8),
+        _buildGoalInput(
+          label: targetLabel,
+          controller: targetController,
+          hint: targetHint,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildJalGoalsSection() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -383,124 +553,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Life Status Points (LSP)',
+            _isJapanese ? '🎯 JAL目標設定' : '🎯 JAL Goals',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red[700]),
           ),
-          const SizedBox(height: 12),
+          Text(
+            _isJapanese ? '空欄のまま保存可能です' : 'Optional - leave blank if not needed',
+            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+          ),
+          const SizedBox(height: 16),
           
-          // 現在のLSP
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _isJapanese ? '現在のLSP' : 'Current LSP',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: TextFormField(
-                        initialValue: currentLsp.toString(),
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                        ),
-                        onChanged: (v) => setState(() => currentLsp = int.tryParse(v) ?? 0),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _isJapanese ? '目標LSP' : 'Target LSP',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: TextFormField(
-                        initialValue: targetLsp.toString(),
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                        ),
-                        onChanged: (v) => setState(() => targetLsp = int.tryParse(v) ?? 1500),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          // LSP行
+          _buildGoalRow(
+            currentLabel: _isJapanese ? '現在LSP' : 'Current LSP',
+            targetLabel: _isJapanese ? '目標LSP' : 'Target LSP',
+            currentController: _currentLspController,
+            targetController: _targetLspController,
+            currentHint: '0',
+            targetHint: '1500',
+          ),
+          const SizedBox(height: 12),
+
+          // FOP行
+          _buildGoalRow(
+            currentLabel: _isJapanese ? '現在FOP' : 'Current FOP',
+            targetLabel: _isJapanese ? '目標FOP' : 'Target FOP',
+            currentController: _currentFopController,
+            targetController: _targetFopController,
+            currentHint: '0',
+            targetHint: '50000',
+          ),
+          const SizedBox(height: 12),
+
+          // マイル行
+          _buildGoalRow(
+            currentLabel: _isJapanese ? '現在マイル' : 'Current Miles',
+            targetLabel: _isJapanese ? '目標マイル' : 'Target Miles',
+            currentController: _currentJalMilesController,
+            targetController: _targetJalMilesController,
+            currentHint: '0',
+            targetHint: '50000',
           ),
           const SizedBox(height: 16),
 
-          // 目標までの残り
-          if (remainingLsp > 0) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _isJapanese 
-                        ? '🎯 目標まで あと $remainingLsp LSP'
-                        : '🎯 $remainingLsp LSP to goal',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red[700]),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _isJapanese 
-                        ? '（国内線 約 $remainingLegs レグ）'
-                        : '(Approx. $remainingLegs domestic legs)',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isJapanese ? '🎉 目標達成！' : '🎉 Goal achieved!',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-
-          // LSP目安ガイド
+          // ステータス目安
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -511,16 +606,161 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isJapanese ? '📊 LSP目安' : '📊 LSP Guide',
+                  _isJapanese ? '📊 ステータス目安' : '📊 Status Reference',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _isJapanese 
-                      ? '1,500 LSP → JGC入会可能 ✨'
-                      : '1,500 LSP → JGC eligible ✨',
+                      ? '• 1,500 LSP → JGC入会可能 ✨\n• 50,000 FOP → JGC修行解脱'
+                      : '• 1,500 LSP → JGC eligible ✨\n• 50,000 FOP → JGC status achieved',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 特典航空券マイル目安
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _isJapanese ? '✈️ 特典航空券マイル目安（往復・Y・L）' : '✈️ Award Miles (Round-trip/Y/L)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 8),
+                _buildMileTable([
+                  [_isJapanese ? '国内線' : 'Domestic', '12,000〜'],
+                  [_isJapanese ? '韓国' : 'Korea', '15,000〜'],
+                  [_isJapanese ? '東南アジア' : 'SE Asia', '35,000〜'],
+                  [_isJapanese ? 'ハワイ' : 'Hawaii', '40,000〜'],
+                  [_isJapanese ? '北米' : 'N. America', '50,000〜'],
+                  [_isJapanese ? '欧州' : 'Europe', '54,000〜'],
+                ]),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMileTable(List<List<String>> rows) {
+    return Column(
+      children: rows.map((row) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 100,
+              child: Text(row[0], style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            ),
+            Text(row[1], style: TextStyle(fontSize: 11, color: Colors.grey[800], fontWeight: FontWeight.w500)),
+          ],
+        ),
+      )).toList(),
+    );
+  }
+
+  Widget _buildAnaGoalsSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _isJapanese ? '🎯 ANA目標設定' : '🎯 ANA Goals',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue[700]),
+          ),
+          Text(
+            _isJapanese ? '空欄のまま保存可能です' : 'Optional - leave blank if not needed',
+            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+          ),
+          const SizedBox(height: 16),
+          
+          // PP行
+          _buildGoalRow(
+            currentLabel: _isJapanese ? '現在PP' : 'Current PP',
+            targetLabel: _isJapanese ? '目標PP' : 'Target PP',
+            currentController: _currentPpController,
+            targetController: _targetPpController,
+            currentHint: '0',
+            targetHint: '50000',
+          ),
+          const SizedBox(height: 12),
+
+          // マイル行
+          _buildGoalRow(
+            currentLabel: _isJapanese ? '現在マイル' : 'Current Miles',
+            targetLabel: _isJapanese ? '目標マイル' : 'Target Miles',
+            currentController: _currentAnaMilesController,
+            targetController: _targetAnaMilesController,
+            currentHint: '0',
+            targetHint: '50000',
+          ),
+          const SizedBox(height: 16),
+
+          // 目安ガイド
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _isJapanese ? '📊 ステータス目安' : '📊 Status Reference',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _isJapanese 
+                      ? '• 50,000 PP → SFC修行解脱 ✨'
+                      : '• 50,000 PP → SFC status achieved ✨',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 特典航空券マイル目安
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _isJapanese ? '✈️ 特典航空券マイル目安（往復・Y・L）' : '✈️ Award Miles (Round-trip/Y/L)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 8),
+                _buildMileTable([
+                  [_isJapanese ? '国内線' : 'Domestic', '10,000〜'],
+                  [_isJapanese ? '韓国' : 'Korea', '15,000〜'],
+                  [_isJapanese ? '東南アジア' : 'SE Asia', '35,000〜'],
+                  [_isJapanese ? 'ハワイ' : 'Hawaii', '35,000〜'],
+                  [_isJapanese ? '北米' : 'N. America', '50,000〜'],
+                  [_isJapanese ? '欧州' : 'Europe', '65,000〜'],
+                ]),
               ],
             ),
           ),

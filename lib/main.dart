@@ -92,7 +92,7 @@ class _MainScreenState extends State<MainScreen> {
 
   String get _displayName {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user == null || user.isAnonymous) return 'guest';
+    if (user == null || user.isAnonymous) return 'Login';
     final email = user.email ?? '';
     if (email.length > 15) return '${email.substring(0, 12)}...';
     return email;
@@ -147,13 +147,13 @@ class _MainScreenState extends State<MainScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          Supabase.instance.client.auth.currentUser?.email ?? 'Guest',
+                          Supabase.instance.client.auth.currentUser?.email ?? (isJapanese ? '未ログイン' : 'Not logged in'),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         Text(
                           _isLoggedIn 
                               ? (isJapanese ? 'ログイン中' : 'Logged in')
-                              : (isJapanese ? 'ゲスト' : 'Guest'),
+                              : (isJapanese ? '未ログイン' : 'Not logged in'),
                           style: TextStyle(color: Colors.grey[600], fontSize: 12),
                         ),
                       ],
