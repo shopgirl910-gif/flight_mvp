@@ -67,6 +67,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isJapanese = Localizations.localeOf(context).languageCode == 'ja';
     return Scaffold(
       appBar: AppBar(
         title: Text(_isLogin ? 'ログイン' : '新規登録'),
@@ -86,7 +87,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 Text(_isLogin ? 'おかえりなさい！' : 'はじめまして！', 
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text('記録を保存してすごろくを進めよう！', 
+                Text(isJapanese ? 'あなたの修行記録を残そう！' : 'Keep track of your mileage run!',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                 const SizedBox(height: 32),
                 

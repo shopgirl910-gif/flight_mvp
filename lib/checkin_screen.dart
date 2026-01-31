@@ -46,6 +46,38 @@ class _CheckinScreenState extends State<CheckinScreen> {
   // 展開中の地方
   Set<String> expandedRegions = {};
 
+  // バッジ定義（5階級）
+  static const List<Map<String, dynamic>> badgeTiers = [
+    {'name': 'Bronze', 'nameJa': 'ブロンズ', 'icon': '🥉', 'required': 5, 'color': 0xFFCD7F32},
+    {'name': 'Silver', 'nameJa': 'シルバー', 'icon': '🥈', 'required': 15, 'color': 0xFFC0C0C0},
+    {'name': 'Gold', 'nameJa': 'ゴールド', 'icon': '🥇', 'required': 30, 'color': 0xFFFFD700},
+    {'name': 'Platinum', 'nameJa': 'プラチナ', 'icon': '💎', 'required': 50, 'color': 0xFFE5E4E2},
+    {'name': 'Diamond', 'nameJa': 'ダイヤモンド', 'icon': '👑', 'required': 70, 'color': 0xFFB9F2FF},
+  ];
+
+  // 現在のバッジを取得
+  Map<String, dynamic>? _getCurrentBadge(int checkedCount) {
+    Map<String, dynamic>? current;
+    for (var badge in badgeTiers) {
+      if (checkedCount >= badge['required']) {
+        current = badge;
+      } else {
+        break;
+      }
+    }
+    return current;
+  }
+
+  // 次のバッジを取得
+  Map<String, dynamic>? _getNextBadge(int checkedCount) {
+    for (var badge in badgeTiers) {
+      if (checkedCount < badge['required']) {
+        return badge;
+      }
+    }
+    return null; // 全バッジ達成
+  }
+
   // 地方名を取得（多言語対応）
   String _getRegionName(String key) {
     final l10n = AppLocalizations.of(context)!;
@@ -74,6 +106,14 @@ class _CheckinScreenState extends State<CheckinScreen> {
   void initState() {
     super.initState();
     _loadData();
+    // ログイン状態の変化を監視
+    Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      if (event.event == AuthChangeEvent.signedIn && mounted) {
+        _loadCheckins().then((_) {
+          if (mounted) setState(() {});
+        });
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -350,6 +390,14 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
   Widget _buildProgressHeader(int checked, int total, double percent) {
     final l10n = AppLocalizations.of(context)!;
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    final currentBadge = _getCurrentBadge(checked);
+    final nextBadge = _getNextBadge(checked);
+    
+    // 70空港を100%として計算
+    const int maxForGauge = 70;
+    final double gaugePercent = (checked / maxForGauge * 100).clamp(0, 100);
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -370,7 +418,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(16)),
-                child: Text('$checked / $total', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text(isJa ? '合計 $checked' : 'Total $checked', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -378,14 +426,102 @@ class _CheckinScreenState extends State<CheckinScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: percent / 100,
+              value: gaugePercent / 100,
               backgroundColor: Colors.white.withOpacity(0.3),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.yellow),
               minHeight: 8,
             ),
           ),
           const SizedBox(height: 8),
-          Text(l10n.conqueredPercent(percent.toStringAsFixed(1)), style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14)),
+          Text(
+            isJa ? '${gaugePercent.toStringAsFixed(1)}% (70空港で達成)' : '${gaugePercent.toStringAsFixed(1)}% (70 airports to complete)',
+            style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
+          ),
+          
+          // バッジ表示
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                // 現在のバッジ
+                if (currentBadge != null) ...[
+                  Row(
+                    children: [
+                      Text(currentBadge['icon'], style: const TextStyle(fontSize: 28)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isJa ? currentBadge['nameJa'] : currentBadge['name'],
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            Text(
+                              isJa ? '${currentBadge['required']}空港達成！' : '${currentBadge['required']} airports achieved!',
+                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  Row(
+                    children: [
+                      const Text('✈️', style: TextStyle(fontSize: 28)),
+                      const SizedBox(width: 12),
+                      Text(
+                        isJa ? 'バッジ未獲得' : 'No badge yet',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ],
+                
+                // 次のバッジへの進捗
+                if (nextBadge != null) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Text(
+                        isJa ? '次: ${nextBadge['icon']} ${nextBadge['nameJa']}' : 'Next: ${nextBadge['icon']} ${nextBadge['name']}',
+                        style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: checked / nextBadge['required'],
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(nextBadge['color'])),
+                            minHeight: 6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$checked/${nextBadge['required']}',
+                        style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    isJa ? '🎉 全バッジ達成！' : '🎉 All badges achieved!',
+                    style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );

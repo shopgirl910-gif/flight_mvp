@@ -612,8 +612,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 8),
                 Text(
                   _isJapanese 
-                      ? '• 1,500 LSP → JGC入会可能 ✨\n• 50,000 FOP → JGC修行解脱'
-                      : '• 1,500 LSP → JGC eligible ✨\n• 50,000 FOP → JGC status achieved',
+                      ? '• 1,500 LSP → JGC入会可能 ✨\n• 50,000 FOP → ラウンジアクセス'
+                      : '• 1,500 LSP → JGC eligible ✨\n• 50,000 FOP → Lounge Access',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
@@ -729,8 +729,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 8),
                 Text(
                   _isJapanese 
-                      ? '• 50,000 PP → SFC修行解脱 ✨'
-                      : '• 50,000 PP → SFC status achieved ✨',
+                      ? '• 50,000 PP → ラウンジアクセス ✨'
+                      : '• 50,000 PP → Lounge Access ✨',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
