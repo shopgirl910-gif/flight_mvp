@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
-import 'simulation_screen_final.dart';
+import 'simulation_screen.dart';
 import 'flight_log_screen.dart';
 import 'quiz_screen.dart';
 import 'checkin_screen.dart';

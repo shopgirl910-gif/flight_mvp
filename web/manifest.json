@@ -1,11 +1,11 @@
 {
-    "name": "flight_mvp",
-    "short_name": "flight_mvp",
+    "name": "MRP - Mileage Run Planner",
+    "short_name": "MRP",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#7b1fa2",
+    "theme_color": "#7b1fa2",
+    "description": "JAL/ANA修行僧のためのFOP/PP計算・空港チェックインアプリ",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

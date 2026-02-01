@@ -34,10 +34,289 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
+  <!-- アプリバージョン（更新時にここを変更） -->
+  <meta name="app-version" content="1.2.1">
+
   <title>MRP - Mileage Run Planner</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* PWAインストールバナー */
+    .pwa-banner {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(135deg, #7b1fa2, #9c27b0);
+      color: white;
+      padding: 12px 16px;
+      z-index: 9999;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+      animation: slideUp 0.3s ease-out;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .pwa-banner .banner-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 600px;
+      margin: 0 auto;
+      gap: 12px;
+    }
+    .pwa-banner .banner-text {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+    .pwa-banner .banner-icon {
+      font-size: 24px;
+    }
+    .pwa-banner .banner-message {
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .pwa-banner .close-btn {
+      border: none;
+      padding: 8px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 13px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      flex-shrink: 0;
+    }
+    .pwa-banner .highlight {
+      background: rgba(255,255,255,0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    /* iOS用説明バナー */
+    #ios-install-banner .ios-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    #ios-install-banner .ios-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #ios-install-banner .step-icon {
+      font-size: 18px;
+    }
+    #ios-install-banner .share-icon {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 4px;
+      text-align: center;
+      line-height: 20px;
+      font-size: 14px;
+      color: #7b1fa2;
+    }
+
+    /* 更新通知バナー */
+    #update-banner {
+      background: linear-gradient(135deg, #1976d2, #2196f3);
+    }
+    #update-banner .update-btn {
+      background: #fff;
+      color: #1976d2;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 13px;
+    }
+  </style>
 </head>
 <body>
+  <!-- 更新通知バナー -->
+  <div id="update-banner" class="pwa-banner">
+    <div class="banner-content">
+      <div class="banner-text">
+        <span class="banner-icon">🔄</span>
+        <span class="banner-message">
+          新しいバージョンがあります！<br>
+          更新してください
+        </span>
+      </div>
+      <button id="update-btn" class="update-btn">更新する</button>
+      <button id="update-close-btn" class="close-btn">後で</button>
+    </div>
+  </div>
+
+  <!-- PC/Android用案内バナー -->
+  <div id="pwa-install-banner" class="pwa-banner">
+    <div class="banner-content">
+      <div class="banner-text">
+        <span class="banner-icon">✈️</span>
+        <span class="banner-message">
+          アプリとして使えます！<br>
+          アドレスバー右の <span class="highlight">⊕</span> からインストール
+        </span>
+      </div>
+      <button id="pwa-close-btn" class="close-btn">OK</button>
+    </div>
+  </div>
+
+  <!-- iOS用説明バナー -->
+  <div id="ios-install-banner" class="pwa-banner">
+    <div class="banner-content" style="flex-direction: column; align-items: stretch;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="banner-text">
+          <span class="banner-icon">✈️</span>
+          <span class="banner-message">
+            MRPをホーム画面に追加
+          </span>
+        </div>
+        <button id="ios-close-btn" class="close-btn">OK</button>
+      </div>
+      <div class="ios-steps">
+        <div class="ios-step">
+          <span class="step-icon">1️⃣</span>
+          <span>下の <span class="share-icon">↑</span> 共有ボタンをタップ</span>
+        </div>
+        <div class="ios-step">
+          <span class="step-icon">2️⃣</span>
+          <span>「ホーム画面に追加」を選択</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // アプリバージョン
+    const APP_VERSION = document.querySelector('meta[name="app-version"]').content;
+    const STORED_VERSION_KEY = 'mrp-app-version';
+
+    // デバイス判定
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+    const pcBanner = document.getElementById('pwa-install-banner');
+    const iosBanner = document.getElementById('ios-install-banner');
+    const updateBanner = document.getElementById('update-banner');
+    const closeBtn = document.getElementById('pwa-close-btn');
+    const iosCloseBtn = document.getElementById('ios-close-btn');
+    const updateBtn = document.getElementById('update-btn');
+    const updateCloseBtn = document.getElementById('update-close-btn');
+
+    // バナー表示判定（7日間非表示）
+    function shouldShowBanner(key) {
+      const dismissed = localStorage.getItem(key);
+      if (dismissed) {
+        const dismissedTime = parseInt(dismissed, 10);
+        if (Date.now() - dismissedTime < 7 * 24 * 60 * 60 * 1000) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // バージョン更新チェック
+    function checkForUpdate() {
+      const storedVersion = localStorage.getItem(STORED_VERSION_KEY);
+      if (storedVersion && storedVersion !== APP_VERSION) {
+        // 新バージョンあり
+        updateBanner.style.display = 'block';
+        return true;
+      }
+      // バージョンを保存
+      localStorage.setItem(STORED_VERSION_KEY, APP_VERSION);
+      return false;
+    }
+
+    // 更新ボタン
+    updateBtn.addEventListener('click', () => {
+      localStorage.setItem(STORED_VERSION_KEY, APP_VERSION);
+      // Service Workerのキャッシュをクリアして再読み込み
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(registration => {
+            registration.update();
+          });
+        });
+      }
+      // キャッシュをクリアして強制リロード
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          names.forEach(name => caches.delete(name));
+        });
+      }
+      window.location.reload(true);
+    });
+
+    // 後でボタン
+    updateCloseBtn.addEventListener('click', () => {
+      updateBanner.style.display = 'none';
+    });
+
+    // 起動時の処理
+    setTimeout(() => {
+      // まず更新チェック
+      if (checkForUpdate()) {
+        return; // 更新バナー表示中はインストールバナーを出さない
+      }
+
+      // スタンドアロンモードならインストールバナーを表示しない
+      if (!isInStandaloneMode) {
+        if (isIOS) {
+          if (shouldShowBanner('ios-banner-dismissed')) {
+            iosBanner.style.display = 'block';
+          }
+        } else {
+          if (shouldShowBanner('pwa-banner-dismissed')) {
+            pcBanner.style.display = 'block';
+          }
+        }
+      }
+    }, 2000);
+
+    // PC/Android 閉じるボタン
+    closeBtn.addEventListener('click', () => {
+      pcBanner.style.display = 'none';
+      localStorage.setItem('pwa-banner-dismissed', Date.now().toString());
+    });
+
+    // iOS 閉じるボタン
+    iosCloseBtn.addEventListener('click', () => {
+      iosBanner.style.display = 'none';
+      localStorage.setItem('ios-banner-dismissed', Date.now().toString());
+    });
+
+    // インストール済みなら非表示
+    window.addEventListener('appinstalled', () => {
+      pcBanner.style.display = 'none';
+      iosBanner.style.display = 'none';
+    });
+
+    // Service Worker更新検知
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        // 新しいService Workerがアクティブになった
+        if (!updateBanner.style.display || updateBanner.style.display === 'none') {
+          updateBanner.style.display = 'block';
+        }
+      });
+    }
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
