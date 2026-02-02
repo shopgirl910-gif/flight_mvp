@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:math';
 import 'auth_screen.dart';
+import 'japan_map_widget.dart';
 import 'l10n/app_localizations.dart';
 
 class CheckinScreen extends StatefulWidget {
@@ -18,19 +19,19 @@ class _CheckinScreenState extends State<CheckinScreen> {
   Map<String, dynamic>? nearestAirport;
   double? distanceToNearest;
   
-  // 都道府県別空港データ
+  // éƒ½é“åºœçœŒåˆ¥ç©ºæ¸¯ãƒ‡ãƒ¼ã‚¿
   Map<String, List<Map<String, dynamic>>> airportsByPrefecture = {};
-  // ユーザーのチェックイン済み空港
+  // ãƒ¦ãƒ¼ã‚¶ãƒ¼ã®ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³æ¸ˆã¿ç©ºæ¸¯
   Set<String> checkedAirports = {};
-  // 展開中の都道府県
+  // å±•é–‹ä¸­ã®éƒ½é“åºœçœŒ
   Set<String> expandedPrefectures = {};
   
-  // 地方キー（多言語対応用）
+  // åœ°æ–¹ã‚­ãƒ¼ï¼ˆå¤šè¨€èªžå¯¾å¿œç”¨ï¼‰
   static const List<String> regionKeys = [
     'hokkaido', 'tohoku', 'kanto', 'chubu', 'kansai', 'chugoku', 'shikoku', 'kyushu', 'okinawa',
   ];
   
-  // 地方→都道府県のマッピング
+  // åœ°æ–¹â†’éƒ½é“åºœçœŒã®ãƒžãƒƒãƒ”ãƒ³ã‚°
   static const Map<String, List<String>> regionPrefectures = {
     'hokkaido': ['北海道'],
     'tohoku': ['青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'],
@@ -43,10 +44,14 @@ class _CheckinScreenState extends State<CheckinScreen> {
     'okinawa': ['沖縄県'],
   };
   
-  // 展開中の地方
+  // å±•é–‹ä¸­ã®åœ°æ–¹
   Set<String> expandedRegions = {};
 
-  // バッジ定義（5階級）
+  // Paint it Black! の表示状態
+  bool _showPaintMap = false;
+
+
+  // ãƒãƒƒã‚¸å®šç¾©ï¼ˆ5éšŽç´šï¼‰
   static const List<Map<String, dynamic>> badgeTiers = [
     {'name': 'Bronze', 'nameJa': 'ブロンズ', 'icon': '🥉', 'required': 5, 'color': 0xFFCD7F32},
     {'name': 'Silver', 'nameJa': 'シルバー', 'icon': '🥈', 'required': 15, 'color': 0xFFC0C0C0},
@@ -55,7 +60,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
     {'name': 'Diamond', 'nameJa': 'ダイヤモンド', 'icon': '👑', 'required': 70, 'color': 0xFFB9F2FF},
   ];
 
-  // 現在のバッジを取得
+  // ç¾åœ¨ã®ãƒãƒƒã‚¸ã‚’å–å¾—
   Map<String, dynamic>? _getCurrentBadge(int checkedCount) {
     Map<String, dynamic>? current;
     for (var badge in badgeTiers) {
@@ -68,17 +73,17 @@ class _CheckinScreenState extends State<CheckinScreen> {
     return current;
   }
 
-  // 次のバッジを取得
+  // æ¬¡ã®ãƒãƒƒã‚¸ã‚’å–å¾—
   Map<String, dynamic>? _getNextBadge(int checkedCount) {
     for (var badge in badgeTiers) {
       if (checkedCount < badge['required']) {
         return badge;
       }
     }
-    return null; // 全バッジ達成
+    return null; // å…¨ãƒãƒƒã‚¸é”æˆ
   }
 
-  // 地方名を取得（多言語対応）
+  // åœ°æ–¹åã‚’å–å¾—ï¼ˆå¤šè¨€èªžå¯¾å¿œï¼‰
   String _getRegionName(String key) {
     final l10n = AppLocalizations.of(context)!;
     switch (key) {
@@ -95,9 +100,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
     }
   }
 
-  // チェックイン可能距離（メートル）
+  // ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³å¯èƒ½è·é›¢ï¼ˆãƒ¡ãƒ¼ãƒˆãƒ«ï¼‰
   double _getCheckinRadius(String airportCode) {
-    // 大空港は3km、それ以外は1.5km
+    // å¤§ç©ºæ¸¯ã¯3kmã€ãã‚Œä»¥å¤–ã¯1.5km
     const largeAirports = ['HND', 'KIX'];
     return largeAirports.contains(airportCode) ? 3000 : 1500;
   }
@@ -106,7 +111,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
   void initState() {
     super.initState();
     _loadData();
-    // ログイン状態の変化を監視
+    // ãƒ­ã‚°ã‚¤ãƒ³çŠ¶æ…‹ã®å¤‰åŒ–ã‚’ç›£è¦–
     Supabase.instance.client.auth.onAuthStateChange.listen((event) {
       if (event.event == AuthChangeEvent.signedIn && mounted) {
         _loadCheckins().then((_) {
@@ -148,7 +153,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
       grouped[pref]!.add(airport);
     }
     
-    // 各都道府県内を空港コード順にソート
+    // å„éƒ½é“åºœçœŒå†…ã‚’ç©ºæ¸¯ã‚³ãƒ¼ãƒ‰é †ã«ã‚½ãƒ¼ãƒˆ
     for (var pref in grouped.keys) {
       grouped[pref]!.sort((a, b) => (a['code'] as String).compareTo(b['code'] as String));
     }
@@ -174,7 +179,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
   Future<void> _getCurrentLocation() async {
     final l10n = AppLocalizations.of(context)!;
     try {
-      // 位置情報の許可確認
+      // ä½ç½®æƒ…å ±ã®è¨±å¯ç¢ºèª
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -188,13 +193,13 @@ class _CheckinScreenState extends State<CheckinScreen> {
         return;
       }
 
-      // 現在位置取得
+      // ç¾åœ¨ä½ç½®å–å¾—
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
       setState(() => currentPosition = position);
       
-      // 最寄り空港を検索
+      // æœ€å¯„ã‚Šç©ºæ¸¯ã‚’æ¤œç´¢
       _findNearestAirport();
     } catch (e) {
       setState(() => errorMessage = '${l10n.locationError}: $e');
@@ -233,9 +238,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
     });
   }
 
-  // Haversine formula で距離計算（メートル）
+  // Haversine formula ã§è·é›¢è¨ˆç®—ï¼ˆãƒ¡ãƒ¼ãƒˆãƒ«ï¼‰
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const double earthRadius = 6371000; // メートル
+    const double earthRadius = 6371000; // ãƒ¡ãƒ¼ãƒˆãƒ«
     final dLat = _toRadians(lat2 - lat1);
     final dLon = _toRadians(lon2 - lon1);
     final a = sin(dLat / 2) * sin(dLat / 2) +
@@ -252,7 +257,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
     return user == null || user.isAnonymous;
   }
 
-  // 空港名を取得（多言語対応）
+  // ç©ºæ¸¯åã‚’å–å¾—ï¼ˆå¤šè¨€èªžå¯¾å¿œï¼‰
   String _getAirportName(Map<String, dynamic> airport) {
     final isJa = Localizations.localeOf(context).languageCode == 'ja';
     if (isJa) {
@@ -280,7 +285,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
       return;
     }
     
-    // 匿名ユーザーはチェックイン不可 → ログイン画面へ誘導
+    // åŒ¿åãƒ¦ãƒ¼ã‚¶ãƒ¼ã¯ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³ä¸å¯ â†’ ãƒ­ã‚°ã‚¤ãƒ³ç”»é¢ã¸èª˜å°Ž
     if (_isAnonymousUser) {
       final shouldLogin = await showDialog<bool>(
         context: context,
@@ -354,6 +359,259 @@ class _CheckinScreenState extends State<CheckinScreen> {
     }
   }
 
+  // === Paint it Black! ===
+  
+  // 都道府県の塗り状態を取得: 0=未踏, 1=一部, 2=完了, 3=空港なし(元から黒)
+  int _getPrefStatus(String pref) {
+    final airports = airportsByPrefecture[pref];
+    if (airports == null || airports.isEmpty) return 3; // 空港なし
+    final checked = airports.where((a) => checkedAirports.contains(a['code'])).length;
+    if (checked == 0) return 0;
+    if (checked >= airports.length) return 2;
+    return 1;
+  }
+
+  Color _getPrefColor(int status) {
+    switch (status) {
+      case 3: return const Color(0xFF1A1A1A); // 空港なし: 黒
+      case 2: return const Color(0xFF000000); // 完了: 真黒
+      case 1: return const Color(0xFF555555); // 一部: ダークグレー
+      default: return const Color(0xFFD0D0D0); // 未踏: ライトグレー
+    }
+  }
+
+  int _getPaintedCount() {
+    int count = 0;
+    for (final name in JapanMapWidget.prefNames.values) {
+      final s = _getPrefStatus(name);
+      if (s >= 2) count++; // 完了 or 空港なし
+    }
+    return count;
+  }
+
+  Widget _buildPaintItBlackSection() {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    final painted = _getPaintedCount();
+    final total = 47;
+    final percent = (painted / total * 100).toStringAsFixed(0);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+      ),
+      child: Column(
+        children: [
+          // ヘッダー（タップで開閉）
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(() => _showPaintMap = !_showPaintMap),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Text('🖤', style: TextStyle(fontSize: 20)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'PAINT IT BLACK!',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: painted == total ? Colors.red[700] : Colors.grey[200],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$painted/$total',
+                          style: TextStyle(
+                            color: painted == total ? Colors.white : Colors.black54,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _showPaintMap ? Icons.expand_less : Icons.expand_more,
+                        color: Colors.black45,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // プログレスバー
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: painted / total,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        painted == total ? Colors.red : Colors.black54,
+                      ),
+                      minHeight: 4,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      '$percent%',
+                      style: TextStyle(color: Colors.black38, fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // マップ本体（開閉）
+          if (_showPaintMap) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: _buildJapanMapView(),
+            ),
+            // 凡例
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLegendItem(const Color(0xFF1A1A1A), isJa ? '制覇 ✓' : 'Done ✓', border: true, borderColor: Colors.red),
+                  const SizedBox(width: 10),
+                  _buildLegendItem(const Color(0xFF4A7A49), isJa ? '一部' : 'Partial'),
+                  const SizedBox(width: 10),
+                  _buildLegendItem(const Color(0xFF7BAF7A), isJa ? '未踏' : 'Unvisited'),
+                  const SizedBox(width: 10),
+                  _buildLegendItem(const Color(0xFFE8E8E8), isJa ? '空港なし' : 'No apt', border: true),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label, {bool border = false, Color? borderColor}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12, height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+            border: border ? Border.all(color: borderColor ?? Colors.grey[400]!, width: 1) : null,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(color: Colors.black54, fontSize: 10)),
+      ],
+    );
+  }
+
+  Widget _buildJapanMapView() {
+    // Build prefecture status map for JapanMapWidget
+    final Map<String, int> prefStatus = {};
+    
+    // All 47 prefectures
+    final allPrefs = JapanMapWidget.prefNames;
+    
+    for (final entry in allPrefs.entries) {
+      final code = entry.key;
+      final prefName = entry.value;
+      final airports = airportsByPrefecture[prefName];
+      
+      if (airports == null || airports.isEmpty) {
+        prefStatus[code] = 3; // No airport
+      } else {
+        final checked = airports.where((a) => checkedAirports.contains(a['code'])).length;
+        if (checked == 0) {
+          prefStatus[code] = 0; // Unvisited
+        } else if (checked >= airports.length) {
+          prefStatus[code] = 2; // Complete
+        } else {
+          prefStatus[code] = 1; // Partial
+        }
+      }
+    }
+    
+    // Build airport locations and names maps
+    final Map<String, Map<String, double>> airportLocs = {};
+    final Map<String, String> airportNameMap = {};
+    
+    // Fallback Japanese names for airports missing name_ja in DB
+    const fallbackNamesJa = {
+      'HND': '羽田', 'NRT': '成田', 'KIX': '関西', 'ITM': '伊丹', 'NGO': '中部',
+      'CTS': '新千歳', 'FUK': '福岡', 'OKA': '那覇', 'NGS': '長崎', 'KMJ': '熊本',
+      'OIT': '大分', 'MYJ': '松山', 'HIJ': '広島', 'TAK': '高松', 'KCZ': '高知',
+      'TKS': '徳島', 'KOJ': '鹿児島', 'SDJ': '仙台', 'AOJ': '青森', 'AKJ': '旭川',
+      'AXT': '秋田', 'GAJ': '山形', 'KIJ': '新潟', 'TOY': '富山', 'KMQ': '小松',
+      'FSZ': '静岡', 'MMB': '女満別', 'OBO': '帯広', 'KUH': '釧路', 'HKD': '函館',
+      'ISG': '石垣', 'MMY': '宮古', 'UBJ': '山口宇部', 'IWK': '岩国', 'OKJ': '岡山',
+      'TTJ': '鳥取', 'YGJ': '米子', 'IZO': '出雲', 'NKM': '県営名古屋', 'UKB': '神戸',
+      'HSG': '佐賀', 'KMI': '宮崎', 'ASJ': '奄美', 'TKN': '徳之島', 'OKI': '隠岐',
+      'FKS': '福島', 'HNA': '花巻', 'MSJ': '三沢', 'ONJ': '大館能代',
+      'SHM': '南紀白浜', 'NTQ': '能登', 'KKJ': '北九州', 'TNE': '種子島',
+      'KUM': '屋久島', 'RNJ': '与論', 'OGN': '与那国', 'HAC': '八丈島',
+      'MBE': '紋別', 'SHB': '中標津', 'WKJ': '稚内', 'OKD': '丘珠',
+      'IKI': '壱岐', 'TSJ': '対馬', 'FUJ': '五島福江', 'OIR': '奥尻',
+      'SYO': '庄内', 'MMJ': '松本', 'AXJ': '天草', 'TJH': '但馬',
+      'KKX': '喜界', 'KJP': '慶良間', 'AGJ': '粟国', 'SHI': '下地島',
+      'MMD': '南大東', 'KTD': '北大東', 'TRA': '多良間', 'MYE': '三宅島',
+      'OIM': '大島',
+    };
+    const fallbackNamesEn = {
+      'HND': 'Haneda', 'NRT': 'Narita', 'KIX': 'Kansai', 'ITM': 'Itami',
+      'NGO': 'Chubu', 'CTS': 'New Chitose', 'FUK': 'Fukuoka', 'OKA': 'Naha',
+      'ISG': 'Ishigaki', 'MMY': 'Miyako', 'KOJ': 'Kagoshima', 'SDJ': 'Sendai',
+      'HIJ': 'Hiroshima', 'KMJ': 'Kumamoto', 'NGS': 'Nagasaki', 'OIT': 'Oita',
+      'MYJ': 'Matsuyama', 'TAK': 'Takamatsu', 'KCZ': 'Kochi', 'TKS': 'Tokushima',
+      'TKN': 'Tokunoshima', 'ASJ': 'Amami', 'RNJ': 'Yoron', 'OGN': 'Yonaguni',
+      'KJP': 'Kerama', 'AGJ': 'Aguni', 'MMD': 'Minamidaito', 'KTD': 'Kitadaito',
+      'TRA': 'Tarama', 'SHI': 'Shimojishima',
+    };
+    
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    
+    for (final airports in airportsByPrefecture.values) {
+      for (final airport in airports) {
+        final code = airport['code'] as String?;
+        final lat = airport['latitude'] as double?;
+        final lon = airport['longitude'] as double?;
+        if (code != null && lat != null && lon != null) {
+          airportLocs[code] = {'lat': lat, 'lon': lon};
+          final dbName = _getAirportName(airport);
+          // Use DB name if available, otherwise fallback
+          if (dbName != code) {
+            airportNameMap[code] = dbName;
+          } else {
+            airportNameMap[code] = isJa 
+                ? (fallbackNamesJa[code] ?? code)
+                : (fallbackNamesEn[code] ?? code);
+          }
+        }
+      }
+    }
+    
+    return JapanMapWidget(
+      prefStatus: prefStatus,
+      airportLocations: airportLocs,
+      airportNames: airportNameMap,
+      checkedAirports: checkedAirports,
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -372,15 +630,19 @@ class _CheckinScreenState extends State<CheckinScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ヘッダー：全体進捗
+            // ãƒ˜ãƒƒãƒ€ãƒ¼ï¼šå…¨ä½“é€²æ—
             _buildProgressHeader(checkedCount, totalAirports, progressPercent),
             const SizedBox(height: 16),
             
-            // チェックインボタン（最寄り空港）
+            // Paint it Black! 日本地図
+            _buildPaintItBlackSection(),
+            const SizedBox(height: 16),
+            
+            // ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³ãƒœã‚¿ãƒ³ï¼ˆæœ€å¯„ã‚Šç©ºæ¸¯ï¼‰
             _buildCheckinCard(),
             const SizedBox(height: 16),
             
-            // 地方別リスト
+            // åœ°æ–¹åˆ¥ãƒªã‚¹ãƒˆ
             ..._buildRegionList(),
           ],
         ),
@@ -394,7 +656,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
     final currentBadge = _getCurrentBadge(checked);
     final nextBadge = _getNextBadge(checked);
     
-    // 70空港を100%として計算
+    // 70ç©ºæ¸¯ã‚’100%ã¨ã—ã¦è¨ˆç®—
     const int maxForGauge = 70;
     final double gaugePercent = (checked / maxForGauge * 100).clamp(0, 100);
     
@@ -438,7 +700,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
             style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
           ),
           
-          // バッジ表示
+          // ãƒãƒƒã‚¸è¡¨ç¤º
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
@@ -448,7 +710,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
             ),
             child: Column(
               children: [
-                // 現在のバッジ
+                // ç¾åœ¨ã®ãƒãƒƒã‚¸
                 if (currentBadge != null) ...[
                   Row(
                     children: [
@@ -484,7 +746,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                   ),
                 ],
                 
-                // 次のバッジへの進捗
+                // æ¬¡ã®ãƒãƒƒã‚¸ã¸ã®é€²æ—
                 if (nextBadge != null) ...[
                   const SizedBox(height: 12),
                   Row(
@@ -620,7 +882,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
       final prefectures = regionPrefectures[regionKey] ?? [];
       if (prefectures.isEmpty) continue;
       
-      // 地方内の全空港数とチェック済み数を計算
+      // åœ°æ–¹å†…ã®å…¨ç©ºæ¸¯æ•°ã¨ãƒã‚§ãƒƒã‚¯æ¸ˆã¿æ•°ã‚’è¨ˆç®—
       int totalInRegion = 0;
       int checkedInRegion = 0;
       for (var pref in prefectures) {
@@ -645,7 +907,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
           ),
           child: Column(
             children: [
-              // 地方ヘッダー
+              // åœ°æ–¹ãƒ˜ãƒƒãƒ€ãƒ¼
               InkWell(
                 onTap: () {
                   setState(() {
@@ -661,7 +923,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                   padding: const EdgeInsets.all(12),
                   child: Row(
                     children: [
-                      // 進捗インジケーター（円形）
+                      // é€²æ—ã‚¤ãƒ³ã‚¸ã‚±ãƒ¼ã‚¿ãƒ¼ï¼ˆå††å½¢ï¼‰
                       SizedBox(
                         width: 40,
                         height: 40,
@@ -722,7 +984,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                   ),
                 ),
               ),
-              // 都道府県リスト（展開時）
+              // éƒ½é“åºœçœŒãƒªã‚¹ãƒˆï¼ˆå±•é–‹æ™‚ï¼‰
               if (isRegionExpanded)
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -745,7 +1007,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
   }
 
   Widget _buildPrefectureGrid(List<String> prefectures) {
-    // 2-3列で表示
+    // 2-3åˆ—ã§è¡¨ç¤º
     return LayoutBuilder(
       builder: (context, constraints) {
         final crossAxisCount = constraints.maxWidth > 500 ? 3 : 2;
