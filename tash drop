@@ -1,0 +1,337 @@
+[1mdiff --git a/.firebase/hosting.YnVpbGRcd2Vi.cache b/.firebase/hosting.YnVpbGRcd2Vi.cache[m
+[1mindex 4da5acb..d799f93 100644[m
+[1m--- a/.firebase/hosting.YnVpbGRcd2Vi.cache[m
+[1m+++ b/.firebase/hosting.YnVpbGRcd2Vi.cache[m
+[36m@@ -1,32 +1,32 @@[m
+[31m-manifest.json,1764742602535,0b4c0ba1506771a9f4d2876db8bdb63380c79d012441181eeee56057ec910fba[m
+[31m-flutter.js,1764739307104,970356511bee637e57348b9e01b3218a3d1d6c4add478fdc306033b4b3e21ef4[m
+[31m-favicon.png,1764739440035,19880e004e8357a51f6a64f5d1fdc8828a6432fe9c781f8acb6b730eced2cd13[m
+[31m-icons/Icon-maskable-512.png,1764742547277,ea58e5c49bc4dcdc5db0a9fe2f25b2a3152f85ef9094f0d020de0aa318451a1d[m
+[31m-icons/Icon-maskable-192.png,1764742547280,f7ac56197638aec92f195c5344d15395c2cbf8a5ae74e846c5b4156b64f05e38[m
+[31m-icons/Icon-512.png,1764739440058,1de493563deb283e6ad70f0d5a89cfd61e37343df3b919c9862c5a41699ac5bc[m
+[31m-icons/Icon-192.png,1764739440054,5fd961c51d8eb53baacac01f8e53743a76f66a43390a11f5df042e8c618ad64a[m
+[31m-canvaskit/skwasm_heavy.wasm,1764739306902,aa021afcfd815b925d5bad0debf468bef50192c458573e4570d6da4e12c2e186[m
+[31m-canvaskit/skwasm_heavy.js.symbols,1764739306793,1259742821cf62bece358301f311840038fc2a0352b0c5827f8d2137d6197d08[m
+[31m-canvaskit/skwasm_heavy.js,1764739306770,2e3aab5e61c0276a6704938362b4b3a4dc32bbb6d17d601e975e7ed03897b224[m
+[31m-canvaskit/skwasm.wasm,1764739306763,4776f3bfb61a7534e2260954b88b177c11a7c73644cd536c47fcaabe5d7dc79b[m
+[31m-canvaskit/skwasm.js.symbols,1764739306689,5d3dd3374664b262880564a3e59d64b150f4c632248fb93f913b4eebdeffca83[m
+[31m-canvaskit/skwasm.js,1764739306667,6f325d22924e678a9417a777104985babcee8f99080bf90855f26bfa9829a5ea[m
+[31m-canvaskit/canvaskit.wasm,1764739306659,ac942f1920618b74351bc74bf1cf4ca078bde56e11692c0bd611e906bfc2d279[m
+[31m-canvaskit/canvaskit.js.symbols,1764739306525,b1e22d35cbc9e3b4b89516a8462c9f1f73d86e6debc790833396dff78ad698a7[m
+[31m-canvaskit/canvaskit.js,1764739306505,777116800268972381a4832500bb0aafd96ab2546075bd4d96a9025feb5c7555[m
+[31m-canvaskit/chromium/canvaskit.wasm,1764739307087,06f70f0703803c7329be30338b79530564ddc1ab2c3789d608431697a9a30ba2[m
+[31m-canvaskit/chromium/canvaskit.js.symbols,1764739306935,4a8d181b0622d7a4b4254deb591c43f48dd89623c621dec6f84d0a0b2b8f77a7[m
+[31m-canvaskit/chromium/canvaskit.js,1764739306916,e0f423bfd63202fb53a4dd5cffe330143bfb9eabf5e4e8198bb605442a49d3e7[m
+[31m-version.json,1765970415492,e5bb603b44dfc7121a8268c2f03be41315b8e8e094abbe54107d13c5bc766067[m
+[31m-index.html,1765970338838,294f81b422409857a226901186e9cc80d6b1656dab850d4d653bb153e4567f69[m
+[31m-flutter_service_worker.js,1765970424032,86e84ad53c247bab95fc8e03eb29fb3730e66481e2e3008beb6dfdb99a8b3a21[m
+[31m-flutter_bootstrap.js,1765970338782,aa19ad04493310550afe96a77d8726760dcb456901a7ef1b6fec45d332a75da2[m
+[31m-assets/FontManifest.json,1765970415733,e38b95988f5d060cf9b7ce97cb5ac9236d6f4cc04a11d69567df97b2b4cbc5e5[m
+[31m-assets/AssetManifest.bin.json,1765970415733,6763aaa55146ec9534c671aaf5a6db93265eaaa8082767ea02eb2ac9b09cbdaa[m
+[31m-assets/AssetManifest.bin,1765970415733,93e425eb6f3c87a588cd708f748fc5bb80fa28bf34c6d814b2bd76daa6a6ed27[m
+[31m-assets/shaders/stretch_effect.frag,1765970416146,586ff23669838dd33070077916f0b971a8800f67093ae8d6eed47e6cea50926f[m
+[31m-assets/shaders/ink_sparkle.frag,1765970416167,591c7517d5cb43eb91ea451e0d3f9f585cbf8298cf6c46a9144b77cb0775a406[m
+[31m-assets/fonts/MaterialIcons-Regular.otf,1765970419778,a2e421fd4c961e4347e63779427160ca42c7a2f529585cd5889ac3b4b86396f7[m
+[31m-assets/packages/cupertino_icons/assets/CupertinoIcons.ttf,1765970419770,d41473de1f7708a0702d7f19327693486512db442f6ab0cf7774e6d6576f9fcb[m
+[31m-assets/NOTICES,1765970415735,50da8c29c8b28810b906496c29f9dc6755ae57dcfca7061fce8f2318c625a908[m
+[31m-main.dart.js,1765970388133,d3f3403cccebaa269af5d59cd0cfda63ab9c290b5833545209cfa0609fbb7107[m
+[32m+[m[32mmanifest.json,1765512246632,0b4c0ba1506771a9f4d2876db8bdb63380c79d012441181eeee56057ec910fba[m
+[32m+[m[32mflutter.js,1765511718574,970356511bee637e57348b9e01b3218a3d1d6c4add478fdc306033b4b3e21ef4[m
+[32m+[m[32mfavicon.png,1765512246628,19880e004e8357a51f6a64f5d1fdc8828a6432fe9c781f8acb6b730eced2cd13[m
+[32m+[m[32micons/Icon-maskable-512.png,1765512246630,ea58e5c49bc4dcdc5db0a9fe2f25b2a3152f85ef9094f0d020de0aa318451a1d[m
+[32m+[m[32micons/Icon-maskable-192.png,1765512246629,f7ac56197638aec92f195c5344d15395c2cbf8a5ae74e846c5b4156b64f05e38[m
+[32m+[m[32micons/Icon-512.png,1765512246629,1de493563deb283e6ad70f0d5a89cfd61e37343df3b919c9862c5a41699ac5bc[m
+[32m+[m[32micons/Icon-192.png,1765512246629,5fd961c51d8eb53baacac01f8e53743a76f66a43390a11f5df042e8c618ad64a[m
+[32m+[m[32mcanvaskit/skwasm_heavy.wasm,1765511718496,aa021afcfd815b925d5bad0debf468bef50192c458573e4570d6da4e12c2e186[m
+[32m+[m[32mcanvaskit/skwasm_heavy.js.symbols,1765511718450,1259742821cf62bece358301f311840038fc2a0352b0c5827f8d2137d6197d08[m
+[32m+[m[32mcanvaskit/skwasm_heavy.js,1765511718439,2e3aab5e61c0276a6704938362b4b3a4dc32bbb6d17d601e975e7ed03897b224[m
+[32m+[m[32mcanvaskit/skwasm.wasm,1765511718434,4776f3bfb61a7534e2260954b88b177c11a7c73644cd536c47fcaabe5d7dc79b[m
+[32m+[m[32mcanvaskit/skwasm.js.symbols,1765511718402,5d3dd3374664b262880564a3e59d64b150f4c632248fb93f913b4eebdeffca83[m
+[32m+[m[32mcanvaskit/skwasm.js,1765511718392,6f325d22924e678a9417a777104985babcee8f99080bf90855f26bfa9829a5ea[m
+[32m+[m[32mcanvaskit/canvaskit.wasm,1765511718389,ac942f1920618b74351bc74bf1cf4ca078bde56e11692c0bd611e906bfc2d279[m
+[32m+[m[32mcanvaskit/canvaskit.js.symbols,1765511718322,b1e22d35cbc9e3b4b89516a8462c9f1f73d86e6debc790833396dff78ad698a7[m
+[32m+[m[32mcanvaskit/canvaskit.js,1765511718312,777116800268972381a4832500bb0aafd96ab2546075bd4d96a9025feb5c7555[m
+[32m+[m[32mcanvaskit/chromium/canvaskit.wasm,1765511718563,06f70f0703803c7329be30338b79530564ddc1ab2c3789d608431697a9a30ba2[m
+[32m+[m[32mcanvaskit/chromium/canvaskit.js.symbols,1765511718515,4a8d181b0622d7a4b4254deb591c43f48dd89623c621dec6f84d0a0b2b8f77a7[m
+[32m+[m[32mcanvaskit/chromium/canvaskit.js,1765511718505,e0f423bfd63202fb53a4dd5cffe330143bfb9eabf5e4e8198bb605442a49d3e7[m
+[32m+[m[32mversion.json,1767591937112,e5bb603b44dfc7121a8268c2f03be41315b8e8e094abbe54107d13c5bc766067[m
+[32m+[m[32mindex.html,1767591887040,294f81b422409857a226901186e9cc80d6b1656dab850d4d653bb153e4567f69[m
+[32m+[m[32massets/FontManifest.json,1767591937239,e38b95988f5d060cf9b7ce97cb5ac9236d6f4cc04a11d69567df97b2b4cbc5e5[m
+[32m+[m[32mflutter_bootstrap.js,1767591886984,820902c40056cb4ff7516339aa2f06d07f4ef007b49c6a0904ddb062c530ff01[m
+[32m+[m[32massets/AssetManifest.bin.json,1767591937239,6763aaa55146ec9534c671aaf5a6db93265eaaa8082767ea02eb2ac9b09cbdaa[m
+[32m+[m[32massets/AssetManifest.bin,1767591937239,93e425eb6f3c87a588cd708f748fc5bb80fa28bf34c6d814b2bd76daa6a6ed27[m
+[32m+[m[32mflutter_service_worker.js,1767591941488,a507f1db9873934e0f19a2de64938e7953668ad656bfbd927f28606749ca0a1a[m
+[32m+[m[32massets/shaders/stretch_effect.frag,1767591937405,586ff23669838dd33070077916f0b971a8800f67093ae8d6eed47e6cea50926f[m
+[32m+[m[32massets/shaders/ink_sparkle.frag,1767591937405,591c7517d5cb43eb91ea451e0d3f9f585cbf8298cf6c46a9144b77cb0775a406[m
+[32m+[m[32massets/fonts/MaterialIcons-Regular.otf,1767591938853,90953c746f41b1119c0d750c6118678e481d63e73e355d293f53ba1300f22d6e[m
+[32m+[m[32massets/packages/cupertino_icons/assets/CupertinoIcons.ttf,1767591938853,d41473de1f7708a0702d7f19327693486512db442f6ab0cf7774e6d6576f9fcb[m
+[32m+[m[32massets/NOTICES,1767591937239,aa2a826f02270c3f4b90c983842da7004f8380949435f2aadb7e3b03a7cad897[m
+[32m+[m[32mmain.dart.js,1767591920011,adf58eb5fd17c8e31cd5be6e494786e4473a3a86f83806a56081793379668700[m
+[1mdiff --git a/lib/history/main.dart b/lib/history/main.dart[m
+[1mindex 569d5ae..6b8c372 100644[m
+[1m--- a/lib/history/main.dart[m
+[1m+++ b/lib/history/main.dart[m
+[36m@@ -1,7 +1,7 @@[m
+ import 'package:flutter/material.dart';[m
+ import 'package:supabase_flutter/supabase_flutter.dart';[m
+ import 'package:flutter_localizations/flutter_localizations.dart';[m
+[31m-import 'simulation_screen.dart';[m
+[32m+[m[32mimport '../simulation_screen.dart';[m
+ import 'history_screen.dart';[m
+ import 'quiz_screen.dart';[m
+ [m
+[1mdiff --git a/lib/history/main_v1.dart b/lib/history/main_v1.dart[m
+[1mindex 8a58489..619649b 100644[m
+[1m--- a/lib/history/main_v1.dart[m
+[1m+++ b/lib/history/main_v1.dart[m
+[36m@@ -1,6 +1,6 @@[m
+ import 'package:flutter/material.dart';[m
+ import 'package:supabase_flutter/supabase_flutter.dart';[m
+[31m-import 'simulation_screen.dart';[m
+[32m+[m[32mimport '../simulation_screen.dart';[m
+ import 'flight_record_screen.dart';[m
+ import 'history_screen.dart';[m
+ import 'quiz_screen.dart';[m
+[1mdiff --git a/lib/history/main_v2.dart b/lib/history/main_v2.dart[m
+[1mindex 019fa74..e68847f 100644[m
+[1m--- a/lib/history/main_v2.dart[m
+[1m+++ b/lib/history/main_v2.dart[m
+[36m@@ -1,6 +1,6 @@[m
+ import 'package:flutter/material.dart';[m
+ import 'package:supabase_flutter/supabase_flutter.dart';[m
+[31m-import 'simulation_screen.dart';[m
+[32m+[m[32mimport '../simulation_screen.dart';[m
+ import 'flight_record_screen.dart';[m
+ import 'history_screen.dart';[m
+ import 'quiz_screen.dart';[m
+[1mdiff --git a/lib/history/simulation_screen.dart b/lib/history/simulation_screen.dart[m
+[1mdeleted file mode 100644[m
+[1mindex f01b6ed..0000000[m
+[1m--- a/lib/history/simulation_screen.dart[m
+[1m+++ /dev/null[m
+[36m@@ -1,722 +0,0 @@[m
+[31m-import 'package:flutter/material.dart';[m
+[31m-import 'package:supabase_flutter/supabase_flutter.dart';[m
+[31m-import 'dart:convert';[m
+[31m-// ignore: avoid_web_libraries_in_flutter[m
+[31m-import 'dart:html' as html;[m
+[31m-[m
+[31m-class SimulationScreen extends StatefulWidget {[m
+[31m-  const SimulationScreen({super.key});[m
+[31m-[m
+[31m-  @override[m
+[31m-  State<SimulationScreen> createState() => _SimulationScreenState();[m
+[31m-}[m
+[31m-[m
+[31m-class _SimulationScreenState extends State<SimulationScreen> with AutomaticKeepAliveClientMixin {[m
+[31m-  @override[m
+[31m-  bool get wantKeepAlive => true;[m
+[31m-[m
+[31m-  List<Map<String, dynamic>> legs = [];[m
+[31m-  [m
+[31m-  Map<int, TextEditingController> dateControllers = {};[m
+[31m-  Map<int, TextEditingController> flightNumberControllers = {};[m
+[31m-  Map<int, TextEditingController> departureTimeControllers = {};[m
+[31m-  Map<int, TextEditingController> arrivalTimeControllers = {};[m
+[31m-  Map<int, TextEditingController> fareAmountControllers = {};[m
+[31m-  [m
+[31m-  Map<int, List<Map<String, dynamic>>> availableFlights = {};[m
+[31m-  Map<int, List<String>> availableDestinations = {};[m
+[31m-  [m
+[31m-  int _legIdCounter = 0;[m
+[31m-  bool isLoading = false;[m
+[31m-  String? errorMessage;[m
+[31m-[m
+[31m-  String? selectedJALCard;[m
+[31m-  String? selectedANACard;[m
+[31m-  String? selectedJALStatus;[m
+[31m-  String? selectedANAStatus;[m
+[31m-  bool jalTourPremium = false; // JALカードツアープレミアム[m
+[31m-[m
+[31m-  // 航空会社別の出発空港リスト（動的取得）[m
+[31m-  List<String> jalDepartureAirports = [];[m
+[31m-  List<String> anaDepartureAirports = [];[m
+[31m-[m
+[31m-  final List<String> jalCardTypes = ['-', 'JMB会員', 'JALカード普通会員', 'JALカードCLUB-A会員', 'JALカードCLUB-Aゴールド会員', 'JALカードプラチナ会員', 'JALグローバルクラブ会員(日本)', 'JALグローバルクラブ会員(海外)', 'JALカードNAVI会員', 'JAL CLUB EST 普通会員', 'JAL CLUB EST CLUB-A会員', 'JAL CLUB EST CLUB-A GOLD会員', 'JAL CLUB EST プラチナ会員'];[m
+[31m-  final List<String> anaCardTypes = ['-', 'AMCカード(提携カード含む)', 'ANAカード 一般', 'ANAカード 学生用', 'ANAカード ワイド', 'ANAカード ゴールド', 'ANAカード プレミアム', 'SFC 一般', 'SFC ゴールド', 'SFC プレミアム'];[m
+[31m-  final List<String> jalStatusTypes = ['-', 'JMBダイヤモンド', 'JMBサファイア', 'JMBクリスタル'];[m
+[31m-  final List<String> anaStatusTypes = ['-', 'ダイヤモンド(1年目)', 'ダイヤモンド(継続2年以上)', 'プラチナ(1年目)', 'プラチナ(継続2年以上)', 'ブロンズ(1年目)', 'ブロンズ(継続2年以上)'];[m
+[31m-  final List<String> airports = [[m
+[31m-    // 主要空港[m
+[31m-    'HND', 'NRT',  // 東京[m
+[31m-    'ITM', 'KIX', 'UKB',  // 大阪[m
+[31m-    'CTS', 'OKD',  // 札幌[m
+[31m-    'NGO', 'NKM',  // 名古屋[m
+[31m-    'FUK',  // 福岡[m
+[31m-    'OKA',  // 沖縄[m
+[31m-    // 北海道（北から）[m
+[31m-    'WKJ', 'MBE', 'MMB', 'SHB', 'KUH', 'OBO', 'AKJ', 'HKD', 'OIR',[m
+[31m-    // 東北（北から）[m
+[31m-    'AOJ', 'MSJ', 'HNA', 'AXT', 'ONJ', 'GAJ', 'SDJ', 'FKS',[m
+[31m-    // 関東・中部[m
+[31m-    'HAC', 'FSZ', 'MMJ', 'NTQ', 'TOY', 'KMQ', 'SHM',[m
+[31m-    // 中国・四国[m
+[31m-    'TTJ', 'YGJ', 'IZO', 'OKJ', 'HIJ', 'IWK', 'UBJ', 'TKS', 'TAK', 'KCZ', 'MYJ',[m
+[31m-    // 九州（北から）[m
+[31m-    'KKJ', 'HSG', 'NGS', 'KMJ', 'OIT', 'KMI', 'KOJ', 'AXJ',[m
+[31m-    // 離島[m
+[31m-    'IKI', 'TSJ', 'FUJ', 'TNE', 'KUM', 'ASJ', 'KKX', 'TKN', 'OGN', 'MMY', 'ISG', 'RNJ',[m
+[31m-  ];[m
+[31m-  final Map<String, String> airportNames = {[m
+[31m-    'HND': '羽田', 'NRT': '成田', 'KIX': '関西', 'ITM': '伊丹', 'NGO': '中部', 'CTS': '新千歳', 'FUK': '福岡', 'OKA': '那覇',[m
+[31m-    'NGS': '長崎', 'KMJ': '熊本', 'OIT': '大分', 'MYJ': '松山', 'HIJ': '広島', 'TAK': '高松', 'KCZ': '高知', 'TKS': '徳島', 'KOJ': '鹿児島',[m
+[31m-    'SDJ': '仙台', 'AOJ': '青森', 'AKJ': '旭川', 'AXT': '秋田', 'GAJ': '山形', 'KIJ': '新潟', 'TOY': '富山', 'KMQ': '小松', 'FSZ': '静岡',[m
+[31m-    'MMB': '女満別', 'OBO': '帯広', 'KUH': '釧路', 'HKD': '函館', 'ISG': '石垣', 'MMY': '宮古', 'UBJ': '山口宇部', 'IWK': '岩国',[m
+[31m-    'OKJ': '岡山', 'TTJ': '鳥取', 'YGJ': '米子', 'IZO': '出雲', 'NKM': '県営名古屋', 'UKB': '神戸', 'HSG': '佐賀', 'KMI': '宮崎',[m
+[31m-    'ASJ': '奄美', 'TKN': '徳之島', 'OKI': '隠岐', 'FKS': '福島', 'HNA': '花巻', 'MSJ': '三沢', 'ONJ': '大館能代', 'SHM': '南紀白浜',[m
+[31m-    'NTQ': '能登', 'KKJ': '北九州', 'TNE': '種子島', 'KUM': '屋久島', 'RNJ': '与論', 'OGN': '与那国', 'HAC': '八丈島',[m
+[31m-    'MBE': '紋別', 'SHB': '中標津', 'WKJ': '稚内', 'OKD': '丘珠', 'IKI': '壱岐', 'TSJ': '対馬', 'FUJ': '五島福江', 'OIR': '奥尻',[m
+[31m-    'SYO': '庄内', 'MMJ': '松本', 'AXJ': '天草', 'TJH': '但馬', 'KKX': '喜界',[m
+[31m-  };[m
+[31m-  final List<String> airlines = ['JAL', 'ANA'];[m
+[31m-  final Map<String, List<String>> fareTypesByAirline = {[m
+[31m-    'JAL': ['運賃1 (100%) フレックス等', '運賃2 (75%) 株主割引', '運賃3 (75%) セイバー', '運賃4 (75%) スペシャルセイバー', '運賃5 (50%) 包括旅行運賃', '運賃6 (50%) スカイメイト等'],[m
+[31m-    'ANA': ['運賃1 (150%) プレミアム運賃', '運賃2 (125%) プレミアム小児', '運賃3 (100%) 片道・往復', '運賃4 (100%) ビジネス', '運賃5 (75%) 特割A', '運賃6 (75%) 特割B', '運賃7 (75%) 特割C', '運賃8 (50%) いっしょにマイル割', '運賃9 (150%) プレミアム株主', '運賃10 (100%) 普通株主', '運賃11 (70%) 特割プラス', '運賃12 (50%) スマートシニア', '運賃13 (30%) 個人包括'],[m
+[31m-  };[m
+[31m-  final Map<String, List<String>> seatClassesByAirline = {'JAL': ['普通席', 'クラスJ', 'ファーストクラス'], 'ANA': ['普通席', 'プレミアムクラス']};[m
+[31m-[m
+[31m-  // JAL搭乗ボーナスFOP（運賃種別で決定）[m
+[31m-  final Map<String, int> jalBonusFOP = {'運賃1': 400, '運賃2': 400, '運賃3': 200, '運賃4': 200, '運賃5': 0, '運賃6': 0};[m
+[31m-  [m
+[31m-  // ANA搭乗ポイント（運賃種別で決定）[m
+[31m-  final Map<String, int> anaBonusPoint = {'運賃1': 400, '運賃2': 400, '運賃3': 400, '運賃4': 0, '運賃5': 400, '運賃6': 200, '運賃7': 0, '運賃8': 0, '運賃9': 0, '運賃10': 0, '運賃11': 0, '運賃12': 0, '運賃13': 0};[m
+[31m-[m
+[31m-  @override[m
+[31m-  void initState() { super.initState(); _addLeg(); _loadAirlineAirports(); }[m
+[31m-[m
+[31m-  Future<void> _loadAirlineAirports() async {[m
+[31m-    try {[m
+[31m-      // JALの出発空港を取得[m
+[31m-      final jalResponse = await Supabase.instance.client[m
+[31m-          .from('schedules')[m
+[31m-          .select('departure_code')[m
+[31m-          .eq('airline_code', 'JAL')[m
+[31m-          .eq('is_active', true);[m
+[31m-      final jalAirports = (jalResponse as List)[m
+[31m-          .map((e) => e['departure_code'] as String)[m
+[31m-          .where((code) => airportNames.containsKey(code))[m
+[31m-          .toSet()[m
+[31m-          .toList();[m
+[31m-      jalAirports.sort();[m
+[31m-[m
+[31m-      // ANAの出発空港を取得[m
+[31m-      final anaResponse = await Supabase.instance.client[m
+[31m-          .from('schedules')[m
+[31m-          .select('departure_code')[m
+[31m-          .eq('airline_code', 'ANA')[m
+[31m-          .eq('is_active', true);[m
+[31m-      final anaAirports = (anaResponse as List)[m
+[31m-          .map((e) => e['departure_code'] as String)[m
+[31m-          .where((code) => airportNames.containsKey(code))[m
+[31m-          .toSet()[m
+[31m-          .toList();[m
+[31m-      anaAirports.sort();[m
+[31m-[m
+[31m-      setState(() {[m
+[31m-        jalDepartureAirports = jalAirports;[m
+[31m-        anaDepartureAirports = anaAirports;[m
+[31m-      });[m
+[31m-    } catch (e) {[m
+[31m-      // エラー時はairportsリストをそのまま使用[m
+[31m-      setState(() {[m
+[31m-        jalDepartureAirports = airports;[m
+[31m-        anaDepartureAirports = airports;[m
+[31m-      });[m
+[31m-    }[m
+[31m-  }[m
+[31m-[m
+[31m-  @override[m
+[31m-  void dispose() {[m
+[31m-    dateControllers.values.forEach((c) => c.dispose());[m
+[31m-    flightNumberControllers.values.forEach((c) => c.dispose());[m
+[31m-    departureTimeControllers.values.forEach((c) => c.dispose());[m
+[31m-    arrivalTimeControllers.values.forEach((c) => c.dispose());[m
+[31m-    fareAmountControllers.values.forEach((c) => c.dispose());[m
+[31m-    super.dispose();[m
+[31m-  }[m
+[31m-[m
+[31m-  void _addLeg() {[m
+[31m-    final legId = _legIdCounter++;[m
+[31m-    dateControllers[legId] = TextEditingController();[m
+[31m-    flightNumberControllers[legId] = TextEditingController();[m
+[31m-    departureTimeControllers[legId] = TextEditingController();[m
+[31m-    arrivalTimeControllers[legId] = TextEditingController();[m
+[31m-    fareAmountControllers[legId] = TextEditingController();[m
+[31m-    String airline = 'JAL'; String departureAirport = ''; String arrivalAirport = ''; String date = '';[m
+[31m-    if (legs.isNotEmpty) {[m
+[31m-      final prevLeg = legs.last; final prevLegId = prevLeg['id'] as int;[m
+[31m-      airline = prevLeg['airline'] as String;[m
+[31m-      departureAirport = prevLeg['arrivalAirport'] as String;[m
+[31m-      arrivalAirport = prevLeg['departureAirport'] as String;[m
+[31m-      date = dateControllers[prevLegId]?.text ?? '';[m
+[31m-    }[m
+[31m-    dateControllers[legId]?.text = date;[m
+[31m-    setState(() { legs.add({'id': legId, 'airline': airline, 'departureAirport': departureAirport, 'arrivalAirport': arrivalAirport, 'fareType': '', 'seatClass': '', 'calculatedFOP': null, 'calculatedMiles': null}); });[m
+[31m-    if (departureAirport.isNotEmpty) _fetchAvailableFlights(legs.length - 1);[m
+[31m-  }[m
+[31m-[m
+[31m-  void _removeLeg(int index) {[m
+[31m-    final legId = legs[index]['id'] as int;[m
+[31m-    dateControllers[legId]?.dispose(); flightNumberControllers[legId]?.dispose(); departureTimeControllers[legId]?.dispose(); arrivalTimeControllers[legId]?.dispose(); fareAmountControllers[legId]?.dispose();[m
+[31m-    dateControllers.remove(legId); flightNumberControllers.remove(legId); departureTimeControllers.remove(legId); arrivalTimeControllers.remove(legId); fareAmountControllers.remove(legId);[m
+[31m-    availableFlights.remove(legId); availableDestinations.remove(legId);[m
+[31m-    setState(() => legs.removeAt(index));[m
+[31m-  }[m
+[31m-[m
+[31m-  void _clearFlightInfo(int index, int legId) {[m
+[31m-    setState(() { legs[index]['departureAirport'] = ''; legs[index]['arrivalAirport'] = ''; legs[index]['calculatedFOP'] = null; legs[index]['calculatedMiles'] = null; availableFlights[legId] = []; availableDestinations[legId] = []; });[m
+[31m-    flightNumberControllers[legId]?.text = ''; departureTimeControllers[legId]?.text = ''; arrivalTimeControllers[legId]?.text = '';[m
+[31m-  }[m
+[31m-[m
+[31m-  void _clearLeg(int index, int legId) {[m
+[31m-    _clearFlightInfo(index, legId);[m
+[31m-    setState(() { legs[index]['fareType'] = ''; legs[index]['seatClass'] = ''; });[m
+[31m-    dateControllers[legId]?.text = ''; fareAmountControllers[legId]?.text = '';[m
+[31m-  }[m
+[31m-[m
+[31m-  String _addMinutes(String time, int minutes) {[m
+[31m-    if (time.isEmpty || !time.contains(':')) return time;[m
+[31m-    final parts = time.split(':'); int hour = int.tryParse(parts[0]) ?? 0; int min = int.tryParse(parts[1]) ?? 0;[m
+[31m-    min += minutes; while (min >= 60) { min -= 60; hour += 1; } if (hour >= 24) hour -= 24;[m
+[31m-    return '${hour.toString().padLeft(2, '0')}:${min.toString().padLeft(2, '0')}';[m
+[31m-  }[m
+[31m-[m
+[31m-  bool _isTimeAfterOrEqual(String time1, String time2) {[m
+[31m-    if (time1.isEmpty || time2.isEmpty || !time1.contains(':') || !time2.contains(':')) return true;[m
+[31m-    final parts1 = time1.split(':'); final parts2 = time2.split(':');[m
+[31m-    final minutes1 = (int.tryParse(parts1[0]) ?? 0) * 60 + (int.tryParse(parts1[1]) ?? 0);[m
+[31m-    final minutes2 = (int.tryParse(parts2[0]) ?? 0) * 60 + (int.tryParse(parts2[1]) ?? 0);[m
+[31m-    return minutes1 >= minutes2;[m
+[31m-  }[m
+[31m-[m
+[31m-  Future<Map<String, dynamic>?> _fetchScheduleByFlightNumber(String airline, String flightNumber) async {[m
+[31m-    try { return await Supabase.instance.client.from('schedules').select().eq('airline_code', airline).eq('flight_number', flightNumber).eq('is_active', true).maybeSingle(); } catch (e) { return null; }[m
+[31m-  }[m
+[31m-[m
+[31m-  Future<void> _autoFillFromFlightNumber(int index) async {[m
+[31m-    final legId = legs[index]['id'] as int;[m
+[31m-    final airline = legs[index]['airline'] as String;[m
+[31m-    final flightNumber = flightNumberControllers[legId]?.text ?? '';[m
+[31m-    if (flightNumber.isEmpty) { setState(() => errorMessage = '便名を入力してください'); return; }[m
+[31m-    final schedule = await _fetchScheduleByFlightNumber(airline, flightNumber);[m
+[31m-    if (schedule != null) {[m
+[31m-      String depTime = schedule['departure_time'] ?? ''; String arrTime = schedule['arrival_time'] ?? '';[m
+[31m-      if (depTime.length > 5) depTime = depTime.substring(0, 5); if (arrTime.length > 5) arrTime = arrTime.substring(0, 5);[m
+[31m-      final depCode = schedule['departure_code'] as String; final arrCode = schedule['arrival_code'] as String;[m
+[31m-      setState(() { legs[index]['departureAirport'] = depCode; legs[index]['arrivalAirport'] = arrCode; errorMessage = null; });[m
+[31m-      departureTimeControllers[legId]?.text = depTime; arrivalTimeControllers[legId]?.text = arrTime;[m
+[31m-      await _fetchAvailableFlights(index);[m
+[31m-      if (index + 1 < legs.length) _fetchAvailableFlights(index + 1);[m
+[31m-      _calculateSingleLeg(index);[m
+[31m-    } else { setState(() => errorMessage = '$flightNumber便が見つかりません'); }[m
+[31m-  }[m
+[31m-[m
+[31m-  Future<void> _fetchAvailableFlights(int index) async {[m
+[31m-    final leg = legs[index]; final legId = leg['id'] as int; final airline = leg['airline'] as String;[m
+[31m-    final departure = leg['departureAirport'] as String; final arrival = leg['arrivalAirport'] as String;[m
+[31m-    if (departure.isEmpty) { setState(() { availableFlights[legId] = []; availableDestinations[legId] =

@@ -412,29 +412,53 @@ class _JapanMapPainter extends CustomPainter {
             ..color = Colors.orange,
         );
       }
+      final planeSize = markerSize * 1.4;
 
-      canvas.drawCircle(
-        Offset(px, py),
-        markerSize * 0.6,
-        Paint()
-          ..style = PaintingStyle.fill
-          ..color = isChecked
-              ? Colors.green.withOpacity(0.8)
-              : Colors.white.withOpacity(0.85),
-      );
-
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '✈',
-          style: TextStyle(
-            fontSize: markerSize,
-            color: isChecked ? Colors.white : Colors.red[700],
+      if (isChecked) {
+        // チェック済み：塗りつぶし✈（緑）
+        final tp = TextPainter(
+          text: TextSpan(
+            text: String.fromCharCode(Icons.flight.codePoint),
+            style: TextStyle(fontSize: planeSize, color: Colors.green[700]),
           ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      tp.layout();
-      tp.paint(canvas, Offset(px - tp.width / 2, py - tp.height / 2));
+          textDirection: TextDirection.ltr,
+        );
+        tp.layout();
+        tp.paint(canvas, Offset(px - tp.width / 2, py - tp.height / 2));
+      } else {
+        // 未チェック：白抜き✈（白ベース＋赤アウトライン）
+        final tpStroke = TextPainter(
+          text: TextSpan(
+            text: '✈',
+            style: TextStyle(
+              fontSize: planeSize,
+              foreground: Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 1.5
+                ..color = Colors.red[700]!,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+        tpStroke.layout();
+        tpStroke.paint(
+          canvas,
+          Offset(px - tpStroke.width / 2, py - tpStroke.height / 2),
+        );
+
+        final tpFill = TextPainter(
+          text: TextSpan(
+            text: '✈',
+            style: TextStyle(fontSize: planeSize, color: Colors.white),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+        tpFill.layout();
+        tpFill.paint(
+          canvas,
+          Offset(px - tpFill.width / 2, py - tpFill.height / 2),
+        );
+      }
     }
   }
 

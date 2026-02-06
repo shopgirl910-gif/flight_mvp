@@ -18,19 +18,27 @@ class _CheckinScreenState extends State<CheckinScreen> {
   Position? currentPosition;
   Map<String, dynamic>? nearestAirport;
   double? distanceToNearest;
-  
+
   // éƒ½é“åºœçœŒåˆ¥ç©ºæ¸¯ãƒ‡ãƒ¼ã‚¿
   Map<String, List<Map<String, dynamic>>> airportsByPrefecture = {};
   // ãƒ¦ãƒ¼ã‚¶ãƒ¼ã®ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³æ¸ˆã¿ç©ºæ¸¯
   Set<String> checkedAirports = {};
   // å±•é–‹ä¸­ã®éƒ½é“åºœçœŒ
   Set<String> expandedPrefectures = {};
-  
+
   // åœ°æ–¹ã‚­ãƒ¼ï¼ˆå¤šè¨€èªžå¯¾å¿œç”¨ï¼‰
   static const List<String> regionKeys = [
-    'hokkaido', 'tohoku', 'kanto', 'chubu', 'kansai', 'chugoku', 'shikoku', 'kyushu', 'okinawa',
+    'hokkaido',
+    'tohoku',
+    'kanto',
+    'chubu',
+    'kansai',
+    'chugoku',
+    'shikoku',
+    'kyushu',
+    'okinawa',
   ];
-  
+
   // åœ°æ–¹â†’éƒ½é“åºœçœŒã®ãƒžãƒƒãƒ”ãƒ³ã‚°
   static const Map<String, List<String>> regionPrefectures = {
     'hokkaido': ['北海道'],
@@ -43,21 +51,50 @@ class _CheckinScreenState extends State<CheckinScreen> {
     'kyushu': ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県'],
     'okinawa': ['沖縄県'],
   };
-  
+
   // å±•é–‹ä¸­ã®åœ°æ–¹
   Set<String> expandedRegions = {};
 
   // Paint it Black! の表示状態
   bool _showPaintMap = false;
 
-
   // ãƒãƒƒã‚¸å®šç¾©ï¼ˆ5éšŽç´šï¼‰
   static const List<Map<String, dynamic>> badgeTiers = [
-    {'name': 'Bronze', 'nameJa': 'ブロンズ', 'icon': '🥉', 'required': 5, 'color': 0xFFCD7F32},
-    {'name': 'Silver', 'nameJa': 'シルバー', 'icon': '🥈', 'required': 15, 'color': 0xFFC0C0C0},
-    {'name': 'Gold', 'nameJa': 'ゴールド', 'icon': '🥇', 'required': 30, 'color': 0xFFFFD700},
-    {'name': 'Platinum', 'nameJa': 'プラチナ', 'icon': '💎', 'required': 50, 'color': 0xFFE5E4E2},
-    {'name': 'Diamond', 'nameJa': 'ダイヤモンド', 'icon': '👑', 'required': 70, 'color': 0xFFB9F2FF},
+    {
+      'name': 'Bronze',
+      'nameJa': 'ブロンズ',
+      'icon': '🥉',
+      'required': 5,
+      'color': 0xFFCD7F32,
+    },
+    {
+      'name': 'Silver',
+      'nameJa': 'シルバー',
+      'icon': '🥈',
+      'required': 15,
+      'color': 0xFFC0C0C0,
+    },
+    {
+      'name': 'Gold',
+      'nameJa': 'ゴールド',
+      'icon': '🥇',
+      'required': 30,
+      'color': 0xFFFFD700,
+    },
+    {
+      'name': 'Platinum',
+      'nameJa': 'プラチナ',
+      'icon': '💎',
+      'required': 50,
+      'color': 0xFFE5E4E2,
+    },
+    {
+      'name': 'Diamond',
+      'nameJa': 'ダイヤモンド',
+      'icon': '👑',
+      'required': 70,
+      'color': 0xFFB9F2FF,
+    },
   ];
 
   // ç¾åœ¨ã®ãƒãƒƒã‚¸ã‚’å–å¾—
@@ -87,24 +124,34 @@ class _CheckinScreenState extends State<CheckinScreen> {
   String _getRegionName(String key) {
     final l10n = AppLocalizations.of(context)!;
     switch (key) {
-      case 'hokkaido': return l10n.regionHokkaido;
-      case 'tohoku': return l10n.regionTohoku;
-      case 'kanto': return l10n.regionKanto;
-      case 'chubu': return l10n.regionChubu;
-      case 'kansai': return l10n.regionKansai;
-      case 'chugoku': return l10n.regionChugoku;
-      case 'shikoku': return l10n.regionShikoku;
-      case 'kyushu': return l10n.regionKyushu;
-      case 'okinawa': return l10n.regionOkinawa;
-      default: return key;
+      case 'hokkaido':
+        return l10n.regionHokkaido;
+      case 'tohoku':
+        return l10n.regionTohoku;
+      case 'kanto':
+        return l10n.regionKanto;
+      case 'chubu':
+        return l10n.regionChubu;
+      case 'kansai':
+        return l10n.regionKansai;
+      case 'chugoku':
+        return l10n.regionChugoku;
+      case 'shikoku':
+        return l10n.regionShikoku;
+      case 'kyushu':
+        return l10n.regionKyushu;
+      case 'okinawa':
+        return l10n.regionOkinawa;
+      default:
+        return key;
     }
   }
 
   // ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³å¯èƒ½è·é›¢ï¼ˆãƒ¡ãƒ¼ãƒˆãƒ«ï¼‰
   double _getCheckinRadius(String airportCode) {
-    // å¤§ç©ºæ¸¯ã¯3kmã€ãã‚Œä»¥å¤–ã¯1.5km
+    // å¤§ç©ºæ¸¯ã¯300mã€ãã‚Œä»¥å¤–ã¯150m
     const largeAirports = ['HND', 'KIX'];
-    return largeAirports.contains(airportCode) ? 3000 : 1500;
+    return largeAirports.contains(airportCode) ? 300 : 150;
   }
 
   @override
@@ -124,10 +171,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
   Future<void> _loadData() async {
     setState(() => isLoading = true);
     try {
-      await Future.wait([
-        _loadAirports(),
-        _loadCheckins(),
-      ]);
+      await Future.wait([_loadAirports(), _loadCheckins()]);
       await _getCurrentLocation();
     } catch (e) {
       final l10n = AppLocalizations.of(context)!;
@@ -143,36 +187,40 @@ class _CheckinScreenState extends State<CheckinScreen> {
         .select('code, name_ja, name_en, prefecture, latitude, longitude')
         .eq('is_active', true)
         .not('prefecture', 'is', null);
-    
+
     final airports = (response as List).cast<Map<String, dynamic>>();
     final grouped = <String, List<Map<String, dynamic>>>{};
-    
+
     for (var airport in airports) {
       final pref = airport['prefecture'] as String;
       grouped.putIfAbsent(pref, () => []);
       grouped[pref]!.add(airport);
     }
-    
+
     // å„éƒ½é“åºœçœŒå†…ã‚’ç©ºæ¸¯ã‚³ãƒ¼ãƒ‰é †ã«ã‚½ãƒ¼ãƒˆ
     for (var pref in grouped.keys) {
-      grouped[pref]!.sort((a, b) => (a['code'] as String).compareTo(b['code'] as String));
+      grouped[pref]!.sort(
+        (a, b) => (a['code'] as String).compareTo(b['code'] as String),
+      );
     }
-    
+
     setState(() => airportsByPrefecture = grouped);
   }
 
   Future<void> _loadCheckins() async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) return;
-    
+
     final response = await Supabase.instance.client
         .from('airport_checkins')
         .select('airport_code')
         .eq('user_id', userId);
-    
+
     final checkins = (response as List).cast<Map<String, dynamic>>();
     setState(() {
-      checkedAirports = checkins.map((c) => c['airport_code'] as String).toSet();
+      checkedAirports = checkins
+          .map((c) => c['airport_code'] as String)
+          .toSet();
     });
   }
 
@@ -198,7 +246,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
       setState(() => currentPosition = position);
-      
+
       // æœ€å¯„ã‚Šç©ºæ¸¯ã‚’æ¤œç´¢
       _findNearestAirport();
     } catch (e) {
@@ -208,30 +256,30 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
   void _findNearestAirport() {
     if (currentPosition == null) return;
-    
+
     double minDistance = double.infinity;
     Map<String, dynamic>? nearest;
-    
+
     for (var airports in airportsByPrefecture.values) {
       for (var airport in airports) {
         final lat = airport['latitude'] as double?;
         final lng = airport['longitude'] as double?;
         if (lat == null || lng == null) continue;
-        
+
         final distance = _calculateDistance(
           currentPosition!.latitude,
           currentPosition!.longitude,
           lat,
           lng,
         );
-        
+
         if (distance < minDistance) {
           minDistance = distance;
           nearest = airport;
         }
       }
     }
-    
+
     setState(() {
       nearestAirport = nearest;
       distanceToNearest = minDistance;
@@ -239,13 +287,21 @@ class _CheckinScreenState extends State<CheckinScreen> {
   }
 
   // Haversine formula ã§è·é›¢è¨ˆç®—ï¼ˆãƒ¡ãƒ¼ãƒˆãƒ«ï¼‰
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const double earthRadius = 6371000; // ãƒ¡ãƒ¼ãƒˆãƒ«
     final dLat = _toRadians(lat2 - lat1);
     final dLon = _toRadians(lon2 - lon1);
-    final a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_toRadians(lat1)) * cos(_toRadians(lat2)) *
-        sin(dLon / 2) * sin(dLon / 2);
+    final a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRadians(lat1)) *
+            cos(_toRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadius * c;
   }
@@ -263,7 +319,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
     if (isJa) {
       return airport['name_ja'] as String? ?? airport['code'] as String;
     } else {
-      return airport['name_en'] as String? ?? airport['name_ja'] as String? ?? airport['code'] as String;
+      return airport['name_en'] as String? ??
+          airport['name_ja'] as String? ??
+          airport['code'] as String;
     }
   }
 
@@ -275,16 +333,18 @@ class _CheckinScreenState extends State<CheckinScreen> {
     if (distanceToNearest! > radius) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.tooFarFromAirport(
-            (distanceToNearest! / 1000).toStringAsFixed(1),
-            (radius / 1000).toStringAsFixed(1),
-          )),
+          content: Text(
+            l10n.tooFarFromAirport(
+              (distanceToNearest! / 1000).toStringAsFixed(1),
+              (radius / 1000).toStringAsFixed(1),
+            ),
+          ),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
-    
+
     // åŒ¿åãƒ¦ãƒ¼ã‚¶ãƒ¼ã¯ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³ä¸å¯ â†’ ãƒ­ã‚°ã‚¤ãƒ³ç”»é¢ã¸èª˜å°Ž
     if (_isAnonymousUser) {
       final shouldLogin = await showDialog<bool>(
@@ -299,13 +359,16 @@ class _CheckinScreenState extends State<CheckinScreen> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple[700], foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple[700],
+                foregroundColor: Colors.white,
+              ),
               child: Text(l10n.goToLogin),
             ),
           ],
         ),
       );
-      
+
       if (shouldLogin == true && mounted) {
         Navigator.push(
           context,
@@ -322,15 +385,18 @@ class _CheckinScreenState extends State<CheckinScreen> {
       }
       return;
     }
-    
+
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.loginRequired), backgroundColor: Colors.orange),
+        SnackBar(
+          content: Text(l10n.loginRequired),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
-    
+
     try {
       await Supabase.instance.client.from('airport_checkins').upsert({
         'user_id': userId,
@@ -339,13 +405,15 @@ class _CheckinScreenState extends State<CheckinScreen> {
         'latitude': currentPosition?.latitude,
         'longitude': currentPosition?.longitude,
       }, onConflict: 'user_id,airport_code,checkin_date');
-      
+
       setState(() => checkedAirports.add(airportCode));
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.checkinSuccess(_getAirportName(nearestAirport!))),
+            content: Text(
+              l10n.checkinSuccess(_getAirportName(nearestAirport!)),
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -353,19 +421,24 @@ class _CheckinScreenState extends State<CheckinScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l10n.checkinError}: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('${l10n.checkinError}: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
   // === Paint it Black! ===
-  
+
   // 都道府県の塗り状態を取得: 0=未踏, 1=一部, 2=完了, 3=空港なし(元から黒)
   int _getPrefStatus(String pref) {
     final airports = airportsByPrefecture[pref];
     if (airports == null || airports.isEmpty) return 3; // 空港なし
-    final checked = airports.where((a) => checkedAirports.contains(a['code'])).length;
+    final checked = airports
+        .where((a) => checkedAirports.contains(a['code']))
+        .length;
     if (checked == 0) return 0;
     if (checked >= airports.length) return 2;
     return 1;
@@ -373,10 +446,14 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
   Color _getPrefColor(int status) {
     switch (status) {
-      case 3: return const Color(0xFF1A1A1A); // 空港なし: 黒
-      case 2: return const Color(0xFF000000); // 完了: 真黒
-      case 1: return const Color(0xFF555555); // 一部: ダークグレー
-      default: return const Color(0xFFD0D0D0); // 未踏: ライトグレー
+      case 3:
+        return const Color(0xFF1A1A1A); // 空港なし: 黒
+      case 2:
+        return const Color(0xFF000000); // 完了: 真黒
+      case 1:
+        return const Color(0xFF555555); // 一部: ダークグレー
+      default:
+        return const Color(0xFFD0D0D0); // 未踏: ライトグレー
     }
   }
 
@@ -426,15 +503,22 @@ class _CheckinScreenState extends State<CheckinScreen> {
                       ),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: painted == total ? Colors.red[700] : Colors.grey[200],
+                          color: painted == total
+                              ? Colors.red[700]
+                              : Colors.grey[200],
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '$painted/$total',
                           style: TextStyle(
-                            color: painted == total ? Colors.white : Colors.black54,
+                            color: painted == total
+                                ? Colors.white
+                                : Colors.black54,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
@@ -485,13 +569,28 @@ class _CheckinScreenState extends State<CheckinScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildLegendItem(const Color(0xFF1A1A1A), isJa ? '制覇 ✓' : 'Done ✓', border: true, borderColor: Colors.red),
+                  _buildLegendItem(
+                    const Color(0xFF1A1A1A),
+                    isJa ? '制覇 ✓' : 'Done ✓',
+                    border: true,
+                    borderColor: Colors.red,
+                  ),
                   const SizedBox(width: 10),
-                  _buildLegendItem(const Color(0xFF4A7A49), isJa ? '一部' : 'Partial'),
+                  _buildLegendItem(
+                    const Color(0xFF4A7A49),
+                    isJa ? '一部' : 'Partial',
+                  ),
                   const SizedBox(width: 10),
-                  _buildLegendItem(const Color(0xFF7BAF7A), isJa ? '未踏' : 'Unvisited'),
+                  _buildLegendItem(
+                    const Color(0xFF7BAF7A),
+                    isJa ? '未踏' : 'Unvisited',
+                  ),
                   const SizedBox(width: 10),
-                  _buildLegendItem(const Color(0xFFE8E8E8), isJa ? '空港なし' : 'No apt', border: true),
+                  _buildLegendItem(
+                    const Color(0xFFE8E8E8),
+                    isJa ? '空港なし' : 'No apt',
+                    border: true,
+                  ),
                 ],
               ),
             ),
@@ -501,20 +600,31 @@ class _CheckinScreenState extends State<CheckinScreen> {
     );
   }
 
-  Widget _buildLegendItem(Color color, String label, {bool border = false, Color? borderColor}) {
+  Widget _buildLegendItem(
+    Color color,
+    String label, {
+    bool border = false,
+    Color? borderColor,
+  }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 12, height: 12,
+          width: 12,
+          height: 12,
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(2),
-            border: border ? Border.all(color: borderColor ?? Colors.grey[400]!, width: 1) : null,
+            border: border
+                ? Border.all(color: borderColor ?? Colors.grey[400]!, width: 1)
+                : null,
           ),
         ),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: Colors.black54, fontSize: 10)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.black54, fontSize: 10),
+        ),
       ],
     );
   }
@@ -522,19 +632,21 @@ class _CheckinScreenState extends State<CheckinScreen> {
   Widget _buildJapanMapView() {
     // Build prefecture status map for JapanMapWidget
     final Map<String, int> prefStatus = {};
-    
+
     // All 47 prefectures
     final allPrefs = JapanMapWidget.prefNames;
-    
+
     for (final entry in allPrefs.entries) {
       final code = entry.key;
       final prefName = entry.value;
       final airports = airportsByPrefecture[prefName];
-      
+
       if (airports == null || airports.isEmpty) {
         prefStatus[code] = 3; // No airport
       } else {
-        final checked = airports.where((a) => checkedAirports.contains(a['code'])).length;
+        final checked = airports
+            .where((a) => checkedAirports.contains(a['code']))
+            .length;
         if (checked == 0) {
           prefStatus[code] = 0; // Unvisited
         } else if (checked >= airports.length) {
@@ -544,45 +656,127 @@ class _CheckinScreenState extends State<CheckinScreen> {
         }
       }
     }
-    
+
     // Build airport locations and names maps
     final Map<String, Map<String, double>> airportLocs = {};
     final Map<String, String> airportNameMap = {};
-    
+
     // Fallback Japanese names for airports missing name_ja in DB
     const fallbackNamesJa = {
-      'HND': '羽田', 'NRT': '成田', 'KIX': '関西', 'ITM': '伊丹', 'NGO': '中部',
-      'CTS': '新千歳', 'FUK': '福岡', 'OKA': '那覇', 'NGS': '長崎', 'KMJ': '熊本',
-      'OIT': '大分', 'MYJ': '松山', 'HIJ': '広島', 'TAK': '高松', 'KCZ': '高知',
-      'TKS': '徳島', 'KOJ': '鹿児島', 'SDJ': '仙台', 'AOJ': '青森', 'AKJ': '旭川',
-      'AXT': '秋田', 'GAJ': '山形', 'KIJ': '新潟', 'TOY': '富山', 'KMQ': '小松',
-      'FSZ': '静岡', 'MMB': '女満別', 'OBO': '帯広', 'KUH': '釧路', 'HKD': '函館',
-      'ISG': '石垣', 'MMY': '宮古', 'UBJ': '山口宇部', 'IWK': '岩国', 'OKJ': '岡山',
-      'TTJ': '鳥取', 'YGJ': '米子', 'IZO': '出雲', 'NKM': '県営名古屋', 'UKB': '神戸',
-      'HSG': '佐賀', 'KMI': '宮崎', 'ASJ': '奄美', 'TKN': '徳之島', 'OKI': '隠岐',
-      'FKS': '福島', 'HNA': '花巻', 'MSJ': '三沢', 'ONJ': '大館能代',
-      'SHM': '南紀白浜', 'NTQ': '能登', 'KKJ': '北九州', 'TNE': '種子島',
-      'KUM': '屋久島', 'RNJ': '与論', 'OGN': '与那国', 'HAC': '八丈島',
-      'MBE': '紋別', 'SHB': '中標津', 'WKJ': '稚内', 'OKD': '丘珠',
-      'IKI': '壱岐', 'TSJ': '対馬', 'FUJ': '五島福江', 'OIR': '奥尻',
-      'SYO': '庄内', 'MMJ': '松本', 'AXJ': '天草', 'TJH': '但馬',
-      'KKX': '喜界', 'KJP': '慶良間', 'AGJ': '粟国', 'SHI': '下地島',
-      'MMD': '南大東', 'KTD': '北大東', 'TRA': '多良間', 'MYE': '三宅島',
+      'HND': '羽田',
+      'NRT': '成田',
+      'KIX': '関西',
+      'ITM': '伊丹',
+      'NGO': '中部',
+      'CTS': '新千歳',
+      'FUK': '福岡',
+      'OKA': '那覇',
+      'NGS': '長崎',
+      'KMJ': '熊本',
+      'OIT': '大分',
+      'MYJ': '松山',
+      'HIJ': '広島',
+      'TAK': '高松',
+      'KCZ': '高知',
+      'TKS': '徳島',
+      'KOJ': '鹿児島',
+      'SDJ': '仙台',
+      'AOJ': '青森',
+      'AKJ': '旭川',
+      'AXT': '秋田',
+      'GAJ': '山形',
+      'KIJ': '新潟',
+      'TOY': '富山',
+      'KMQ': '小松',
+      'FSZ': '静岡',
+      'MMB': '女満別',
+      'OBO': '帯広',
+      'KUH': '釧路',
+      'HKD': '函館',
+      'ISG': '石垣',
+      'MMY': '宮古',
+      'UBJ': '山口宇部',
+      'IWK': '岩国',
+      'OKJ': '岡山',
+      'TTJ': '鳥取',
+      'YGJ': '米子',
+      'IZO': '出雲',
+      'NKM': '県営名古屋',
+      'UKB': '神戸',
+      'HSG': '佐賀',
+      'KMI': '宮崎',
+      'ASJ': '奄美',
+      'TKN': '徳之島',
+      'OKI': '隠岐',
+      'FKS': '福島',
+      'HNA': '花巻',
+      'MSJ': '三沢',
+      'ONJ': '大館能代',
+      'SHM': '南紀白浜',
+      'NTQ': '能登',
+      'KKJ': '北九州',
+      'TNE': '種子島',
+      'KUM': '屋久島',
+      'RNJ': '与論',
+      'OGN': '与那国',
+      'HAC': '八丈島',
+      'MBE': '紋別',
+      'SHB': '中標津',
+      'WKJ': '稚内',
+      'OKD': '丘珠',
+      'IKI': '壱岐',
+      'TSJ': '対馬',
+      'FUJ': '五島福江',
+      'OIR': '奥尻',
+      'SYO': '庄内',
+      'MMJ': '松本',
+      'AXJ': '天草',
+      'TJH': '但馬',
+      'KKX': '喜界',
+      'KJP': '慶良間',
+      'AGJ': '粟国',
+      'SHI': '下地島',
+      'MMD': '南大東',
+      'KTD': '北大東',
+      'TRA': '多良間',
+      'MYE': '三宅島',
       'OIM': '大島',
     };
     const fallbackNamesEn = {
-      'HND': 'Haneda', 'NRT': 'Narita', 'KIX': 'Kansai', 'ITM': 'Itami',
-      'NGO': 'Chubu', 'CTS': 'New Chitose', 'FUK': 'Fukuoka', 'OKA': 'Naha',
-      'ISG': 'Ishigaki', 'MMY': 'Miyako', 'KOJ': 'Kagoshima', 'SDJ': 'Sendai',
-      'HIJ': 'Hiroshima', 'KMJ': 'Kumamoto', 'NGS': 'Nagasaki', 'OIT': 'Oita',
-      'MYJ': 'Matsuyama', 'TAK': 'Takamatsu', 'KCZ': 'Kochi', 'TKS': 'Tokushima',
-      'TKN': 'Tokunoshima', 'ASJ': 'Amami', 'RNJ': 'Yoron', 'OGN': 'Yonaguni',
-      'KJP': 'Kerama', 'AGJ': 'Aguni', 'MMD': 'Minamidaito', 'KTD': 'Kitadaito',
-      'TRA': 'Tarama', 'SHI': 'Shimojishima',
+      'HND': 'Haneda',
+      'NRT': 'Narita',
+      'KIX': 'Kansai',
+      'ITM': 'Itami',
+      'NGO': 'Chubu',
+      'CTS': 'New Chitose',
+      'FUK': 'Fukuoka',
+      'OKA': 'Naha',
+      'ISG': 'Ishigaki',
+      'MMY': 'Miyako',
+      'KOJ': 'Kagoshima',
+      'SDJ': 'Sendai',
+      'HIJ': 'Hiroshima',
+      'KMJ': 'Kumamoto',
+      'NGS': 'Nagasaki',
+      'OIT': 'Oita',
+      'MYJ': 'Matsuyama',
+      'TAK': 'Takamatsu',
+      'KCZ': 'Kochi',
+      'TKS': 'Tokushima',
+      'TKN': 'Tokunoshima',
+      'ASJ': 'Amami',
+      'RNJ': 'Yoron',
+      'OGN': 'Yonaguni',
+      'KJP': 'Kerama',
+      'AGJ': 'Aguni',
+      'MMD': 'Minamidaito',
+      'KTD': 'Kitadaito',
+      'TRA': 'Tarama',
+      'SHI': 'Shimojishima',
     };
-    
+
     final isJa = Localizations.localeOf(context).languageCode == 'ja';
-    
+
     for (final airports in airportsByPrefecture.values) {
       for (final airport in airports) {
         final code = airport['code'] as String?;
@@ -595,22 +789,25 @@ class _CheckinScreenState extends State<CheckinScreen> {
           if (dbName != code) {
             airportNameMap[code] = dbName;
           } else {
-            airportNameMap[code] = isJa 
+            airportNameMap[code] = isJa
                 ? (fallbackNamesJa[code] ?? code)
                 : (fallbackNamesEn[code] ?? code);
           }
         }
       }
     }
-    
-    return JapanMapWidget(
-      prefStatus: prefStatus,
-      airportLocations: airportLocs,
-      airportNames: airportNameMap,
-      checkedAirports: checkedAirports,
+
+    return InteractiveViewer(
+      minScale: 0.5,
+      maxScale: 4.0,
+      child: JapanMapWidget(
+        prefStatus: prefStatus,
+        airportLocations: airportLocs,
+        airportNames: airportNameMap,
+        checkedAirports: checkedAirports,
+      ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -618,9 +815,14 @@ class _CheckinScreenState extends State<CheckinScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final totalAirports = airportsByPrefecture.values.fold<int>(0, (sum, list) => sum + list.length);
+    final totalAirports = airportsByPrefecture.values.fold<int>(
+      0,
+      (sum, list) => sum + list.length,
+    );
     final checkedCount = checkedAirports.length;
-    final double progressPercent = totalAirports > 0 ? (checkedCount / totalAirports * 100) : 0.0;
+    final double progressPercent = totalAirports > 0
+        ? (checkedCount / totalAirports * 100)
+        : 0.0;
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -633,15 +835,15 @@ class _CheckinScreenState extends State<CheckinScreen> {
             // ãƒ˜ãƒƒãƒ€ãƒ¼ï¼šå…¨ä½“é€²æ—
             _buildProgressHeader(checkedCount, totalAirports, progressPercent),
             const SizedBox(height: 16),
-            
+
             // Paint it Black! 日本地図
             _buildPaintItBlackSection(),
             const SizedBox(height: 16),
-            
+
             // ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³ãƒœã‚¿ãƒ³ï¼ˆæœ€å¯„ã‚Šç©ºæ¸¯ï¼‰
             _buildCheckinCard(),
             const SizedBox(height: 16),
-            
+
             // åœ°æ–¹åˆ¥ãƒªã‚¹ãƒˆ
             ..._buildRegionList(),
           ],
@@ -655,11 +857,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
     final isJa = Localizations.localeOf(context).languageCode == 'ja';
     final currentBadge = _getCurrentBadge(checked);
     final nextBadge = _getNextBadge(checked);
-    
+
     // 70ç©ºæ¸¯ã‚’100%ã¨ã—ã¦è¨ˆç®—
     const int maxForGauge = 70;
     final double gaugePercent = (checked / maxForGauge * 100).clamp(0, 100);
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -676,11 +878,30 @@ class _CheckinScreenState extends State<CheckinScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(l10n.airportStampRally, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                l10n.airportStampRally,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(16)),
-                child: Text(isJa ? '合計 $checked' : 'Total $checked', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  isJa ? '合計 $checked' : 'Total $checked',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -696,10 +917,15 @@ class _CheckinScreenState extends State<CheckinScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            isJa ? '${gaugePercent.toStringAsFixed(1)}% (70空港で達成)' : '${gaugePercent.toStringAsFixed(1)}% (70 airports to complete)',
-            style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
+            isJa
+                ? '${gaugePercent.toStringAsFixed(1)}% (70空港で達成)'
+                : '${gaugePercent.toStringAsFixed(1)}% (70 airports to complete)',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 14,
+            ),
           ),
-          
+
           // ãƒãƒƒã‚¸è¡¨ç¤º
           const SizedBox(height: 16),
           Container(
@@ -714,19 +940,33 @@ class _CheckinScreenState extends State<CheckinScreen> {
                 if (currentBadge != null) ...[
                   Row(
                     children: [
-                      Text(currentBadge['icon'], style: const TextStyle(fontSize: 28)),
+                      Text(
+                        currentBadge['icon'],
+                        style: const TextStyle(fontSize: 28),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isJa ? currentBadge['nameJa'] : currentBadge['name'],
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                              isJa
+                                  ? currentBadge['nameJa']
+                                  : currentBadge['name'],
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                             Text(
-                              isJa ? '${currentBadge['required']}空港達成！' : '${currentBadge['required']} airports achieved!',
-                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                              isJa
+                                  ? '${currentBadge['required']}空港達成！'
+                                  : '${currentBadge['required']} airports achieved!',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -740,20 +980,29 @@ class _CheckinScreenState extends State<CheckinScreen> {
                       const SizedBox(width: 12),
                       Text(
                         isJa ? 'バッジ未獲得' : 'No badge yet',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ],
                   ),
                 ],
-                
+
                 // æ¬¡ã®ãƒãƒƒã‚¸ã¸ã®é€²æ—
                 if (nextBadge != null) ...[
                   const SizedBox(height: 12),
                   Row(
                     children: [
                       Text(
-                        isJa ? '次: ${nextBadge['icon']} ${nextBadge['nameJa']}' : 'Next: ${nextBadge['icon']} ${nextBadge['name']}',
-                        style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13),
+                        isJa
+                            ? '次: ${nextBadge['icon']} ${nextBadge['nameJa']}'
+                            : 'Next: ${nextBadge['icon']} ${nextBadge['name']}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -762,7 +1011,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
                           child: LinearProgressIndicator(
                             value: checked / nextBadge['required'],
                             backgroundColor: Colors.white.withOpacity(0.2),
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(nextBadge['color'])),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Color(nextBadge['color']),
+                            ),
                             minHeight: 6,
                           ),
                         ),
@@ -770,7 +1021,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
                       const SizedBox(width: 8),
                       Text(
                         '$checked/${nextBadge['required']}',
-                        style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -778,7 +1033,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
                   const SizedBox(height: 8),
                   Text(
                     isJa ? '🎉 全バッジ達成！' : '🎉 All badges achieved!',
-                    style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 14),
+                    style: const TextStyle(
+                      color: Colors.yellow,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ],
@@ -793,18 +1052,23 @@ class _CheckinScreenState extends State<CheckinScreen> {
     final l10n = AppLocalizations.of(context)!;
     final airportCode = nearestAirport?['code'] as String? ?? '';
     final radius = _getCheckinRadius(airportCode);
-    final canCheckin = nearestAirport != null && 
-                       distanceToNearest != null && 
-                       distanceToNearest! <= radius;
+    final canCheckin =
+        nearestAirport != null &&
+        distanceToNearest != null &&
+        distanceToNearest! <= radius;
     final needsLogin = _isAnonymousUser;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: canCheckin ? (needsLogin ? Colors.orange[50] : Colors.green[50]) : Colors.grey[100],
+        color: canCheckin
+            ? (needsLogin ? Colors.orange[50] : Colors.green[50])
+            : Colors.grey[100],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: canCheckin ? (needsLogin ? Colors.orange : Colors.green) : Colors.grey[300]!,
+          color: canCheckin
+              ? (needsLogin ? Colors.orange : Colors.green)
+              : Colors.grey[300]!,
           width: canCheckin ? 2 : 1,
         ),
       ),
@@ -815,16 +1079,20 @@ class _CheckinScreenState extends State<CheckinScreen> {
             children: [
               Icon(
                 canCheckin ? Icons.location_on : Icons.location_off,
-                color: canCheckin ? (needsLogin ? Colors.orange : Colors.green) : Colors.grey,
+                color: canCheckin
+                    ? (needsLogin ? Colors.orange : Colors.green)
+                    : Colors.grey,
               ),
               const SizedBox(width: 8),
               Text(
-                canCheckin 
-                  ? (needsLogin ? l10n.loginToCheckin : l10n.checkinAvailable) 
-                  : l10n.nearestAirport,
+                canCheckin
+                    ? (needsLogin ? l10n.loginToCheckin : l10n.checkinAvailable)
+                    : l10n.nearestAirport,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: canCheckin ? (needsLogin ? Colors.orange[700] : Colors.green[700]) : Colors.grey[700],
+                  color: canCheckin
+                      ? (needsLogin ? Colors.orange[700] : Colors.green[700])
+                      : Colors.grey[700],
                 ),
               ),
             ],
@@ -838,7 +1106,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
             const SizedBox(height: 4),
             Text(
               distanceToNearest != null
-                  ? l10n.distanceFromHere((distanceToNearest! / 1000).toStringAsFixed(1))
+                  ? l10n.distanceFromHere(
+                      (distanceToNearest! / 1000).toStringAsFixed(1),
+                    )
                   : l10n.calculatingDistance,
               style: TextStyle(color: Colors.grey[600]),
             ),
@@ -849,12 +1119,16 @@ class _CheckinScreenState extends State<CheckinScreen> {
                 onPressed: canCheckin ? _checkin : null,
                 icon: Icon(needsLogin ? Icons.login : Icons.check_circle),
                 label: Text(
-                  canCheckin 
-                    ? (needsLogin ? l10n.loginRequired : l10n.checkin)
-                    : l10n.checkinWithinRadius((radius / 1000).toStringAsFixed(1))
+                  canCheckin
+                      ? (needsLogin ? l10n.loginRequired : l10n.checkin)
+                      : l10n.checkinWithinRadius(
+                          (radius / 1000).toStringAsFixed(1),
+                        ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: canCheckin ? (needsLogin ? Colors.orange : Colors.green) : Colors.grey,
+                  backgroundColor: canCheckin
+                      ? (needsLogin ? Colors.orange : Colors.green)
+                      : Colors.grey,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -877,26 +1151,28 @@ class _CheckinScreenState extends State<CheckinScreen> {
   List<Widget> _buildRegionList() {
     final l10n = AppLocalizations.of(context)!;
     final widgets = <Widget>[];
-    
+
     for (var regionKey in regionKeys) {
       final prefectures = regionPrefectures[regionKey] ?? [];
       if (prefectures.isEmpty) continue;
-      
+
       // åœ°æ–¹å†…ã®å…¨ç©ºæ¸¯æ•°ã¨ãƒã‚§ãƒƒã‚¯æ¸ˆã¿æ•°ã‚’è¨ˆç®—
       int totalInRegion = 0;
       int checkedInRegion = 0;
       for (var pref in prefectures) {
         final airports = airportsByPrefecture[pref] ?? [];
         totalInRegion += airports.length;
-        checkedInRegion += airports.where((a) => checkedAirports.contains(a['code'])).length;
+        checkedInRegion += airports
+            .where((a) => checkedAirports.contains(a['code']))
+            .length;
       }
-      
+
       if (totalInRegion == 0) continue;
-      
+
       final isRegionExpanded = expandedRegions.contains(regionKey);
       final regionProgress = checkedInRegion / totalInRegion;
       final regionName = _getRegionName(regionKey);
-      
+
       widgets.add(
         Container(
           margin: const EdgeInsets.only(bottom: 8),
@@ -957,27 +1233,44 @@ class _CheckinScreenState extends State<CheckinScreen> {
                           children: [
                             Text(
                               regionName,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                             Text(
                               l10n.nAirports(totalInRegion),
-                              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       if (checkedInRegion == totalInRegion)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.amber,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text(l10n.conquered, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          child: Text(
+                            l10n.conquered,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       const SizedBox(width: 8),
                       Icon(
-                        isRegionExpanded ? Icons.expand_less : Icons.expand_more,
+                        isRegionExpanded
+                            ? Icons.expand_less
+                            : Icons.expand_more,
                         color: Colors.grey[600],
                       ),
                     ],
@@ -1002,7 +1295,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
         ),
       );
     }
-    
+
     return widgets;
   }
 
@@ -1011,21 +1304,25 @@ class _CheckinScreenState extends State<CheckinScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final crossAxisCount = constraints.maxWidth > 500 ? 3 : 2;
-        
+
         return Wrap(
           spacing: 8,
           runSpacing: 8,
           children: prefectures.map((prefecture) {
             final airports = airportsByPrefecture[prefecture] ?? [];
             if (airports.isEmpty) return const SizedBox.shrink();
-            
-            final checkedCount = airports.where((a) => checkedAirports.contains(a['code'])).length;
+
+            final checkedCount = airports
+                .where((a) => checkedAirports.contains(a['code']))
+                .length;
             final totalCount = airports.length;
             final isExpanded = expandedPrefectures.contains(prefecture);
             final isComplete = checkedCount == totalCount;
-            
-            final itemWidth = (constraints.maxWidth - (crossAxisCount - 1) * 8) / crossAxisCount;
-            
+
+            final itemWidth =
+                (constraints.maxWidth - (crossAxisCount - 1) * 8) /
+                crossAxisCount;
+
             return SizedBox(
               width: itemWidth,
               child: Container(
@@ -1059,16 +1356,25 @@ class _CheckinScreenState extends State<CheckinScreen> {
                                   Row(
                                     children: [
                                       Text(
-                                        prefecture.replaceAll('県', '').replaceAll('府', '').replaceAll('都', ''),
+                                        prefecture
+                                            .replaceAll('県', '')
+                                            .replaceAll('府', '')
+                                            .replaceAll('都', ''),
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 13,
-                                          color: isComplete ? Colors.amber[800] : Colors.black,
+                                          color: isComplete
+                                              ? Colors.amber[800]
+                                              : Colors.black,
                                         ),
                                       ),
                                       if (isComplete) ...[
                                         const SizedBox(width: 4),
-                                        const Icon(Icons.check_circle, size: 14, color: Colors.amber),
+                                        const Icon(
+                                          Icons.check_circle,
+                                          size: 14,
+                                          color: Colors.amber,
+                                        ),
                                       ],
                                     ],
                                   ),
@@ -1083,7 +1389,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
                               ),
                             ),
                             Icon(
-                              isExpanded ? Icons.expand_less : Icons.expand_more,
+                              isExpanded
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
                               size: 18,
                               color: Colors.grey[600],
                             ),
@@ -1102,15 +1410,24 @@ class _CheckinScreenState extends State<CheckinScreen> {
                         ),
                         child: Column(
                           children: airports.map((airport) {
-                            final isChecked = checkedAirports.contains(airport['code']);
+                            final isChecked = checkedAirports.contains(
+                              airport['code'],
+                            );
                             return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               child: Row(
                                 children: [
                                   Icon(
-                                    isChecked ? Icons.check_circle : Icons.circle_outlined,
+                                    isChecked
+                                        ? Icons.check_circle
+                                        : Icons.circle_outlined,
                                     size: 16,
-                                    color: isChecked ? Colors.green : Colors.grey,
+                                    color: isChecked
+                                        ? Colors.green
+                                        : Colors.grey,
                                   ),
                                   const SizedBox(width: 6),
                                   Expanded(
@@ -1118,8 +1435,12 @@ class _CheckinScreenState extends State<CheckinScreen> {
                                       '${_getAirportName(airport)} (${airport['code']})',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: isChecked ? Colors.black : Colors.grey[600],
-                                        fontWeight: isChecked ? FontWeight.bold : FontWeight.normal,
+                                        color: isChecked
+                                            ? Colors.black
+                                            : Colors.grey[600],
+                                        fontWeight: isChecked
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
                                       ),
                                     ),
                                   ),
