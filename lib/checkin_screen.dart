@@ -23,6 +23,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
   Map<String, List<Map<String, dynamic>>> airportsByPrefecture = {};
   // ãƒ¦ãƒ¼ã‚¶ãƒ¼ã®ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³æ¸ˆã¿ç©ºæ¸¯
   Set<String> checkedAirports = {};
+  bool _isCheckinLoading = false;
+  String? _lastCheckinResult; // 'success:CODE' or 'far'
   // å±•é–‹ä¸­ã®éƒ½é“åºœçœŒ
   Set<String> expandedPrefectures = {};
 
@@ -150,8 +152,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
   // ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³å¯èƒ½è·é›¢ï¼ˆãƒ¡ãƒ¼ãƒˆãƒ«ï¼‰
   double _getCheckinRadius(String airportCode) {
     // å¤§ç©ºæ¸¯ã¯300mã€ãã‚Œä»¥å¤–ã¯150m
-    const largeAirports = ['HND', 'KIX'];
-    return largeAirports.contains(airportCode) ? 300 : 150;
+    const largeAirports = ['HND', 'NRT', 'KIX', 'ITM', 'NGO', 'CTS', 'FUK'];
+    return largeAirports.contains(airportCode) ? 1000 : 500;
   }
 
   @override
@@ -172,7 +174,6 @@ class _CheckinScreenState extends State<CheckinScreen> {
     setState(() => isLoading = true);
     try {
       await Future.wait([_loadAirports(), _loadCheckins()]);
-      await _getCurrentLocation();
     } catch (e) {
       final l10n = AppLocalizations.of(context)!;
       setState(() => errorMessage = '${l10n.dataLoadError}: $e');
@@ -325,25 +326,119 @@ class _CheckinScreenState extends State<CheckinScreen> {
     }
   }
 
+  Future<void> _attemptCheckin() async {
+    final l10n = AppLocalizations.of(context)!;
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+
+    // 0. 未許可の場合、事前にアプリ側で説明ダイアログ
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(isJa ? '📍 位置情報の使用' : '📍 Use Location'),
+          content: Text(
+            isJa
+                ? '最寄りの空港を判定するために、現在地を取得します。\n\n'
+                  '位置情報はチェックイン判定のみに使用し、サーバーには保存しません。\n\n'
+                  '次に表示されるブラウザの許可ダイアログで「許可」を選んでください。'
+                : 'We need your location to find the nearest airport.\n\n'
+                  'Location is used only for check-in and is not stored on our server.\n\n'
+                  'Please allow location access in the browser dialog that follows.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(isJa ? 'キャンセル' : 'Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple[700],
+                foregroundColor: Colors.white,
+              ),
+              child: Text(isJa ? '許可する' : 'Allow'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+
+    setState(() {
+      _isCheckinLoading = true;
+      errorMessage = null;
+      _lastCheckinResult = null;
+    });
+
+    try {
+      // 1. 位置情報の許可確認
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _isCheckinLoading = false;
+            errorMessage = isJa
+                ? '位置情報の共有を許可してください。'
+                : 'Please allow location sharing.';
+          });
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _isCheckinLoading = false;
+          errorMessage = isJa
+              ? '位置情報の共有を許可してください。\n設定 → プライバシーとセキュリティ → 位置情報サービス → SafariのWebサイト'
+              : 'Please allow location sharing.\nSettings → Privacy & Security → Location Services → Safari Websites';
+        });
+        return;
+      }
+
+      // 2. 現在位置取得
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() => currentPosition = position);
+
+      // 3. 最寄り空港を検索
+      _findNearestAirport();
+
+      if (nearestAirport == null) {
+        setState(() {
+          _isCheckinLoading = false;
+          errorMessage = isJa ? '付近に空港が見つかりません' : 'No airport found nearby';
+        });
+        return;
+      }
+
+      // 4. 距離チェック
+      final airportCode = nearestAirport!['code'] as String;
+      final radius = _getCheckinRadius(airportCode);
+      if (distanceToNearest! > radius) {
+        setState(() {
+          _isCheckinLoading = false;
+          _lastCheckinResult = 'far';
+        });
+        return;
+      }
+
+      // 5. チェックイン実行
+      await _checkin();
+    } catch (e) {
+      setState(() {
+        errorMessage = '${l10n.locationError}: $e';
+      });
+    } finally {
+      if (mounted) setState(() => _isCheckinLoading = false);
+    }
+  }
+
   Future<void> _checkin() async {
     final l10n = AppLocalizations.of(context)!;
     if (nearestAirport == null || distanceToNearest == null) return;
     final airportCode = nearestAirport!['code'] as String;
-    final radius = _getCheckinRadius(airportCode);
-    if (distanceToNearest! > radius) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            l10n.tooFarFromAirport(
-              (distanceToNearest! / 1000).toStringAsFixed(1),
-              (radius / 1000).toStringAsFixed(1),
-            ),
-          ),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
 
     // åŒ¿åãƒ¦ãƒ¼ã‚¶ãƒ¼ã¯ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³ä¸å¯ â†’ ãƒ­ã‚°ã‚¤ãƒ³ç”»é¢ã¸èª˜å°Ž
     if (_isAnonymousUser) {
@@ -406,7 +501,10 @@ class _CheckinScreenState extends State<CheckinScreen> {
         'longitude': currentPosition?.longitude,
       }, onConflict: 'user_id,airport_code,checkin_date');
 
-      setState(() => checkedAirports.add(airportCode));
+      setState(() {
+        checkedAirports.add(airportCode);
+        _lastCheckinResult = 'success:$airportCode';
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -441,27 +539,26 @@ class _CheckinScreenState extends State<CheckinScreen> {
         .length;
     if (checked == 0) return 0;
     if (checked >= airports.length) return 2;
-    return 1;
+    return 1; // 一部
   }
 
   Color _getPrefColor(int status) {
-    switch (status) {
-      case 3:
-        return const Color(0xFF1A1A1A); // 空港なし: 黒
-      case 2:
-        return const Color(0xFF000000); // 完了: 真黒
-      case 1:
-        return const Color(0xFF555555); // 一部: ダークグレー
-      default:
-        return const Color(0xFFD0D0D0); // 未踏: ライトグレー
+    if (status == 3) return const Color(0xFF1A1A1A); // 空港なし: 黒
+    if (status == 2) return const Color(0xFF000000); // 完了: 真黒
+    if (status >= 10 && status <= 19) {
+      // 一部: グレー→黒のグラデーション
+      final ratio = (status - 10) / 9.0;
+      final grey = (0xC8 - (0xC8 * ratio)).round();
+      return Color.fromARGB(255, grey, grey, grey);
     }
+    return const Color(0xFFD0D0D0); // 未踏: ライトグレー
   }
 
   int _getPaintedCount() {
     int count = 0;
     for (final name in JapanMapWidget.prefNames.values) {
       final s = _getPrefStatus(name);
-      if (s >= 2) count++; // 完了 or 空港なし
+      if (s == 1 || s == 2) count++; // 踏んだ県をカウント（一部or完了）
     }
     return count;
   }
@@ -469,8 +566,13 @@ class _CheckinScreenState extends State<CheckinScreen> {
   Widget _buildPaintItBlackSection() {
     final isJa = Localizations.localeOf(context).languageCode == 'ja';
     final painted = _getPaintedCount();
-    final total = 47;
-    final percent = (painted / total * 100).toStringAsFixed(0);
+    // 空港がある都道府県数を分母にする
+    int totalWithAirports = 0;
+    for (final name in JapanMapWidget.prefNames.values) {
+      if (_getPrefStatus(name) != 3) totalWithAirports++;
+    }
+    final total = totalWithAirports;
+    final percent = total > 0 ? (painted.toDouble() / total * 100).toStringAsFixed(0) : '0';
 
     return Container(
       decoration: BoxDecoration(
@@ -502,25 +604,30 @@ class _CheckinScreenState extends State<CheckinScreen> {
                         ),
                       ),
                       const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: painted == total
-                              ? Colors.red[700]
-                              : Colors.grey[200],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '$painted/$total',
-                          style: TextStyle(
+                      Tooltip(
+                        message: isJa 
+                            ? '空港がある$total都道府県中、${painted}都道府県の空港にチェックイン済み'
+                            : '$painted of $total prefectures with airports visited',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
                             color: painted == total
-                                ? Colors.white
-                                : Colors.black54,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                                ? Colors.red[700]
+                                : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$painted/$total',
+                            style: TextStyle(
+                              color: painted == total
+                                  ? Colors.white
+                                  : Colors.black54,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ),
@@ -536,7 +643,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(3),
                     child: LinearProgressIndicator(
-                      value: painted / total,
+                      value: total > 0 ? painted.toDouble() / total : 0.0,
                       backgroundColor: Colors.grey[200],
                       valueColor: AlwaysStoppedAnimation<Color>(
                         painted == total ? Colors.red : Colors.black54,
@@ -545,12 +652,18 @@ class _CheckinScreenState extends State<CheckinScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      '$percent%',
-                      style: TextStyle(color: Colors.black38, fontSize: 11),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isJa ? '空港がある都道府県の踏破率' : 'Prefectures visited (with airports)',
+                        style: TextStyle(color: Colors.black38, fontSize: 10),
+                      ),
+                      Text(
+                        '$percent%',
+                        style: TextStyle(color: Colors.black38, fontSize: 11),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -577,19 +690,18 @@ class _CheckinScreenState extends State<CheckinScreen> {
                   ),
                   const SizedBox(width: 10),
                   _buildLegendItem(
-                    const Color(0xFF4A7A49),
+                    const Color(0xFF666666),
                     isJa ? '一部' : 'Partial',
                   ),
                   const SizedBox(width: 10),
                   _buildLegendItem(
-                    const Color(0xFF7BAF7A),
+                    const Color(0xFFC8C8C8),
                     isJa ? '未踏' : 'Unvisited',
                   ),
                   const SizedBox(width: 10),
                   _buildLegendItem(
-                    const Color(0xFFE8E8E8),
+                    const Color(0xFF1A1A1A),
                     isJa ? '空港なし' : 'No apt',
-                    border: true,
                   ),
                 ],
               ),
@@ -616,7 +728,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
             color: color,
             borderRadius: BorderRadius.circular(2),
             border: border
-                ? Border.all(color: borderColor ?? Colors.grey[400]!, width: 1)
+                ? Border.all(color: borderColor ?? Colors.grey[400]!, width: 2)
                 : null,
           ),
         ),
@@ -652,7 +764,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
         } else if (checked >= airports.length) {
           prefStatus[code] = 2; // Complete
         } else {
-          prefStatus[code] = 1; // Partial
+          // 一部制覇: 10+比率(0-9) → 例: 空港3つ中1つ=13, 2つ=16
+          prefStatus[code] = 10 + (checked * 9 ~/ airports.length);
         }
       }
     }
@@ -1048,100 +1161,159 @@ class _CheckinScreenState extends State<CheckinScreen> {
     );
   }
 
+  void _showLocationHelp() {
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isJa ? '📍 位置情報について' : '📍 About Location'),
+        content: SingleChildScrollView(
+          child: Text(
+            isJa 
+                ? '位置情報はチェックインボタンを押した時のみ取得します。サーバーには保存しません。\n\n'
+                  '位置情報の許可を変更するには：\n\n'
+                  '【iPhoneホーム画面から使用の場合】\n'
+                  'ホーム画面に追加したアプリ（PWA）は「SafariのWebサイト」の設定が適用されます。\n'
+                  '設定 → プライバシーとセキュリティ → 位置情報サービス → SafariのWebサイト\n'
+                  '※ Safari単体の設定とは別です\n\n'
+                  '【iPhone Safariブラウザの場合】\n'
+                  '設定 → Safari → 位置情報\n\n'
+                  '【PC Chrome】\n'
+                  'アドレスバー左アイコン → 位置情報をONに\n\n'
+                  '【PC Edge / Firefox】\n'
+                  'アドレスバー左の🔒アイコン → このサイトに対する権限 → 場所を許可に'
+                : 'Location is only retrieved when you press the check-in button. It is not stored on our server.\n\n'
+                  'To manage location permission:\n\n'
+                  '【iPhone Home Screen App】\n'
+                  'Apps added to home screen (PWA) use the "Safari Websites" location setting.\n'
+                  'Settings → Privacy & Security → Location Services → Safari Websites\n'
+                  '* This is separate from Safari browser settings\n\n'
+                  '【iPhone Safari Browser】\n'
+                  'Settings → Safari → Location\n\n'
+                  '【PC Chrome】\n'
+                  'Click icon in address bar → Turn on Location\n\n'
+                  '【PC Edge / Firefox】\n'
+                  'Click 🔒 icon in address bar → Permissions for this site → Allow location',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCheckinCard() {
-    final l10n = AppLocalizations.of(context)!;
-    final airportCode = nearestAirport?['code'] as String? ?? '';
-    final radius = _getCheckinRadius(airportCode);
-    final canCheckin =
-        nearestAirport != null &&
-        distanceToNearest != null &&
-        distanceToNearest! <= radius;
-    final needsLogin = _isAnonymousUser;
+    final isJa = Localizations.localeOf(context).languageCode == 'ja';
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: canCheckin
-            ? (needsLogin ? Colors.orange[50] : Colors.green[50])
-            : Colors.grey[100],
+        color: Colors.grey[100],
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: canCheckin
-              ? (needsLogin ? Colors.orange : Colors.green)
-              : Colors.grey[300]!,
-          width: canCheckin ? 2 : 1,
-        ),
+        border: Border.all(color: Colors.grey[300]!, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                canCheckin ? Icons.location_on : Icons.location_off,
-                color: canCheckin
-                    ? (needsLogin ? Colors.orange : Colors.green)
-                    : Colors.grey,
-              ),
+              const Icon(Icons.flight_land, color: Colors.purple),
               const SizedBox(width: 8),
               Text(
-                canCheckin
-                    ? (needsLogin ? l10n.loginToCheckin : l10n.checkinAvailable)
-                    : l10n.nearestAirport,
+                isJa ? '空港チェックイン' : 'Airport Check-in',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: canCheckin
-                      ? (needsLogin ? Colors.orange[700] : Colors.green[700])
-                      : Colors.grey[700],
+                  color: Colors.grey[700],
                 ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: _showLocationHelp,
+                child: Icon(Icons.help_outline, size: 20, color: Colors.grey[400]),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Text(
+            isJa
+                ? '空港にいる時にボタンを押すと、位置情報で最寄りの空港にチェックインできます。'
+                : 'Press the button at an airport to check in using your location.',
+            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          ),
           const SizedBox(height: 12),
-          if (nearestAirport != null) ...[
-            Text(
-              '${_getAirportName(nearestAirport!)} (${nearestAirport!['code']})',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              distanceToNearest != null
-                  ? l10n.distanceFromHere(
-                      (distanceToNearest! / 1000).toStringAsFixed(1),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isCheckinLoading ? null : _attemptCheckin,
+              icon: _isCheckinLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
-                  : l10n.calculatingDistance,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: canCheckin ? _checkin : null,
-                icon: Icon(needsLogin ? Icons.login : Icons.check_circle),
-                label: Text(
-                  canCheckin
-                      ? (needsLogin ? l10n.loginRequired : l10n.checkin)
-                      : l10n.checkinWithinRadius(
-                          (radius / 1000).toStringAsFixed(1),
-                        ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: canCheckin
-                      ? (needsLogin ? Colors.orange : Colors.green)
-                      : Colors.grey,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
+                  : const Icon(Icons.my_location),
+              label: Text(
+                _isCheckinLoading
+                    ? (isJa ? '位置情報を取得中...' : 'Getting location...')
+                    : (isJa ? 'チェックイン' : 'Check in'),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple[700],
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
-          ] else ...[
-            Text(l10n.gettingLocation),
+          ),
+          if (errorMessage != null) ...[
             const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: _getCurrentLocation,
-              icon: const Icon(Icons.refresh),
-              label: Text(l10n.retry),
+            Text(
+              errorMessage!,
+              style: TextStyle(color: Colors.red[700], fontSize: 12),
             ),
+          ],
+          if (_lastCheckinResult != null && !_isCheckinLoading) ...[
+            const SizedBox(height: 12),
+            if (_lastCheckinResult!.startsWith('success'))
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, size: 16, color: Colors.green[700]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isJa
+                            ? '${_getAirportName(nearestAirport!)}（${nearestAirport!['code']}）にチェックインしました ✓'
+                            : 'Checked in at ${_getAirportName(nearestAirport!)} (${nearestAirport!['code']}) ✓',
+                        style: TextStyle(
+                          color: Colors.green[700],
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Text(
+                isJa
+                    ? '近くに空港が見つかりませんでした。空港でお試しください。'
+                    : 'No airport found nearby. Please try at an airport.',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
           ],
         ],
       ),

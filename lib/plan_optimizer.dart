@@ -9,6 +9,8 @@ class OptimizedFlight {
   final String departureTime;
   final String arrivalTime;
   final int distanceMiles;
+  final double fareRate;
+  final int bonusFop;
 
   OptimizedFlight({
     required this.flightNumber,
@@ -17,13 +19,14 @@ class OptimizedFlight {
     required this.departureTime,
     required this.arrivalTime,
     required this.distanceMiles,
+    this.fareRate = 0.75,
+    this.bonusFop = 400,
   });
 
   int get depMinutes => _toMinutes(departureTime);
   int get arrMinutes => _toMinutes(arrivalTime);
 
-  // デフォルト: 特割A(75%) 普通席 でFOP計算
-  int get fop => ((distanceMiles * 0.75) * 2 + 400).toInt();
+  int get fop => ((distanceMiles * fareRate) * 2 + bonusFop).toInt();
 
   static int _toMinutes(String time) {
     final parts = time.split(':');
@@ -84,40 +87,86 @@ class _Flight {
 class PlanOptimizer {
   static const int _minConnection = 30; // 最低乗り継ぎ時間(分)
 
+  // 航空会社グループ定義
+  static const Map<String, List<String>> airlineGroups = {
+    'JAL': ['JAL', 'JTA', 'RAC'],
+    'ANA': ['ANA'],
+  };
+
   final Map<String, int> _distances = {};
   List<_Flight> _flights = [];
 
-  /// データ読み込み
-  Future<void> loadData(String airline, String date) async {
+  /// データ読み込み（JAL選択時はJTA/RACも含む）
+  /// 戻り値: null=該当日の時刻表あり, String=フォールバック時の注意文
+  Future<String?> loadData(String airline, String date, {bool includeCodeshare = true}) async {
     final targetDate = date.replaceAll('/', '-');
+    final codes = includeCodeshare
+        ? (airlineGroups[airline] ?? [airline])
+        : [airline];
 
     // 路線距離
     final routes = await Supabase.instance.client
         .from('routes')
-        .select('departure_code, arrival_code, distance_miles');
+        .select('departure_code, arrival_code, distance_miles')
+        .limit(5000);
     _distances.clear();
     for (var r in routes) {
       _distances['${r['departure_code']}_${r['arrival_code']}'] =
           r['distance_miles'] as int;
     }
 
-    // 時刻表
-    final response = await Supabase.instance.client
-        .from('schedules')
-        .select()
-        .eq('airline_code', airline)
-        .eq('is_active', true)
-        .order('departure_time');
+    // 時刻表（JAL系: JAL+JTA+RAC / ANA系: ANA）
+    // Supabase max_rows=1000対策: ページネーションで全件取得
+    List<dynamic> allSchedules = [];
+    String? fallbackNotice;
 
-    final schedules = (response as List).cast<Map<String, dynamic>>();
+    Future<List<dynamic>> _fetchAllPages(String code, String date) async {
+      List<dynamic> all = [];
+      int offset = 0;
+      const pageSize = 999;
+      while (true) {
+        final res = await Supabase.instance.client
+            .from('schedules')
+            .select()
+            .eq('airline_code', code)
+            .eq('is_active', true)
+            .lte('period_start', date)
+            .gte('period_end', date)
+            .order('departure_time')
+            .range(offset, offset + pageSize);
+        final list = res as List;
+        all.addAll(list);
+        if (list.length <= pageSize) break;
+        offset += pageSize + 1;
+      }
+      return all;
+    }
+
+    for (var code in codes) {
+      allSchedules.addAll(await _fetchAllPages(code, targetDate));
+    }
+
+    // 該当日のデータがない場合、最新の時刻表にフォールバック
+    if (allSchedules.isEmpty) {
+      final latestRow = await Supabase.instance.client
+          .from('schedules')
+          .select('period_end')
+          .inFilter('airline_code', codes)
+          .eq('is_active', true)
+          .order('period_end', ascending: false)
+          .limit(1);
+      if ((latestRow as List).isNotEmpty) {
+        final latestEnd = latestRow.first['period_end'] as String;
+        for (var code in codes) {
+          allSchedules.addAll(await _fetchAllPages(code, latestEnd));
+        }
+        fallbackNotice = '※ 時刻表が変更されている可能性があります。実際のダイヤは公式サイトでご確認ください。';
+      }
+    }
+
+    final schedules = allSchedules.cast<Map<String, dynamic>>();
 
     _flights = schedules
-        .where((s) {
-          final start = s['period_start'] as String? ?? '';
-          final end = s['period_end'] as String? ?? '';
-          return start.compareTo(targetDate) <= 0 &&
-              end.compareTo(targetDate) >= 0;
-        })
         .map((s) {
           String dep = s['departure_time'] ?? '';
           String arr = s['arrival_time'] ?? '';
@@ -141,16 +190,31 @@ class PlanOptimizer {
       seen.add(key);
       return true;
     }).toList();
+
+    // 出発時刻順にソート（Supabaseの文字列ソートに依存しない）
+    _flights.sort((a, b) => a.depMinutes.compareTo(b.depMinutes));
+
+    // デバッグ: 読み込みデータ確認
+    final hndCts = _flights.where((f) => f.depCode == 'HND' && f.arrCode == 'CTS').length;
+    final ctsHnd = _flights.where((f) => f.depCode == 'CTS' && f.arrCode == 'HND').length;
+    print('[Optimizer] total flights: ${_flights.length}, schedules raw: ${schedules.length}, CTS→HND: $ctsHnd, HND→CTS: $hndCts');
+
+    return fallbackNotice;
   }
 
   List<_Flight> _getFlightsFrom(String airport, int afterMinutes) {
-    return _flights
+    final list = _flights
         .where((f) => f.depCode == airport && f.depMinutes >= afterMinutes)
         .toList();
+    list.sort((a, b) => a.depMinutes.compareTo(b.depMinutes));
+    return list;
   }
 
   int _dist(String dep, String arr) =>
       _distances['${dep}_${arr}'] ?? 0;
+
+  double _fareRate = 0.75;
+  int _bonusFop = 400;
 
   OptimizedFlight _toOptimized(_Flight f) {
     return OptimizedFlight(
@@ -160,14 +224,18 @@ class PlanOptimizer {
       departureTime: f.depTime,
       arrivalTime: f.arrTime,
       distanceMiles: _dist(f.depCode, f.arrCode),
+      fareRate: _fareRate,
+      bonusFop: _bonusFop,
     );
   }
 
   /// 最適プランを探索
-  List<OptimalPlan> findOptimalPlans(String homeAirport) {
+  List<OptimalPlan> findOptimalPlans(String homeAirport, {double fareRate = 0.75, int bonusFop = 400, int depMinStart = 0, int depMinEnd = 1439, int arrMinStart = 0, int arrMinEnd = 1439}) {
+    _fareRate = fareRate;
+    _bonusFop = bonusFop;
     final allPlans = <List<_Flight>>[];
 
-    // パターンA: 単純往復 HOME→HUB→HOME (×1, ×2)
+    // パターンA: 単純往復 HOME→HUB→HOME (×1〜×6)
     _findSimpleRoundTrips(homeAirport, allPlans);
 
     // パターンB: ハブ+シャトル HOME→HUB→(SHUTTLE⇄HUB)×N→HOME
@@ -178,8 +246,18 @@ class PlanOptimizer {
 
     if (allPlans.isEmpty) return [];
 
+    // 時刻フィルター（出発: 最初のレグ、到着: 最後のレグ）
+    final filtered = allPlans.where((plan) {
+      final firstDep = plan.first.depMinutes;
+      final lastArr = plan.last.arrMinutes;
+      return firstDep >= depMinStart && firstDep <= depMinEnd &&
+             lastArr >= arrMinStart && lastArr <= arrMinEnd;
+    }).toList();
+
+    if (filtered.isEmpty) return [];
+
     // OptimizedFlightに変換してFOP計算
-    final scored = allPlans.map((plan) {
+    final scored = filtered.map((plan) {
       final optimized = plan.map(_toOptimized).toList();
       final fop = optimized.fold(0, (sum, f) => sum + f.fop);
       return _ScoredPlan(flights: optimized, totalFop: fop);
@@ -196,22 +274,32 @@ class PlanOptimizer {
     final fopBestRoute = scored.first.flights.map((f) => f.departureCode).join() +
         scored.first.flights.last.arrivalCode;
 
-    // レグ最多（FOP最多と異なる場合）
+    // レグ最多（同数レグの全候補をFOP順で表示、ルート重複除去、最大5件）
     scored.sort((a, b) {
       final legDiff = b.flights.length.compareTo(a.flights.length);
       if (legDiff != 0) return legDiff;
       return b.totalFop.compareTo(a.totalFop);
     });
-    final legBestRoute = scored.first.flights.map((f) => f.departureCode).join() +
-        scored.first.flights.last.arrivalCode;
-    if (legBestRoute != fopBestRoute) {
+    final maxLegs = scored.first.flights.length;
+    final seenLegRoutes = <String>{};
+    int legPlanCount = 0;
+    String? legBestRoute;
+    for (var plan in scored) {
+      if (plan.flights.length < maxLegs) break;
+      final route = plan.flights.map((f) => f.departureCode).join('→') + '→' + plan.flights.last.arrivalCode;
+      if (seenLegRoutes.contains(route)) continue;
+      seenLegRoutes.add(route);
+      if (route == fopBestRoute) continue; // FOP最多と同じルートはスキップ
+      if (legBestRoute == null) legBestRoute = route;
+      legPlanCount++;
       results.add(OptimalPlan(
-        flights: scored.first.flights,
-        label: '✈️ レグ最多',
+        flights: plan.flights,
+        label: legPlanCount == 1 ? '✈️ レグ最多' : '✈️ レグ最多 #$legPlanCount',
       ));
+      if (legPlanCount >= 5) break;
     }
 
-    // FOP効率最良（FOP÷レグ数が最大）
+    // 1レグFOP最大（FOP÷レグ数が最大、重複しない場合のみ）
     scored.sort((a, b) {
       final effA = a.totalFop / a.flights.length;
       final effB = b.totalFop / b.flights.length;
@@ -219,111 +307,146 @@ class PlanOptimizer {
     });
     final effBestRoute = scored.first.flights.map((f) => f.departureCode).join() +
         scored.first.flights.last.arrivalCode;
-    if (effBestRoute != fopBestRoute && effBestRoute != legBestRoute) {
+    if (effBestRoute != fopBestRoute && !seenLegRoutes.contains(effBestRoute)) {
       results.add(OptimalPlan(
         flights: scored.first.flights,
-        label: '💎 FOP効率最良',
+        label: '💎 1レグFOP最大',
       ));
     }
 
     return results;
   }
 
-  // === パターンA: 単純往復 ===
+  // === パターンA: 単純往復（貪欲法で最大深度探索） ===
+  static const int _maxRoundTrips = 6;
+
   void _findSimpleRoundTrips(String home, List<List<_Flight>> results) {
     final outbounds = _getFlightsFrom(home, 0);
+    // 行先ごとにグルーピング
+    final destMap = <String, List<_Flight>>{};
+    for (var f in outbounds) {
+      destMap.putIfAbsent(f.arrCode, () => []).add(f);
+    }
+    print('[Optimizer] SimpleRT: home=$home, outbound dests=${destMap.keys.toList()}, counts=${destMap.map((k,v) => MapEntry(k, v.length))}');
 
-    for (var out1 in outbounds) {
-      final returns1 = _getFlightsFrom(
-              out1.arrCode, out1.arrMinutes + _minConnection)
-          .where((f) => f.arrCode == home)
-          .toList();
-
-      for (var ret1 in returns1) {
-        results.add([out1, ret1]);
-
-        // ダブル往復: HOME→HUB→HOME→HUB→HOME
-        final out2s = _getFlightsFrom(home, ret1.arrMinutes + _minConnection)
-            .where((f) => f.arrCode == out1.arrCode)
-            .toList();
-
-        for (var out2 in out2s) {
-          final returns2 = _getFlightsFrom(
-                  out2.arrCode, out2.arrMinutes + _minConnection)
-              .where((f) => f.arrCode == home)
-              .toList();
-
-          for (var ret2 in returns2) {
-            results.add([out1, ret1, out2, ret2]);
-          }
+    for (var dest in destMap.keys) {
+      final firstOuts = destMap[dest]!;
+      int maxLegs = 0;
+      for (var out1 in firstOuts.take(10)) {
+        final before = results.length;
+        _greedyMaxRoundTrips(home, dest, out1, results);
+        for (int i = before; i < results.length; i++) {
+          if (results[i].length > maxLegs) maxLegs = results[i].length;
         }
+      }
+      if (dest == 'HND' || dest == 'MMB' || maxLegs >= 6) {
+        print('[Optimizer] SimpleRT $home⇄$dest: maxLegs=$maxLegs');
       }
     }
   }
 
-  // === パターンB: ハブ+シャトル ===
+  /// DFS: 全組み合わせを探索して最大レグ数プランを見つける
+  void _greedyMaxRoundTrips(
+    String home, String dest, _Flight firstOut, List<List<_Flight>> results,
+  ) {
+    List<List<_Flight>> allCompletePlans = [];
+
+    void dfs(List<_Flight> plan, _Flight lastFlight, int trips) {
+      // 帰り便を探す
+      final returns = _getFlightsFrom(
+        lastFlight.arrCode, lastFlight.arrMinutes + _minConnection)
+          .where((f) => f.arrCode == home)
+          .toList();
+
+      if (dest == 'HND' || dest == 'MMB') {
+        print('[DFS] depth=$trips, planLegs=${plan.length}, looking return from ${lastFlight.arrCode} after ${lastFlight.arrMinutes + _minConnection}min, found ${returns.length} returns');
+      }
+
+      for (var ret in returns.take(3)) {
+        final currentPlan = List<_Flight>.from([...plan, ret]);
+        allCompletePlans.add(currentPlan);
+
+        if (dest == 'HND' || dest == 'MMB') {
+          print('[DFS] depth=$trips, completePlan=${currentPlan.length}legs, lastArr=${ret.arrMinutes}');
+        }
+
+        if (trips + 1 >= _maxRoundTrips) continue;
+
+        // 次の出発便を探す
+        final nextOuts = _getFlightsFrom(home, ret.arrMinutes + _minConnection)
+            .where((f) => f.arrCode == dest)
+            .toList();
+
+        if (dest == 'HND' || dest == 'MMB') {
+          print('[DFS] depth=$trips, looking next out from $home after ${ret.arrMinutes + _minConnection}min, found ${nextOuts.length} outs');
+        }
+
+        for (var nextOut in nextOuts.take(3)) {
+          dfs(List<_Flight>.from([...currentPlan, nextOut]), nextOut, trips + 1);
+        }
+      }
+    }
+
+    dfs([firstOut], firstOut, 0);
+
+    // 最大レグのプランを結果に追加
+    if (allCompletePlans.isNotEmpty) {
+      allCompletePlans.sort((a, b) => b.length.compareTo(a.length));
+      results.add(allCompletePlans.first);
+      if (dest == 'HND' || dest == 'MMB') {
+        print('[DFS] BEST for $home⇄$dest start=${firstOut.flightNumber}: ${allCompletePlans.first.length}legs');
+      }
+    }
+  }
+
+  // === パターンB: ハブ+シャトル（貪欲法） ===
   void _findHubShuttlePlans(String home, List<List<_Flight>> results) {
     final outbounds = _getFlightsFrom(home, 0);
 
     for (var toHub in outbounds) {
       final hub = toHub.arrCode;
 
-      // ハブからのシャトル先（出発空港以外）
       final shuttleDests = _getFlightsFrom(hub, toHub.arrMinutes + _minConnection)
           .map((f) => f.arrCode)
           .where((code) => code != home)
           .toSet();
 
       for (var shuttle in shuttleDests) {
-        _buildShuttlePlan(home, hub, shuttle, toHub, [], results, 0);
+        _greedyShuttlePlan(home, hub, shuttle, toHub, results);
       }
     }
   }
 
-  void _buildShuttlePlan(
-    String home,
-    String hub,
-    String shuttle,
-    _Flight toHub,
-    List<_Flight> currentShuttles,
+  /// 貪欲法: ハブ→シャトル→ハブ を最早便で最大回数繰り返す
+  void _greedyShuttlePlan(
+    String home, String hub, String shuttle, _Flight toHub,
     List<List<_Flight>> results,
-    int depth,
   ) {
-    if (depth >= 3) return; // シャトル最大3往復
+    final shuttleLegs = <_Flight>[];
+    var lastArrMinutes = toHub.arrMinutes;
 
-    final lastArr = currentShuttles.isEmpty
-        ? toHub.arrMinutes
-        : currentShuttles.last.arrMinutes;
+    for (int i = 0; i < 5; i++) {
+      // HUB → SHUTTLE
+      final toS = _getFlightsFrom(hub, lastArrMinutes + _minConnection)
+          .where((f) => f.arrCode == shuttle)
+          .toList();
+      if (toS.isEmpty) break;
 
-    // HUB→SHUTTLE
-    final toShuttles =
-        _getFlightsFrom(hub, lastArr + _minConnection)
-            .where((f) => f.arrCode == shuttle)
-            .toList();
+      // SHUTTLE → HUB
+      final backH = _getFlightsFrom(shuttle, toS.first.arrMinutes + _minConnection)
+          .where((f) => f.arrCode == hub)
+          .toList();
+      if (backH.isEmpty) break;
 
-    for (var toS in toShuttles) {
-      // SHUTTLE→HUB
-      final backToHubs =
-          _getFlightsFrom(shuttle, toS.arrMinutes + _minConnection)
-              .where((f) => f.arrCode == hub)
-              .toList();
+      shuttleLegs.addAll([toS.first, backH.first]);
+      lastArrMinutes = backH.first.arrMinutes;
 
-      for (var backH in backToHubs) {
-        final newShuttles = [...currentShuttles, toS, backH];
-
-        // HUB→HOME 帰還便
-        final returns =
-            _getFlightsFrom(hub, backH.arrMinutes + _minConnection)
-                .where((f) => f.arrCode == home)
-                .toList();
-
-        for (var ret in returns) {
-          results.add([toHub, ...newShuttles, ret]);
-        }
-
-        // さらにシャトル往復を追加
-        _buildShuttlePlan(
-            home, hub, shuttle, toHub, newShuttles, results, depth + 1);
+      // HUB → HOME 帰還便を探して登録
+      final returns = _getFlightsFrom(hub, lastArrMinutes + _minConnection)
+          .where((f) => f.arrCode == home)
+          .toList();
+      if (returns.isNotEmpty) {
+        results.add([toHub, ...shuttleLegs, returns.first]);
       }
     }
   }
@@ -339,15 +462,14 @@ class PlanOptimizer {
               .where((f) => f.arrCode != home && f.arrCode != mid)
               .toList();
 
-      for (var leg2 in leg2s) {
-        // 直接帰還
+      for (var leg2 in leg2s.take(10)) {
         final returns =
             _getFlightsFrom(leg2.arrCode, leg2.arrMinutes + _minConnection)
                 .where((f) => f.arrCode == home)
                 .toList();
 
-        for (var ret in returns) {
-          results.add([leg1, leg2, ret]);
+        if (returns.isNotEmpty) {
+          results.add([leg1, leg2, returns.first]);
         }
       }
     }

@@ -37,8 +37,10 @@
 
   <!-- アプリバージョン（更新時にここを変更）-->
   <!--1.3.0　JAL,JTA,RACと同じ便名 を判別-->
-  <!--1.3.1　JTA,RACの便もプルダウンに表示されるよう変更-->
-  <meta name="app-version" content="1.3.1">
+  <!--1.3.1　JTA,RACの便もプルダウンに表示されるよう変更--> 
+  <!--1.3.2　Paint it Blackの空港無し県の表示変更-->
+ <!--1.3.2　位置情報の許可をユーザに求めるよう設定-->
+  <meta name="app-version" content="1.3.3">
 
   <title>MRP - Mileage Run Planner</title>
   <link rel="manifest" href="manifest.json">
@@ -265,6 +267,7 @@
     // 更新ボタン
     updateBtn.addEventListener('click', () => {
       localStorage.setItem(STORED_VERSION_KEY, APP_VERSION);
+      localStorage.setItem('mrp-updating', 'true');
       // Service Workerのキャッシュをクリアして再読み込み
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(registrations => {
@@ -329,10 +332,37 @@
     // Service Worker更新検知
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        // 新しいService Workerがアクティブになった
+        // Skip banner if user just clicked update
+        if (localStorage.getItem('mrp-updating')) {
+          localStorage.removeItem('mrp-updating');
+          return;
+        }
         if (!updateBanner.style.display || updateBanner.style.display === 'none') {
           updateBanner.style.display = 'block';
         }
+      });
+    }
+  </script>
+
+  <script>
+    // Flutter Service Workerの待機状態を自動スキップ
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(reg => {
+          if (reg.waiting) {
+            reg.waiting.postMessage('skipWaiting');
+          }
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  newWorker.postMessage('skipWaiting');
+                }
+              });
+            }
+          });
+        });
       });
     }
   </script>
