@@ -327,7 +327,7 @@ class _JapanMapPainter extends CustomPainter {
         path,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = status == 2 ? 1.2 : 0.5
+          ..strokeWidth = status == 2 ? 1.5 : 0.5
           ..color = _getStrokeColor(status),
       );
     }
@@ -413,22 +413,12 @@ class _JapanMapPainter extends CustomPainter {
         );
       }
 
-      canvas.drawCircle(
-        Offset(px, py),
-        markerSize * 0.6,
-        Paint()
-          ..style = PaintingStyle.fill
-          ..color = isChecked
-              ? Colors.green.withOpacity(0.8)
-              : Colors.white.withOpacity(0.85),
-      );
-
       final tp = TextPainter(
         text: TextSpan(
           text: '✈',
           style: TextStyle(
-            fontSize: markerSize,
-            color: isChecked ? Colors.white : Colors.red[700],
+            fontSize: markerSize * 1.1,
+            color: isChecked ? Colors.amber : Colors.white70,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -512,7 +502,7 @@ class _JapanMapPainter extends CustomPainter {
       Paint()..color = Colors.black26,
     );
 
-    final bgColor = isChecked ? Colors.green[700]! : Colors.grey[800]!;
+    final bgColor = isChecked ? Colors.amber[800]! : Colors.grey[800]!;
     canvas.drawRRect(rect, Paint()..color = bgColor);
 
     final arrowPath = Path();
@@ -533,27 +523,22 @@ class _JapanMapPainter extends CustomPainter {
   }
 
   Color _getColor(int status) {
-    switch (status) {
-      case 3:
-        return const Color(0xFFE8E8E8);
-      case 2:
-        return const Color(0xFF1A1A1A);
-      case 1:
-        return const Color(0xFF4A7A49);
-      default:
-        return const Color(0xFF7BAF7A);
+    if (status == 3) return const Color(0xFF1A1A1A); // 空港なし: 黒（最初から塗り済み）
+    if (status == 2) return const Color(0xFF1A1A1A); // 全空港制覇: 黒
+    if (status >= 10 && status <= 19) {
+      // 一部訪問: グレー→黒のグラデーション（比率に応じて）
+      final ratio = (status - 10) / 9.0;
+      final v = (0xC8 - (0xC8 - 0x1A) * ratio).round();
+      return Color.fromARGB(255, v, v, v);
     }
+    return const Color(0xFFC8C8C8); // 未訪問: グレー
   }
 
   Color _getStrokeColor(int status) {
-    switch (status) {
-      case 2:
-        return Colors.red.withOpacity(0.7);
-      case 3:
-        return Colors.grey[400]!;
-      default:
-        return Colors.white.withOpacity(0.6);
-    }
+    if (status == 2) return Colors.red.withOpacity(0.9); // 全制覇: 赤縁取り
+    if (status == 3) return const Color(0xFF2A2A2A); // 空港なし: 黒に馴染む枠
+    if (status >= 10 && status <= 19) return Colors.white.withOpacity(0.4); // 一部
+    return Colors.white.withOpacity(0.6); // 未訪問
   }
 
   Path _parseSvgPath(String d, double sx, double sy, double ox, double oy) {

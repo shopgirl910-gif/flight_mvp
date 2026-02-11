@@ -72,9 +72,10 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _ensureSignedIn();
-    // ログイン状態の変化を監視
-    Supabase.instance.client.auth.onAuthStateChange.listen((_) {
-      if (mounted) setState(() {});
+    _handleAuthStateChange();
+    // リセットリンクから来た場合のチェック
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForPasswordRecovery();
     });
   }
 
@@ -83,6 +84,126 @@ class _MainScreenState extends State<MainScreen> {
     if (session == null) {
       await Supabase.instance.client.auth.signInAnonymously();
     }
+  }
+
+  void _handleAuthStateChange() {
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        _showNewPasswordDialog();
+      }
+      if (mounted) setState(() {});
+    });
+  }
+  void _checkForPasswordRecovery() {
+    final uri = Uri.base;
+    if (uri.fragment.contains('type=recovery')) {
+      _showNewPasswordDialog();
+    }
+  }
+
+  void _showNewPasswordDialog() {
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        String? dialogError;
+        bool isSaving = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('新しいパスワードを設定'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: '新しいパスワード',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'パスワード確認',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                ),
+                if (dialogError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(dialogError!, style: TextStyle(color: Colors.red[700], fontSize: 12)),
+                ],
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        final newPass = newPasswordController.text.trim();
+                        final confirmPass = confirmPasswordController.text.trim();
+
+                        if (newPass.isEmpty) {
+                          setDialogState(() => dialogError = 'パスワードを入力してください');
+                          return;
+                        }
+                        if (newPass.length < 6) {
+                          setDialogState(() => dialogError = 'パスワードは6文字以上必要です');
+                          return;
+                        }
+                        if (newPass != confirmPass) {
+                          setDialogState(() => dialogError = 'パスワードが一致しません');
+                          return;
+                        }
+
+                        setDialogState(() {
+                          isSaving = true;
+                          dialogError = null;
+                        });
+
+                        try {
+                          await Supabase.instance.client.auth.updateUser(
+                            UserAttributes(password: newPass),
+                          );
+                          if (context.mounted) Navigator.pop(context);
+                          if (mounted) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(
+                                content: Text('パスワードを更新しました'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          setDialogState(() {
+                            isSaving = false;
+                            dialogError = 'エラー: $e';
+                          });
+                        }
+                      },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple[700]),
+                child: isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('更新', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   bool get _isLoggedIn {
@@ -114,27 +235,16 @@ class _MainScreenState extends State<MainScreen> {
     final l10n = AppLocalizations.of(context)!;
     final isJapanese = Localizations.localeOf(context).languageCode == 'ja';
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
+      builder: (context) => AlertDialog(
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
             // ユーザー情報
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 children: [
                   CircleAvatar(
@@ -147,11 +257,12 @@ class _MainScreenState extends State<MainScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          Supabase.instance.client.auth.currentUser?.email ?? (isJapanese ? '未ログイン' : 'Not logged in'),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          Supabase.instance.client.auth.currentUser?.email ??
+                              (isJapanese ? '未ログイン' : 'Not logged in'),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                         Text(
-                          _isLoggedIn 
+                          _isLoggedIn
                               ? (isJapanese ? 'ログイン中' : 'Logged in')
                               : (isJapanese ? '未ログイン' : 'Not logged in'),
                           style: TextStyle(color: Colors.grey[600], fontSize: 12),
@@ -162,12 +273,12 @@ class _MainScreenState extends State<MainScreen> {
                 ],
               ),
             ),
-            const Divider(),
+            const Divider(height: 1),
             // プロフィール設定
             ListTile(
-              leading: const Icon(Icons.settings),
-              title: Text(isJapanese ? 'プロフィール設定' : 'Profile Settings'),
-              subtitle: Text(isJapanese ? 'カード・ステータス・LSP目標' : 'Card, Status, LSP Goal'),
+              dense: true,
+              leading: const Icon(Icons.settings, size: 20),
+              title: Text(isJapanese ? 'プロフィール設定' : 'Profile Settings', style: const TextStyle(fontSize: 14)),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -179,8 +290,9 @@ class _MainScreenState extends State<MainScreen> {
             // ログアウト
             if (_isLoggedIn)
               ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
+                dense: true,
+                leading: const Icon(Icons.logout, color: Colors.red, size: 20),
+                title: Text(l10n.logout, style: const TextStyle(color: Colors.red, fontSize: 14)),
                 onTap: () async {
                   Navigator.pop(context);
                   final confirm = await showDialog<bool>(
@@ -210,10 +322,11 @@ class _MainScreenState extends State<MainScreen> {
             // ログイン
             if (!_isLoggedIn)
               ListTile(
-                leading: Icon(Icons.login, color: Colors.purple[700]),
+                dense: true,
+                leading: Icon(Icons.login, color: Colors.purple[700], size: 20),
                 title: Text(
                   isJapanese ? 'ログイン / 新規登録' : 'Login / Sign up',
-                  style: TextStyle(color: Colors.purple[700], fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.purple[700], fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -230,13 +343,11 @@ class _MainScreenState extends State<MainScreen> {
                   );
                 },
               ),
-            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final currentLocale = Localizations.localeOf(context);
@@ -328,9 +439,7 @@ class _MainScreenState extends State<MainScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: isSelected ? Colors.purple[700] : Colors.white,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                           fontSize: 14,
                         ),
                       ),

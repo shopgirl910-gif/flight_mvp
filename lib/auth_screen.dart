@@ -57,7 +57,95 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() => _isLoading = false);
     }
   }
+  void _showPasswordResetDialog() {
+    final resetEmailController = TextEditingController();
+    // ログイン画面のメールアドレスが入っていたら初期値にセット
+    if (_emailController.text.trim().isNotEmpty) {
+      resetEmailController.text = _emailController.text.trim();
+    }
 
+    showDialog(
+      context: context,
+      builder: (context) {
+        String? dialogError;
+        bool isSending = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('パスワードリセット'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '登録済みのメールアドレスを入力してください。\nリセット用のリンクを送信します。',
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: resetEmailController,
+                  decoration: const InputDecoration(
+                    labelText: 'メールアドレス',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    prefixIcon: Icon(Icons.email),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                if (dialogError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(dialogError!, style: TextStyle(color: Colors.red[700], fontSize: 12)),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('キャンセル'),
+              ),
+              ElevatedButton(
+                onPressed: isSending ? null : () async {
+                  final email = resetEmailController.text.trim();
+                  if (email.isEmpty) {
+                    setDialogState(() => dialogError = 'メールアドレスを入力してください');
+                    return;
+                  }
+                  if (!email.contains('@')) {
+                    setDialogState(() => dialogError = '正しいメールアドレスを入力してください');
+                    return;
+                  }
+
+                  setDialogState(() { isSending = true; dialogError = null; });
+
+                  try {
+                    await Supabase.instance.client.auth.resetPasswordForEmail(email);
+                    if (context.mounted) Navigator.pop(context);
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: Text('$email にリセットメールを送信しました'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    setDialogState(() {
+                      isSending = false;
+                      dialogError = 'エラーが発生しました: $e';
+                    });
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple[700]),
+                child: isSending
+                    ? const SizedBox(width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('送信', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
   String _getErrorMessage(String message) {
     if (message.contains('Invalid login')) return 'メールまたはパスワードが間違っています';
     if (message.contains('User already registered')) return 'このメールは既に登録されています';
@@ -74,13 +162,13 @@ class _AuthScreenState extends State<AuthScreen> {
         backgroundColor: Colors.purple[700],
         foregroundColor: Colors.white,
       ),
-      body: Center(
+      body: Align(
+        alignment: Alignment.topCenter,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 400),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.flight_takeoff, size: 64, color: Colors.purple[700]),
                 const SizedBox(height: 16),
@@ -157,6 +245,14 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 const SizedBox(height: 16),
                 
+                if (_isLogin)
+                  TextButton(
+                    onPressed: _isLoading ? null : _showPasswordResetDialog,
+                    child: Text(
+                      'パスワードを忘れた方',
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    ),
+                  ),
                 TextButton(
                   onPressed: () => setState(() { _isLogin = !_isLogin; _errorMessage = null; }),
                   child: Text(

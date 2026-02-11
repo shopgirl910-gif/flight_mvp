@@ -144,66 +144,54 @@ class _SimulationScreenState extends State<SimulationScreen> with TickerProvider
     for (var f in arrivalAirportFocusNodes.values) f.dispose();
     super.dispose();
   }
+
     void _addLeg() async {
-    final proService = ProService();
-    final isPro = await proService.isPro();
-
-    if (!isPro && legs.length >= ProService.freeCalcLimit) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('無料版の制限'),
-            content: Text(
-              '無料版は${ProService.freeCalcLimit}レグまでです。\n'
-              'Pro版にアップグレードすると無制限に使えます。'
+      final proService = ProService();
+      final isPro = await proService.isPro();
+      
+      if (!isPro && legs.length >= ProService.freeCalcLimit) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('無料版の制限'),
+              content: const Text(
+                '無料版は1日${ProService.freeCalcLimit}レグまでです。\n'
+                'Pro版にアップグレードすると無制限に使えます。'
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('閉じる'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    // TODO: Pro版購入画面に遷移
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                  child: const Text('Pro版を見る', style: TextStyle(color: Colors.white)),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('閉じる'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  // TODO: Pro版購入画面に遷移
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-                child: const Text('Pro版を見る', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        );
+          );
+        }
+        return;
       }
-      return;
+
+      final legId = _nextLegId++;
+      _initControllersForLeg(legId);
+      setState(() {
+        legs.add({
+          'id': legId, 'airline': airline,
+          'departureAirport': departureAirport, 'arrivalAirport': arrivalAirport,
+          'fareType': '', 'seatClass': '',
+          'calculatedFOP': null, 'calculatedMiles': null, 'calculatedLSP': null,
+        });
+        expandedLegId = legId;
+      });
     }
-
-    final legId = _legIdCounter++;
-    dateControllers[legId] = TextEditingController();
-    flightNumberControllers[legId] = TextEditingController();
-    departureTimeControllers[legId] = TextEditingController();
-    arrivalTimeControllers[legId] = TextEditingController();
-    fareAmountControllers[legId] = TextEditingController();
-    departureAirportControllers[legId] = TextEditingController();
-    arrivalAirportControllers[legId] = TextEditingController();
-    departureAirportFocusNodes[legId] = FocusNode();
-    arrivalAirportFocusNodes[legId] = FocusNode();
-    String airline = 'JAL', departureAirport = '', arrivalAirport = '', date = '';
-    if (legs.isNotEmpty) {
-      final prevLeg = legs.last; final prevLegId = prevLeg['id'] as int;
-      airline = prevLeg['airline'] as String;
-      departureAirport = prevLeg['arrivalAirport'] as String;
-      arrivalAirport = prevLeg['departureAirport'] as String;
-      date = dateControllers[prevLegId]?.text ?? '';
-    }
-    dateControllers[legId]?.text = date;
-    departureAirportControllers[legId]?.text = departureAirport;
-    arrivalAirportControllers[legId]?.text = arrivalAirport;
-    setState(() { legs.add({'id': legId, 'airline': airline, 'departureAirport': departureAirport, 'arrivalAirport': arrivalAirport, 'fareType': '', 'seatClass': '', 'calculatedFOP': null, 'calculatedMiles': null, 'calculatedLSP': null}); expandedLegId = legId; });
-    if (departureAirport.isNotEmpty) _fetchAvailableFlights(legs.length - 1);
-  }
-
-
+  
     void _removeLeg(int index) {
     final legId = legs[index]['id'] as int;
     dateControllers[legId]?.dispose(); flightNumberControllers[legId]?.dispose(); departureTimeControllers[legId]?.dispose(); arrivalTimeControllers[legId]?.dispose(); fareAmountControllers[legId]?.dispose();
