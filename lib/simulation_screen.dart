@@ -28,6 +28,7 @@ class _SimulationScreenState extends State<SimulationScreen>
   bool _optSearching = false;
   List<OptimalPlan> _optResults = [];
   String? _optError;
+  bool _optResultLimited = false;
 
   List<Map<String, dynamic>> legs = [];
   int? expandedLegId;
@@ -1726,6 +1727,7 @@ class _SimulationScreenState extends State<SimulationScreen>
       _optSearching = true;
       _optError = null;
       _optResults = [];
+      _optResultLimited = false;
     });
     try {
       final optimizer = PlanOptimizer();
@@ -1740,9 +1742,14 @@ class _SimulationScreenState extends State<SimulationScreen>
         fareRate: fareParams['fareRate'],
         bonusFop: fareParams['bonusFop'],
       );
+      final isPro = await ProService().isPro();
+      final limitedResults = isPro
+          ? results
+          : results.take(ProService.freeOptimizeResults).toList();
       setState(() {
-        _optResults = results;
+        _optResults = limitedResults;
         _optSearching = false;
+        _optResultLimited = !isPro && results.length > ProService.freeOptimizeResults;
         if (results.isEmpty) _optError = '$_optHomeAirport発の最適ルートが見つかりませんでした';
       });
     } catch (e) {
@@ -2069,6 +2076,33 @@ class _SimulationScreenState extends State<SimulationScreen>
                       ? _buildAccordionPlanCard(plan, isMobile)
                       : _buildPlanCard(plan, isMobile),
                 ),
+                if (_optResultLimited)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ProPurchaseScreen()),
+                          ).then((_) {
+                            ProService().clearCache();
+                            // Pro化後に再検索
+                            _runOptimization();
+                          });
+                        },
+                        icon: const Icon(Icons.lock, size: 16),
+                        label: const Text('Pro版でレグ最多ランキングも見る'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple[700],
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ],
           ),
