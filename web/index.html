@@ -37,14 +37,20 @@
 
   <!-- アプリバージョン（更新時にここを変更）-->
   <!--1.3.0　JAL,JTA,RACと同じ便名 を判別-->
-  <!--1.3.1　JTA,RACの便もプルダウンに表示されるよう変更--> 
+  <!--1.3.1　JTA,RACの便もプルダウンに表示されるよう変更-->
   <!--1.3.2　Paint it Blackの空港無し県の表示変更-->
- <!--1.3.2　位置情報の許可をユーザに求めるよう設定-->
+  <!--1.3.2　位置情報の許可をユーザに求めるよう設定-->
   <meta name="app-version" content="1.3.3">
 
   <title>MRP - Mileage Run Planner</title>
   <link rel="manifest" href="manifest.json">
-
+  <script>
+    // PWAインストールバナーを抑制
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      window.deferredPrompt = e;  // 後で使えるように保存
+    });
+  </script>
   <style>
     /* PWAインストールバナー */
     .pwa-banner {

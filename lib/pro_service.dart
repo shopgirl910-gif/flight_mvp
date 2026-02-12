@@ -1,14 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Pro版の制限管理サービス
-/// 
+///
 /// 無料版の制限:
 /// - FOP/PP計算: 3レグ/日
 /// - おまかせ最適化: 結果1件のみ表示
 /// - 修行ログ保存: 5旅程まで
 /// - CSVエクスポート: 不可
 /// - AIメール解析: 不可
-/// 
+///
 /// Pro版（100円→480円）:
 /// - 全機能 無制限ｃ無制限
 class ProService {
@@ -23,12 +23,12 @@ class ProService {
   DateTime? _lastChecked;
 
   // ========== 制限定数 ==========
-  static const int freeCalcLimit = 6;       // 無料版: 1日6レグ計算
-  static const int freeLogLimit = 5;        // 無料版: 5旅程まで保存
+  static const int freeCalcLimit = 6; // 無料版: 1日6レグ計算
+  static const int freeLogLimit = 5; // 無料版: 5旅程まで保存
   static const int freeOptimizeResults = 1; // 無料版: 最適化結果1件
-  static const int proPrice = 100;          // リリース記念価格（円）
-  static const int regularPrice = 480;      // 正規価格（円）
-  static const int earlyBirdSlots = 200;    // 先着枠
+  static const int proPrice = 100; // リリース記念価格（円）
+  static const int regularPrice = 480; // 正規価格（円）
+  static const int earlyBirdSlots = 200; // 先着枠
 
   // ========== Pro判定 ==========
 
@@ -48,7 +48,7 @@ class ProService {
       final response = await _supabase
           .from('user_profiles')
           .select('is_pro')
-          .eq('user_id', user.id)
+          .eq('id', user.id)
           .maybeSingle();
 
       _isPro = response?['is_pro'] == true;
