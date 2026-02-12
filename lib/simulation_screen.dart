@@ -1500,55 +1500,167 @@ class _SimulationScreenState extends State<SimulationScreen>
 
   Future<void> _showEmailImportDialogInternal() async {
     final controller = TextEditingController();
+    final isPro = await ProService().isPro();
+
+    if (!mounted) return;
     final result = await showDialog<List<Map<String, dynamic>>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.email, color: Colors.purple),
-            SizedBox(width: 8),
-            Text('メールから入力', style: TextStyle(fontSize: 16)),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'JAL/ANAの予約確認メールを貼り付けてください',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+      builder: (dialogContext) {
+        bool isLoading = false;
+        String? errorMsg;
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.email, color: Colors.purple),
+                const SizedBox(width: 8),
+                const Text('メールから入力', style: TextStyle(fontSize: 16)),
+                if (isPro) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.purple[700],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text('AI', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isPro
+                        ? 'JAL/ANAの予約確認メールを貼り付けてください（AI解析）'
+                        : 'JAL/ANAの予約確認メールを貼り付けてください',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: controller,
+                    maxLines: 10,
+                    decoration: const InputDecoration(
+                      hintText: 'メール本文をここに貼り付け...',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.all(8),
+                    ),
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  if (errorMsg != null) ...[
+                    const SizedBox(height: 8),
+                    Text(errorMsg!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                  ],
+                  if (!isPro) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.purple[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.purple[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.auto_awesome, size: 16, color: Colors.purple[700]),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Pro版ならAIがどんなメール形式でも正確に解析します',
+                              style: TextStyle(fontSize: 11, color: Colors.purple[700]),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: controller,
-                maxLines: 10,
-                decoration: const InputDecoration(
-                  hintText: 'メール本文をここに貼り付け...',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.all(8),
-                ),
-                style: const TextStyle(fontSize: 11),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+                child: const Text('キャンセル'),
+              ),
+              ElevatedButton(
+                onPressed: isLoading ? null : () async {
+                  if (controller.text.trim().isEmpty) {
+                    setDialogState(() => errorMsg = 'メール本文を貼り付けてください');
+                    return;
+                  }
+
+                  if (isPro) {
+                    // Pro: AI解析（Edge Function）
+                    setDialogState(() { isLoading = true; errorMsg = null; });
+                    try {
+                      final response = await Supabase.instance.client.functions.invoke(
+                        'swift-endpoint',
+                        body: {'emailText': controller.text},
+                      );
+                      if (response.status != 200) {
+                        throw Exception(response.data['error'] ?? '解析に失敗しました');
+                      }
+                      final data = response.data as Map<String, dynamic>;
+                      final parsedLegs = (data['legs'] as List<dynamic>)
+                          .map((e) => Map<String, dynamic>.from(e as Map))
+                          .map((l) {
+                            // Edge Functionのキー名をアプリ内のキー名に変換
+                            final airline = l['airline'] as String? ?? 'JAL';
+                            final rawFareType = l['fare_type'] as String? ?? '';
+                            final mappedFareType = airline == 'JAL'
+                                ? _mapJALFareType(rawFareType)
+                                : _mapANAFareType(rawFareType);
+                            // 便名にエアライン名を付加（数字のみの場合）
+                            var flightNum = (l['flight_number'] ?? '').toString();
+                            if (flightNum.isNotEmpty && RegExp(r'^\d+$').hasMatch(flightNum)) {
+                              flightNum = '$airline$flightNum';
+                            }
+                            return {
+                              'airline': airline,
+                              'date': l['date'],
+                              'flightNumber': flightNum,
+                              'departure': l['departure'],
+                              'arrival': l['arrival'],
+                              'departureTime': l['departure_time'] ?? '',
+                              'arrivalTime': l['arrival_time'] ?? '',
+                              'seatClass': (l['seat_class'] == 'ファースト') ? 'ファーストクラス' : l['seat_class'],
+                              'fareType': mappedFareType,
+                              'fare': l['fare'],
+                            };
+                          })
+                          .toList();
+                      if (dialogContext.mounted) Navigator.pop(dialogContext, parsedLegs);
+                    } catch (e) {
+                      setDialogState(() {
+                        isLoading = false;
+                        errorMsg = 'AI解析エラー: $e';
+                      });
+                    }
+                  } else {
+                    // 無料版: ローカル正規表現解析
+                    final parsed = _parseEmailText(controller.text);
+                    Navigator.pop(dialogContext, parsed);
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(
+                        isPro ? 'AI解析' : '解析',
+                        style: const TextStyle(color: Colors.white),
+                      ),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final parsed = _parseEmailText(controller.text);
-              Navigator.pop(context, parsed);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-            child: const Text('解析', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+        );
+      },
     );
     controller.dispose();
 
@@ -1564,7 +1676,11 @@ class _SimulationScreenState extends State<SimulationScreen>
 
       // 解析結果を入力
       for (int i = 0; i < result.length; i++) {
-        if (i >= legs.length) _addLeg();
+        if (i >= legs.length) {
+          _addLeg();
+          // コントローラー初期化を待つ
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
         final data = result[i];
         final legId = legs[i]['id'] as int;
 
@@ -1576,12 +1692,15 @@ class _SimulationScreenState extends State<SimulationScreen>
           legs[i]['seatClass'] = data['seatClass'];
         });
 
-        dateControllers[legId]?.text = data['date'];
-        flightNumberControllers[legId]?.text = data['flightNumber'];
-        departureTimeControllers[legId]?.text = data['departureTime'];
-        arrivalTimeControllers[legId]?.text = data['arrivalTime'];
-        departureAirportControllers[legId]?.text = data['departure'];
-        arrivalAirportControllers[legId]?.text = data['arrival'];
+        dateControllers[legId]?.text = data['date'] ?? '';
+        flightNumberControllers[legId]?.text = data['flightNumber'] ?? '';
+        departureTimeControllers[legId]?.text = data['departureTime'] ?? '';
+        arrivalTimeControllers[legId]?.text = data['arrivalTime'] ?? '';
+        departureAirportControllers[legId]?.text = data['departure'] ?? '';
+        arrivalAirportControllers[legId]?.text = data['arrival'] ?? '';
+        if (data['fare'] != null && data['fare'] != 0) {
+          fareAmountControllers[legId]?.text = data['fare'].toString();
+        }
 
         await _fetchAvailableFlights(i);
         _calculateSingleLeg(i);
