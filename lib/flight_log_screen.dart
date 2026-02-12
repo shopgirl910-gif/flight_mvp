@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'l10n/app_localizations.dart';
+import 'dart:convert';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+import 'pro_service.dart';
+import 'pro_purchase_screen.dart';
 
 class FlightLogScreen extends StatefulWidget {
   const FlightLogScreen({super.key});
@@ -183,6 +188,82 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
           );
         }
       }
+    }
+  }
+
+  Future<void> _exportCsv(Map<String, dynamic> itinerary) async {
+    // Pro判定
+    final isPro = await ProService().isPro();
+    if (!isPro) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Pro版限定機能'),
+          content: const Text('CSVエクスポートはPro版の機能です。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('閉じる'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProPurchaseScreen()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple[700],
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Pro版を見る'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final buf = StringBuffer();
+    buf.write('\uFEFF');
+    buf.writeln('航空会社,日付,便名,出発空港,到着空港,出発時刻,到着時刻,運賃種別,座席クラス,運賃(円),FOP/PP,マイル,LSP');
+
+    final legs = itinerary['legs'] as List<dynamic>? ?? [];
+    for (var leg in legs) {
+      final l = leg as Map<String, dynamic>;
+      final airline = l['airline'] ?? '';
+      final date = l['date'] ?? '';
+      final flightNum = l['flight_number'] ?? '';
+      final dep = l['departure'] ?? '';
+      final arr = l['arrival'] ?? '';
+      final depTime = l['departure_time'] ?? '';
+      final arrTime = l['arrival_time'] ?? '';
+      final fareType = (l['fare_type'] as String? ?? '').replaceAll(',', ' ');
+      final seatClass = l['seat_class'] ?? '';
+      final fare = l['fare'] ?? 0;
+      final fop = l['fop'] ?? 0;
+      final miles = l['miles'] ?? 0;
+      final lsp = l['lsp'] ?? 0;
+      buf.writeln('$airline,$date,$flightNum,$dep,$arr,$depTime,$arrTime,$fareType,$seatClass,$fare,$fop,$miles,$lsp');
+    }
+
+    final bytes = utf8.encode(buf.toString());
+    final blob = html.Blob([bytes], 'text/csv');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final title = (itinerary['title'] as String? ?? 'flight_log').replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+    final now = DateTime.now();
+    final filename = 'MRP_${title}_${now.year}${now.month.toString().padLeft(2, "0")}${now.day.toString().padLeft(2, "0")}.csv';
+    html.AnchorElement(href: url)
+      ..setAttribute('download', filename)
+      ..click();
+    html.Url.revokeObjectUrl(url);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('CSVをダウンロードしました'), backgroundColor: Colors.green),
+      );
     }
   }
 
@@ -821,9 +902,37 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                 children: [
                   ...legs.map((leg) => _buildLegSummary(leg as Map<String, dynamic>)),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _exportCsv(itinerary),
+                        icon: const Icon(Icons.download, size: 16),
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('CSV'),
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.purple[700],
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('PRO', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.purple[700],
+                          side: BorderSide(color: Colors.purple[200]!),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          textStyle: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       OutlinedButton.icon(
                         onPressed: () => _shareToX(itinerary),
                         icon: const Icon(Icons.share, size: 16),

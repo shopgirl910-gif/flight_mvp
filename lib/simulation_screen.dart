@@ -2590,7 +2590,7 @@ class _SimulationScreenState extends State<SimulationScreen>
               ElevatedButton.icon(
                 onPressed: _saveItinerary,
                 icon: const Icon(Icons.save, size: 14),
-                label: const Text('保存'),
+                label: const Text('修行ログに保存'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple,
                   foregroundColor: Colors.white,
@@ -2874,7 +2874,7 @@ class _SimulationScreenState extends State<SimulationScreen>
           ElevatedButton.icon(
             onPressed: _saveItinerary,
             icon: const Icon(Icons.save, size: 16),
-            label: const Text('保存'),
+            label: const Text('修行ログに保存'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.purple,
               foregroundColor: Colors.white,
@@ -3737,7 +3737,7 @@ class _SimulationScreenState extends State<SimulationScreen>
                   TextButton(
                     onPressed: _saveItinerary,
                     child: Text(
-                      '保存',
+                      '修行ログに保存',
                       style: TextStyle(color: Colors.purple[700], fontSize: 12),
                     ),
                   ),
