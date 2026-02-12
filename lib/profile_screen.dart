@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'l10n/app_localizations.dart';
 import 'auth_screen.dart';
 
@@ -248,6 +249,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   ),
                 ),
+                const SizedBox(height: 48),
+                const Divider(),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () => launchUrl(Uri.parse('https://mileage-run-planner.web.app/tokushoho.html')),
+                  child: Text(
+                    _isJapanese ? '特定商取引法に基づく表記' : 'Specified Commercial Transactions Act',
+                    style: TextStyle(fontSize: 11, color: Colors.blue[400], decoration: TextDecoration.underline),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () => launchUrl(Uri.parse('https://mileage-run-planner.web.app/privacy.html')),
+                  child: Text(
+                    _isJapanese ? 'プライバシーポリシー' : 'Privacy Policy',
+                    style: TextStyle(fontSize: 11, color: Colors.blue[400], decoration: TextDecoration.underline),
+                  ),
+                ),
               ],
             ),
           ),
@@ -386,6 +405,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     : Text(l10n.save, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
+
+            // フッターリンク
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () => launchUrl(Uri.parse('https://mileage-run-planner.web.app/tokushoho.html')),
+                  child: Text(
+                    _isJapanese ? '特定商取引法に基づく表記' : 'Specified Commercial Transactions Act',
+                    style: TextStyle(fontSize: 11, color: Colors.blue[400], decoration: TextDecoration.underline),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () => launchUrl(Uri.parse('https://mileage-run-planner.web.app/privacy.html')),
+                  child: Text(
+                    _isJapanese ? 'プライバシーポリシー' : 'Privacy Policy',
+                    style: TextStyle(fontSize: 11, color: Colors.blue[400], decoration: TextDecoration.underline),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
