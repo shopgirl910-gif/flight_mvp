@@ -33,9 +33,17 @@ class ProService {
   // ========== Pro判定 ==========
 
   /// Pro版かどうか（キャッシュ付き・5分間有効）
+  String? _cachedUserId;
+
   Future<bool> isPro() async {
     final user = _supabase.auth.currentUser;
     if (user == null || user.isAnonymous) return false;
+
+    // ユーザーが変わったらキャッシュクリア
+    if (_cachedUserId != null && _cachedUserId != user.id) {
+      clearCache();
+    }
+    _cachedUserId = user.id;
 
     // キャッシュが5分以内なら再利用
     if (_isPro != null && _lastChecked != null) {
