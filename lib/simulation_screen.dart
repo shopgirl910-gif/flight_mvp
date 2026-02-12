@@ -3485,17 +3485,43 @@ class _SimulationScreenState extends State<SimulationScreen>
                       ),
                     const Spacer(),
                     if (fop != null) ...[
-                      Text(
-                        '${_formatNumber(fop)}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: airlineColor,
-                        ),
-                      ),
-                      Text(
-                        airline == 'JAL' ? ' FOP' : ' PP',
-                        style: TextStyle(fontSize: 10, color: airlineColor),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${_formatNumber(fop)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: airlineColor,
+                                ),
+                              ),
+                              Text(
+                                airline == 'JAL' ? ' FOP' : ' PP',
+                                style: TextStyle(fontSize: 10, color: airlineColor),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${_formatNumber(miles ?? 0)}マイル',
+                                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                              ),
+                              if (airline == 'JAL' && lsp != null) ...[
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${lsp}LSP',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                     const SizedBox(width: 8),
@@ -3676,60 +3702,6 @@ class _SimulationScreenState extends State<SimulationScreen>
               ),
             ],
           ),
-          if (fop != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: airlineColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        '${_formatNumber(fop)} ${airline == "JAL" ? "FOP" : "PP"}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        '${_formatNumber(miles ?? 0)}マイル',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 11,
-                        ),
-                      ),
-                      if (airline == 'JAL' && lsp != null) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          '${lsp}LSP',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (fare > 0)
-                    Text(
-                      '¥$unitPrice/${airline == "JAL" ? "FOP" : "PP"}',
-                      style: const TextStyle(
-                        color: Colors.yellow,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

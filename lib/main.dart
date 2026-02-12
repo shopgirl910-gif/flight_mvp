@@ -80,6 +80,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _ensureSignedIn() async {
+    final uri = Uri.base;
+    if (uri.fragment.contains('type=recovery')) return;
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) {
       await Supabase.instance.client.auth.signInAnonymously();
@@ -94,6 +96,7 @@ class _MainScreenState extends State<MainScreen> {
       if (mounted) setState(() {});
     });
   }
+
   void _checkForPasswordRecovery() {
     final uri = Uri.base;
     if (uri.fragment.contains('type=recovery')) {
@@ -141,7 +144,10 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 if (dialogError != null) ...[
                   const SizedBox(height: 12),
-                  Text(dialogError!, style: TextStyle(color: Colors.red[700], fontSize: 12)),
+                  Text(
+                    dialogError!,
+                    style: TextStyle(color: Colors.red[700], fontSize: 12),
+                  ),
                 ],
               ],
             ),
@@ -151,7 +157,8 @@ class _MainScreenState extends State<MainScreen> {
                     ? null
                     : () async {
                         final newPass = newPasswordController.text.trim();
-                        final confirmPass = confirmPasswordController.text.trim();
+                        final confirmPass = confirmPasswordController.text
+                            .trim();
 
                         if (newPass.isEmpty) {
                           setDialogState(() => dialogError = 'パスワードを入力してください');
@@ -185,18 +192,35 @@ class _MainScreenState extends State<MainScreen> {
                             );
                           }
                         } catch (e) {
+                          String msg = e.toString();
+                          if (msg.contains('same_password')) {
+                            final isJa =
+                                Localizations.localeOf(
+                                  this.context,
+                                ).languageCode ==
+                                'ja';
+                            msg = isJa
+                                ? '現在と同じパスワードは使えません'
+                                : 'New password must be different from the current one';
+                          }
                           setDialogState(() {
                             isSaving = false;
-                            dialogError = 'エラー: $e';
+                            dialogError = msg;
                           });
                         }
                       },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple[700]),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple[700],
+                ),
                 child: isSaving
                     ? const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Text('更新', style: TextStyle(color: Colors.white)),
               ),
             ],
@@ -259,13 +283,19 @@ class _MainScreenState extends State<MainScreen> {
                         Text(
                           Supabase.instance.client.auth.currentUser?.email ??
                               (isJapanese ? '未ログイン' : 'Not logged in'),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
                         Text(
                           _isLoggedIn
                               ? (isJapanese ? 'ログイン中' : 'Logged in')
                               : (isJapanese ? '未ログイン' : 'Not logged in'),
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -278,12 +308,17 @@ class _MainScreenState extends State<MainScreen> {
             ListTile(
               dense: true,
               leading: const Icon(Icons.settings, size: 20),
-              title: Text(isJapanese ? 'プロフィール設定' : 'Profile Settings', style: const TextStyle(fontSize: 14)),
+              title: Text(
+                isJapanese ? 'プロフィール設定' : 'Profile Settings',
+                style: const TextStyle(fontSize: 14),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(),
+                  ),
                 );
               },
             ),
@@ -292,7 +327,10 @@ class _MainScreenState extends State<MainScreen> {
               ListTile(
                 dense: true,
                 leading: const Icon(Icons.logout, color: Colors.red, size: 20),
-                title: Text(l10n.logout, style: const TextStyle(color: Colors.red, fontSize: 14)),
+                title: Text(
+                  l10n.logout,
+                  style: const TextStyle(color: Colors.red, fontSize: 14),
+                ),
                 onTap: () async {
                   Navigator.pop(context);
                   final confirm = await showDialog<bool>(
@@ -307,7 +345,10 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(context, true),
-                          child: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
+                          child: Text(
+                            l10n.logout,
+                            style: const TextStyle(color: Colors.red),
+                          ),
                         ),
                       ],
                     ),
@@ -326,7 +367,11 @@ class _MainScreenState extends State<MainScreen> {
                 leading: Icon(Icons.login, color: Colors.purple[700], size: 20),
                 title: Text(
                   isJapanese ? 'ログイン / 新規登録' : 'Login / Sign up',
-                  style: TextStyle(color: Colors.purple[700], fontWeight: FontWeight.bold, fontSize: 14),
+                  style: TextStyle(
+                    color: Colors.purple[700],
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -348,6 +393,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final currentLocale = Localizations.localeOf(context);
@@ -362,7 +408,9 @@ class _MainScreenState extends State<MainScreen> {
           // 言語切替ボタン
           GestureDetector(
             onTap: () {
-              final newLocale = isJapanese ? const Locale('en') : const Locale('ja');
+              final newLocale = isJapanese
+                  ? const Locale('en')
+                  : const Locale('ja');
               MyApp.setLocale(context, newLocale);
             },
             child: Container(
@@ -374,7 +422,11 @@ class _MainScreenState extends State<MainScreen> {
               ),
               child: Text(
                 isJapanese ? 'EN' : 'JA',
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -385,7 +437,9 @@ class _MainScreenState extends State<MainScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
-                color: _isLoggedIn ? Colors.white.withOpacity(0.2) : Colors.orange.withOpacity(0.8),
+                color: _isLoggedIn
+                    ? Colors.white.withOpacity(0.2)
+                    : Colors.orange.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
@@ -439,7 +493,9 @@ class _MainScreenState extends State<MainScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: isSelected ? Colors.purple[700] : Colors.white,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           fontSize: 14,
                         ),
                       ),
