@@ -8,6 +8,7 @@ import 'quiz_screen.dart';
 import 'checkin_screen.dart';
 import 'auth_screen.dart';
 import 'profile_screen.dart';
+import 'dart:html' as html;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,6 +77,7 @@ class _MainScreenState extends State<MainScreen> {
     // リセットリンクから来た場合のチェック
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForPasswordRecovery();
+      _checkPaymentResult();
     });
   }
 
@@ -228,6 +230,44 @@ class _MainScreenState extends State<MainScreen> {
         );
       },
     );
+  }
+
+  void _checkPaymentResult() {
+    final uri = Uri.base;
+    final payment = uri.queryParameters['payment'];
+
+    if (payment == 'success') {
+      // URLからパラメータを消す
+      html.window.history.replaceState(null, '', uri.path);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text('🎉 ご購入ありがとうございます！'),
+            content: const Text(
+              'Pro版が有効になりました。\n\n'
+              '全機能をお楽しみください！',
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      });
+    } else if (payment == 'cancel') {
+      html.window.history.replaceState(null, '', uri.path);
+    }
   }
 
   bool get _isLoggedIn {
