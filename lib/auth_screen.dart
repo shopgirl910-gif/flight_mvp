@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'profile_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   final VoidCallback onAuthSuccess;
@@ -25,41 +26,187 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submit() async {
     final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'メールとパスワードを入力してください');
+    if (email.isEmpty) {
+      setState(() => _errorMessage = 'メールアドレスを入力してください');
       return;
+    }
+
+    if (_isLogin) {
+      final password = _passwordController.text.trim();
+      if (password.isEmpty) {
+        setState(() => _errorMessage = 'パスワードを入力してください');
+        return;
+      }
     }
 
     setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
       if (_isLogin) {
-        await Supabase.instance.client.auth.signInWithPassword(email: email, password: password);
+        await Supabase.instance.client.auth.signInWithPassword(
+          email: email,
+          password: _passwordController.text.trim(),
+        );
+        widget.onAuthSuccess();
       } else {
-        final response = await Supabase.instance.client.auth.signUp(email: email, password: password);
+        // 新規登録: 仮パスワードで登録 → パスワード設定 → プロフィール設定
+        final tempPassword = 'Temp${DateTime.now().millisecondsSinceEpoch}!';
+        final response = await Supabase.instance.client.auth.signUp(
+          email: email,
+          password: tempPassword,
+        );
         if (response.user != null) {
-          // 新規登録時にuser_profilesにレコード作成
           await Supabase.instance.client.from('user_profiles').insert({
             'id': response.user!.id,
             'email': email,
             'quiz_total_correct': 0,
           });
+
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showSetPasswordDialog();
+          }
+          return;
         }
       }
-      widget.onAuthSuccess();
     } on AuthException catch (e) {
       setState(() => _errorMessage = _getErrorMessage(e.message));
     } catch (e) {
       setState(() => _errorMessage = 'エラー: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  /// パスワード設定後 → 既存のプロフィール設定画面へ
+  void _goToProfileScreen() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ProfileScreen(),
+      ),
+    );
+  }
+
+  void _showSetPasswordDialog() {
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool showPassword = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        String? dialogError;
+        bool isSaving = false;
+
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('🔐 パスワードを設定'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '次回ログイン用のパスワードを設定してください。\n6文字以上で入力してください。',
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: !showPassword,
+                  decoration: InputDecoration(
+                    labelText: 'パスワード',
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(showPassword ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => showPassword = !showPassword),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: !showPassword,
+                  decoration: InputDecoration(
+                    labelText: 'パスワード確認',
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(showPassword ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => showPassword = !showPassword),
+                    ),
+                  ),
+                ),
+                if (dialogError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(dialogError!, style: TextStyle(color: Colors.red[700], fontSize: 12)),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _goToProfileScreen();
+                },
+                child: const Text('あとで設定'),
+              ),
+              ElevatedButton(
+                onPressed: isSaving ? null : () async {
+                  final newPass = newPasswordController.text.trim();
+                  final confirmPass = confirmPasswordController.text.trim();
+
+                  if (newPass.isEmpty) {
+                    setDialogState(() => dialogError = 'パスワードを入力してください');
+                    return;
+                  }
+                  if (newPass.length < 6) {
+                    setDialogState(() => dialogError = 'パスワードは6文字以上必要です');
+                    return;
+                  }
+                  if (newPass != confirmPass) {
+                    setDialogState(() => dialogError = 'パスワードが一致しません');
+                    return;
+                  }
+
+                  setDialogState(() { isSaving = true; dialogError = null; });
+
+                  try {
+                    await Supabase.instance.client.auth.updateUser(
+                      UserAttributes(password: newPass),
+                    );
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    _goToProfileScreen();
+                  } catch (e) {
+                    setDialogState(() {
+                      isSaving = false;
+                      dialogError = 'エラー: $e';
+                    });
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple[700],
+                  foregroundColor: Colors.white,
+                ),
+                child: isSaving
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('設定する'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showPasswordResetDialog() {
     final resetEmailController = TextEditingController();
-    // ログイン画面のメールアドレスが入っていたら初期値にセット
     if (_emailController.text.trim().isNotEmpty) {
       resetEmailController.text = _emailController.text.trim();
     }
@@ -146,6 +293,7 @@ class _AuthScreenState extends State<AuthScreen> {
       },
     );
   }
+
   String _getErrorMessage(String message) {
     if (message.contains('Invalid login')) return 'メールまたはパスワードが間違っています';
     if (message.contains('User already registered')) return 'このメールは既に登録されています';
@@ -172,37 +320,43 @@ class _AuthScreenState extends State<AuthScreen> {
               children: [
                 Icon(Icons.flight_takeoff, size: 64, color: Colors.purple[700]),
                 const SizedBox(height: 16),
-                Text(_isLogin ? 'おかえりなさい！' : 'はじめまして！', 
+                Text(_isLogin ? 'おかえりなさい！' : 'はじめまして！',
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text(isJapanese ? 'あなたの修行記録を残そう！' : 'Keep track of your mileage run!',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                Text(
+                  _isLogin
+                    ? (isJapanese ? 'あなたの修行記録を残そう！' : 'Keep track of your mileage run!')
+                    : (isJapanese ? 'メールアドレスだけで登録できます' : 'Just enter your email to sign up'),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
                 const SizedBox(height: 32),
-                
+
                 TextField(
                   controller: _emailController,
                   decoration: const InputDecoration(
-                    labelText: 'メールアドレス', 
-                    border: OutlineInputBorder(), 
+                    labelText: 'メールアドレス',
+                    border: OutlineInputBorder(),
                     isDense: true,
                     prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
                 ),
-                const SizedBox(height: 16),
-                
-                TextField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'パスワード', 
-                    border: OutlineInputBorder(), 
-                    isDense: true,
-                    prefixIcon: Icon(Icons.lock),
+
+                if (_isLogin) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _passwordController,
+                    decoration: const InputDecoration(
+                      labelText: 'パスワード',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      prefixIcon: Icon(Icons.lock),
+                    ),
+                    obscureText: true,
                   ),
-                  obscureText: true,
-                ),
+                ],
                 const SizedBox(height: 20),
-                
+
                 if (_errorMessage != null)
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -217,34 +371,34 @@ class _AuthScreenState extends State<AuthScreen> {
                         Icon(Icons.error_outline, color: Colors.red[700], size: 20),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(_errorMessage!, 
+                          child: Text(_errorMessage!,
                             style: TextStyle(color: Colors.red[700], fontSize: 13)),
                         ),
                       ],
                     ),
                   ),
-                
+
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple[700], 
+                      backgroundColor: Colors.purple[700],
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: _isLoading 
-                      ? const SizedBox(width: 20, height: 20, 
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                      : Text(_isLogin ? 'ログイン' : '登録', 
+                    child: _isLoading
+                      ? const SizedBox(width: 20, height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Text(_isLogin ? 'ログイン' : 'メールで登録',
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 if (_isLogin)
                   TextButton(
                     onPressed: _isLoading ? null : _showPasswordResetDialog,
@@ -256,7 +410,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 TextButton(
                   onPressed: () => setState(() { _isLogin = !_isLogin; _errorMessage = null; }),
                   child: Text(
-                    _isLogin ? 'アカウントを新規作成する' : 'ログインに戻る', 
+                    _isLogin ? 'アカウントを新規作成する' : 'ログインに戻る',
                     style: TextStyle(fontSize: 14, color: Colors.purple[700]),
                   ),
                 ),

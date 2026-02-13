@@ -14,16 +14,16 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool isLoading = true;
   bool isSaving = false;
-  
+
   // JAL設定
   String? jalCard;
   String? jalStatus;
   bool jalTourPremium = false;
-  
+
   // ANA設定
   String? anaCard;
   String? anaStatus;
-  
+
   // 共通設定
   String? homeAirport;
   String defaultAirline = 'JAL';
@@ -35,7 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _targetFopController = TextEditingController();
   final _currentJalMilesController = TextEditingController();
   final _targetJalMilesController = TextEditingController();
-  
+
   // テキストコントローラー - ANA
   final _currentPpController = TextEditingController();
   final _targetPpController = TextEditingController();
@@ -43,29 +43,165 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _targetAnaMilesController = TextEditingController();
 
   // JALカード種別
-  final List<String> jalCardKeys = ['-', 'jmb', 'jal_regular', 'jal_club_a', 'jal_club_a_gold', 'jal_platinum', 'jgc_japan', 'jgc_overseas', 'jal_navi', 'jal_est_regular', 'jal_est_club_a', 'jal_est_gold', 'jal_est_platinum'];
-  final Map<String, String> jalCardNamesJa = {'-': '-', 'jmb': 'JMB会員', 'jal_regular': 'JALカード普通会員', 'jal_club_a': 'JALカードCLUB-A会員', 'jal_club_a_gold': 'JALカードCLUB-Aゴールド会員', 'jal_platinum': 'JALカードプラチナ会員', 'jgc_japan': 'JALグローバルクラブ会員(日本)', 'jgc_overseas': 'JALグローバルクラブ会員(海外)', 'jal_navi': 'JALカードNAVI会員', 'jal_est_regular': 'JAL CLUB EST 普通会員', 'jal_est_club_a': 'JAL CLUB EST CLUB-A会員', 'jal_est_gold': 'JAL CLUB EST CLUB-A GOLD会員', 'jal_est_platinum': 'JAL CLUB EST プラチナ会員'};
-  final Map<String, String> jalCardNamesEn = {'-': '-', 'jmb': 'JMB Member', 'jal_regular': 'JAL Card Regular', 'jal_club_a': 'JAL Card CLUB-A', 'jal_club_a_gold': 'JAL Card CLUB-A Gold', 'jal_platinum': 'JAL Card Platinum', 'jgc_japan': 'JGC Member (Japan)', 'jgc_overseas': 'JGC Member (Overseas)', 'jal_navi': 'JAL Card NAVI', 'jal_est_regular': 'JAL CLUB EST Regular', 'jal_est_club_a': 'JAL CLUB EST CLUB-A', 'jal_est_gold': 'JAL CLUB EST CLUB-A Gold', 'jal_est_platinum': 'JAL CLUB EST Platinum'};
+  final List<String> jalCardKeys = [
+    '-',
+    'jmb',
+    'jal_regular',
+    'jal_club_a',
+    'jal_club_a_gold',
+    'jal_platinum',
+    'jgc_japan',
+    'jgc_overseas',
+    'jal_navi',
+    'jal_est_regular',
+    'jal_est_club_a',
+    'jal_est_gold',
+    'jal_est_platinum',
+  ];
+  final Map<String, String> jalCardNamesJa = {
+    '-': '-',
+    'jmb': 'JMB会員',
+    'jal_regular': 'JALカード普通会員',
+    'jal_club_a': 'JALカードCLUB-A会員',
+    'jal_club_a_gold': 'JALカードCLUB-Aゴールド会員',
+    'jal_platinum': 'JALカードプラチナ会員',
+    'jgc_japan': 'JALグローバルクラブ会員(日本)',
+    'jgc_overseas': 'JALグローバルクラブ会員(海外)',
+    'jal_navi': 'JALカードNAVI会員',
+    'jal_est_regular': 'JAL CLUB EST 普通会員',
+    'jal_est_club_a': 'JAL CLUB EST CLUB-A会員',
+    'jal_est_gold': 'JAL CLUB EST CLUB-A GOLD会員',
+    'jal_est_platinum': 'JAL CLUB EST プラチナ会員',
+  };
+  final Map<String, String> jalCardNamesEn = {
+    '-': '-',
+    'jmb': 'JMB Member',
+    'jal_regular': 'JAL Card Regular',
+    'jal_club_a': 'JAL Card CLUB-A',
+    'jal_club_a_gold': 'JAL Card CLUB-A Gold',
+    'jal_platinum': 'JAL Card Platinum',
+    'jgc_japan': 'JGC Member (Japan)',
+    'jgc_overseas': 'JGC Member (Overseas)',
+    'jal_navi': 'JAL Card NAVI',
+    'jal_est_regular': 'JAL CLUB EST Regular',
+    'jal_est_club_a': 'JAL CLUB EST CLUB-A',
+    'jal_est_gold': 'JAL CLUB EST CLUB-A Gold',
+    'jal_est_platinum': 'JAL CLUB EST Platinum',
+  };
 
   // JALステータス
   final List<String> jalStatusKeys = ['-', 'diamond', 'sapphire', 'crystal'];
-  final Map<String, String> jalStatusNamesJa = {'-': '-', 'diamond': 'JMBダイヤモンド', 'sapphire': 'JMBサファイア', 'crystal': 'JMBクリスタル'};
-  final Map<String, String> jalStatusNamesEn = {'-': '-', 'diamond': 'JMB Diamond', 'sapphire': 'JMB Sapphire', 'crystal': 'JMB Crystal'};
+  final Map<String, String> jalStatusNamesJa = {
+    '-': '-',
+    'diamond': 'JMBダイヤモンド',
+    'sapphire': 'JMBサファイア',
+    'crystal': 'JMBクリスタル',
+  };
+  final Map<String, String> jalStatusNamesEn = {
+    '-': '-',
+    'diamond': 'JMB Diamond',
+    'sapphire': 'JMB Sapphire',
+    'crystal': 'JMB Crystal',
+  };
 
   // ANAカード種別
-  final List<String> anaCardKeys = ['-', 'amc', 'ana_regular', 'ana_student', 'ana_wide', 'ana_gold', 'ana_premium', 'sfc_regular', 'sfc_gold', 'sfc_premium'];
-  final Map<String, String> anaCardNamesJa = {'-': '-', 'amc': 'AMCカード(提携カード含む)', 'ana_regular': 'ANAカード 一般', 'ana_student': 'ANAカード 学生用', 'ana_wide': 'ANAカード ワイド', 'ana_gold': 'ANAカード ゴールド', 'ana_premium': 'ANAカード プレミアム', 'sfc_regular': 'SFC 一般', 'sfc_gold': 'SFC ゴールド', 'sfc_premium': 'SFC プレミアム'};
-  final Map<String, String> anaCardNamesEn = {'-': '-', 'amc': 'AMC Card', 'ana_regular': 'ANA Card Regular', 'ana_student': 'ANA Card Student', 'ana_wide': 'ANA Card Wide', 'ana_gold': 'ANA Card Gold', 'ana_premium': 'ANA Card Premium', 'sfc_regular': 'SFC Regular', 'sfc_gold': 'SFC Gold', 'sfc_premium': 'SFC Premium'};
+  final List<String> anaCardKeys = [
+    '-',
+    'amc',
+    'ana_regular',
+    'ana_student',
+    'ana_wide',
+    'ana_gold',
+    'ana_premium',
+    'sfc_regular',
+    'sfc_gold',
+    'sfc_premium',
+  ];
+  final Map<String, String> anaCardNamesJa = {
+    '-': '-',
+    'amc': 'AMCカード(提携カード含む)',
+    'ana_regular': 'ANAカード 一般',
+    'ana_student': 'ANAカード 学生用',
+    'ana_wide': 'ANAカード ワイド',
+    'ana_gold': 'ANAカード ゴールド',
+    'ana_premium': 'ANAカード プレミアム',
+    'sfc_regular': 'SFC 一般',
+    'sfc_gold': 'SFC ゴールド',
+    'sfc_premium': 'SFC プレミアム',
+  };
+  final Map<String, String> anaCardNamesEn = {
+    '-': '-',
+    'amc': 'AMC Card',
+    'ana_regular': 'ANA Card Regular',
+    'ana_student': 'ANA Card Student',
+    'ana_wide': 'ANA Card Wide',
+    'ana_gold': 'ANA Card Gold',
+    'ana_premium': 'ANA Card Premium',
+    'sfc_regular': 'SFC Regular',
+    'sfc_gold': 'SFC Gold',
+    'sfc_premium': 'SFC Premium',
+  };
 
   // ANAステータス
-  final List<String> anaStatusKeys = ['-', 'diamond_1', 'diamond_2', 'platinum_1', 'platinum_2', 'bronze_1', 'bronze_2'];
-  final Map<String, String> anaStatusNamesJa = {'-': '-', 'diamond_1': 'ダイヤモンド(1年目)', 'diamond_2': 'ダイヤモンド(継続2年以上)', 'platinum_1': 'プラチナ(1年目)', 'platinum_2': 'プラチナ(継続2年以上)', 'bronze_1': 'ブロンズ(1年目)', 'bronze_2': 'ブロンズ(継続2年以上)'};
-  final Map<String, String> anaStatusNamesEn = {'-': '-', 'diamond_1': 'Diamond (1st year)', 'diamond_2': 'Diamond (2+ years)', 'platinum_1': 'Platinum (1st year)', 'platinum_2': 'Platinum (2+ years)', 'bronze_1': 'Bronze (1st year)', 'bronze_2': 'Bronze (2+ years)'};
+  final List<String> anaStatusKeys = [
+    '-',
+    'diamond_1',
+    'diamond_2',
+    'platinum_1',
+    'platinum_2',
+    'bronze_1',
+    'bronze_2',
+  ];
+  final Map<String, String> anaStatusNamesJa = {
+    '-': '-',
+    'diamond_1': 'ダイヤモンド(1年目)',
+    'diamond_2': 'ダイヤモンド(継続2年以上)',
+    'platinum_1': 'プラチナ(1年目)',
+    'platinum_2': 'プラチナ(継続2年以上)',
+    'bronze_1': 'ブロンズ(1年目)',
+    'bronze_2': 'ブロンズ(継続2年以上)',
+  };
+  final Map<String, String> anaStatusNamesEn = {
+    '-': '-',
+    'diamond_1': 'Diamond (1st year)',
+    'diamond_2': 'Diamond (2+ years)',
+    'platinum_1': 'Platinum (1st year)',
+    'platinum_2': 'Platinum (2+ years)',
+    'bronze_1': 'Bronze (1st year)',
+    'bronze_2': 'Bronze (2+ years)',
+  };
 
   // 主要空港
-  final List<String> majorAirports = ['HND', 'NRT', 'ITM', 'KIX', 'NGO', 'CTS', 'FUK', 'OKA'];
-  final Map<String, String> airportNamesJa = {'HND': '羽田', 'NRT': '成田', 'ITM': '伊丹', 'KIX': '関西', 'NGO': '中部', 'CTS': '新千歳', 'FUK': '福岡', 'OKA': '那覇'};
-  final Map<String, String> airportNamesEn = {'HND': 'Haneda', 'NRT': 'Narita', 'ITM': 'Itami', 'KIX': 'Kansai', 'NGO': 'Chubu', 'CTS': 'New Chitose', 'FUK': 'Fukuoka', 'OKA': 'Naha'};
+  final List<String> majorAirports = [
+    'HND',
+    'NRT',
+    'ITM',
+    'KIX',
+    'NGO',
+    'CTS',
+    'FUK',
+    'OKA',
+  ];
+  final Map<String, String> airportNamesJa = {
+    'HND': '羽田',
+    'NRT': '成田',
+    'ITM': '伊丹',
+    'KIX': '関西',
+    'NGO': '中部',
+    'CTS': '新千歳',
+    'FUK': '福岡',
+    'OKA': '那覇',
+  };
+  final Map<String, String> airportNamesEn = {
+    'HND': 'Haneda',
+    'NRT': 'Narita',
+    'ITM': 'Itami',
+    'KIX': 'Kansai',
+    'NGO': 'Chubu',
+    'CTS': 'New Chitose',
+    'FUK': 'Fukuoka',
+    'OKA': 'Naha',
+  };
 
   @override
   void initState() {
@@ -90,11 +226,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool get _isJapanese => Localizations.localeOf(context).languageCode == 'ja';
 
-  String _getJalCardName(String key) => _isJapanese ? (jalCardNamesJa[key] ?? key) : (jalCardNamesEn[key] ?? key);
-  String _getJalStatusName(String key) => _isJapanese ? (jalStatusNamesJa[key] ?? key) : (jalStatusNamesEn[key] ?? key);
-  String _getAnaCardName(String key) => _isJapanese ? (anaCardNamesJa[key] ?? key) : (anaCardNamesEn[key] ?? key);
-  String _getAnaStatusName(String key) => _isJapanese ? (anaStatusNamesJa[key] ?? key) : (anaStatusNamesEn[key] ?? key);
-  String _getAirportName(String code) => _isJapanese ? (airportNamesJa[code] ?? code) : (airportNamesEn[code] ?? code);
+  String _getJalCardName(String key) =>
+      _isJapanese ? (jalCardNamesJa[key] ?? key) : (jalCardNamesEn[key] ?? key);
+  String _getJalStatusName(String key) => _isJapanese
+      ? (jalStatusNamesJa[key] ?? key)
+      : (jalStatusNamesEn[key] ?? key);
+  String _getAnaCardName(String key) =>
+      _isJapanese ? (anaCardNamesJa[key] ?? key) : (anaCardNamesEn[key] ?? key);
+  String _getAnaStatusName(String key) => _isJapanese
+      ? (anaStatusNamesJa[key] ?? key)
+      : (anaStatusNamesEn[key] ?? key);
+  String _getAirportName(String code) => _isJapanese
+      ? (airportNamesJa[code] ?? code)
+      : (airportNamesEn[code] ?? code);
 
   Future<void> _loadProfile() async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -120,23 +264,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
           homeAirport = response['home_airport'] as String?;
           defaultAirline = response['default_airline'] as String? ?? 'JAL';
         });
-        
+
         // テキストコントローラーに値を設定
-        _currentLspController.text = (response['current_lsp'] as int?)?.toString() ?? '';
-        _targetLspController.text = (response['target_lsp'] as int?)?.toString() ?? '';
-        _currentFopController.text = (response['current_fop'] as int?)?.toString() ?? '';
-        _targetFopController.text = (response['target_fop'] as int?)?.toString() ?? '';
-        _currentJalMilesController.text = (response['current_jal_miles'] as int?)?.toString() ?? '';
-        _targetJalMilesController.text = (response['target_jal_miles'] as int?)?.toString() ?? '';
-        _currentPpController.text = (response['current_pp'] as int?)?.toString() ?? '';
-        _targetPpController.text = (response['target_pp'] as int?)?.toString() ?? '';
-        _currentAnaMilesController.text = (response['current_ana_miles'] as int?)?.toString() ?? '';
-        _targetAnaMilesController.text = (response['target_ana_miles'] as int?)?.toString() ?? '';
+        _currentLspController.text =
+            (response['current_lsp'] as int?)?.toString() ?? '';
+        _targetLspController.text =
+            (response['target_lsp'] as int?)?.toString() ?? '';
+        _currentFopController.text =
+            (response['current_fop'] as int?)?.toString() ?? '';
+        _targetFopController.text =
+            (response['target_fop'] as int?)?.toString() ?? '';
+        _currentJalMilesController.text =
+            (response['current_jal_miles'] as int?)?.toString() ?? '';
+        _targetJalMilesController.text =
+            (response['target_jal_miles'] as int?)?.toString() ?? '';
+        _currentPpController.text =
+            (response['current_pp'] as int?)?.toString() ?? '';
+        _targetPpController.text =
+            (response['target_pp'] as int?)?.toString() ?? '';
+        _currentAnaMilesController.text =
+            (response['current_ana_miles'] as int?)?.toString() ?? '';
+        _targetAnaMilesController.text =
+            (response['target_ana_miles'] as int?)?.toString() ?? '';
       }
     } catch (e) {
       // エラー時はデフォルト値のまま
     }
-    
+
     setState(() => isLoading = false);
   }
 
@@ -197,7 +351,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final l10n = AppLocalizations.of(context)!;
     final user = Supabase.instance.client.auth.currentUser;
     final isAnonymous = user == null || user.isAnonymous;
-    
+
     // 未ログインの場合はログイン促進画面を表示
     if (isAnonymous) {
       return Scaffold(
@@ -216,11 +370,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 24),
                 Text(
                   _isJapanese ? 'ログインが必要です' : 'Login Required',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _isJapanese 
+                  _isJapanese
                       ? 'プロフィール設定を保存するには\nログインしてください'
                       : 'Please log in to save\nyour profile settings',
                   textAlign: TextAlign.center,
@@ -246,25 +403,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.purple,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 48),
                 const Divider(),
                 const SizedBox(height: 12),
                 GestureDetector(
-                  onTap: () => launchUrl(Uri.parse('https://mileage-run-planner.web.app/tokushoho.html')),
+                  onTap: () => launchUrl(
+                    Uri.parse(
+                      'https://mileage-run-planner.web.app/tokushoho.html',
+                    ),
+                  ),
                   child: Text(
-                    _isJapanese ? '特定商取引法に基づく表記' : 'Specified Commercial Transactions Act',
-                    style: TextStyle(fontSize: 11, color: Colors.blue[400], decoration: TextDecoration.underline),
+                    _isJapanese
+                        ? '特定商取引法に基づく表記'
+                        : 'Specified Commercial Transactions Act',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue[400],
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
                 GestureDetector(
-                  onTap: () => launchUrl(Uri.parse('https://mileage-run-planner.web.app/privacy.html')),
+                  onTap: () => launchUrl(
+                    Uri.parse(
+                      'https://mileage-run-planner.web.app/privacy.html',
+                    ),
+                  ),
                   child: Text(
                     _isJapanese ? 'プライバシーポリシー' : 'Privacy Policy',
-                    style: TextStyle(fontSize: 11, color: Colors.blue[400], decoration: TextDecoration.underline),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue[400],
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
               ],
@@ -273,7 +451,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     }
-    
+
     if (isLoading) {
       return Scaffold(
         appBar: AppBar(
@@ -295,7 +473,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: isSaving ? null : _saveProfile,
             child: Text(
               l10n.save,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -305,6 +486,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ヒントテキスト
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                _isJapanese ? '空白可。いつでも設定できます。' : 'All fields are optional.',
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 8),
             // JAL設定セクション
             _buildSectionHeader('JAL', Colors.red),
             const SizedBox(height: 12),
@@ -333,7 +525,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Colors.red,
             ),
             const SizedBox(height: 16),
-            
+
             // JAL目標設定
             _buildJalGoalsSection(),
             const SizedBox(height: 24),
@@ -359,20 +551,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Colors.blue,
             ),
             const SizedBox(height: 16),
-            
+
             // ANA目標設定
             _buildAnaGoalsSection(),
             const SizedBox(height: 24),
 
             // 共通設定セクション
-            _buildSectionHeader(_isJapanese ? '共通設定' : 'General', Colors.purple),
+            _buildSectionHeader(
+              _isJapanese ? '共通設定' : 'General',
+              Colors.purple,
+            ),
             const SizedBox(height: 12),
             _buildDropdown(
               label: _isJapanese ? 'ホーム空港' : 'Home Airport',
               value: homeAirport,
               items: ['-', ...majorAirports],
-              displayText: (code) => code == '-' ? '-' : '$code ${_getAirportName(code)}',
-              onChanged: (v) => setState(() => homeAirport = v == '-' ? null : v),
+              displayText: (code) =>
+                  code == '-' ? '-' : '$code ${_getAirportName(code)}',
+              onChanged: (v) =>
+                  setState(() => homeAirport = v == '-' ? null : v),
               color: Colors.purple,
             ),
             const SizedBox(height: 12),
@@ -400,9 +597,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
                       )
-                    : Text(l10n.save, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    : Text(
+                        l10n.save,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
 
@@ -414,10 +620,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 GestureDetector(
-                  onTap: () => launchUrl(Uri.parse('https://mileage-run-planner.web.app/tokushoho.html')),
+                  onTap: () => launchUrl(
+                    Uri.parse(
+                      'https://mileage-run-planner.web.app/tokushoho.html',
+                    ),
+                  ),
                   child: Text(
-                    _isJapanese ? '特定商取引法に基づく表記' : 'Specified Commercial Transactions Act',
-                    style: TextStyle(fontSize: 11, color: Colors.blue[400], decoration: TextDecoration.underline),
+                    _isJapanese
+                        ? '特定商取引法に基づく表記'
+                        : 'Specified Commercial Transactions Act',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue[400],
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
               ],
@@ -427,10 +643,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 GestureDetector(
-                  onTap: () => launchUrl(Uri.parse('https://mileage-run-planner.web.app/privacy.html')),
+                  onTap: () => launchUrl(
+                    Uri.parse(
+                      'https://mileage-run-planner.web.app/privacy.html',
+                    ),
+                  ),
                   child: Text(
                     _isJapanese ? 'プライバシーポリシー' : 'Privacy Policy',
-                    style: TextStyle(fontSize: 11, color: Colors.blue[400], decoration: TextDecoration.underline),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue[400],
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
               ],
@@ -482,11 +706,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required void Function(String?) onChanged,
     required Color color,
   }) {
-    final currentValue = value == null || !items.contains(value) ? items.first : value;
+    final currentValue = value == null || !items.contains(value)
+        ? items.first
+        : value;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700])),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[700],
+          ),
+        ),
         const SizedBox(height: 4),
         Container(
           width: double.infinity,
@@ -499,10 +732,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             value: currentValue,
             isExpanded: true,
             underline: const SizedBox(),
-            items: items.map((item) => DropdownMenuItem(
-              value: item,
-              child: Text(displayText(item), style: const TextStyle(fontSize: 14)),
-            )).toList(),
+            items: items
+                .map(
+                  (item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(
+                      displayText(item),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                )
+                .toList(),
             onChanged: onChanged,
           ),
         ),
@@ -518,11 +758,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) {
     return Row(
       children: [
-        Checkbox(
-          value: value,
-          onChanged: onChanged,
-          activeColor: color,
-        ),
+        Checkbox(value: value, onChanged: onChanged, activeColor: color),
         Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[800])),
       ],
     );
@@ -604,14 +840,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Text(
             _isJapanese ? '🎯 JAL目標設定' : '🎯 JAL Goals',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red[700]),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.red[700],
+            ),
           ),
           Text(
-            _isJapanese ? '空欄のまま保存可能です' : 'Optional - leave blank if not needed',
+            _isJapanese
+                ? '空欄のまま保存可能です'
+                : 'Optional - leave blank if not needed',
             style: TextStyle(fontSize: 11, color: Colors.grey[500]),
           ),
           const SizedBox(height: 16),
-          
+
           // LSP行
           _buildGoalRow(
             currentLabel: _isJapanese ? '現在LSP' : 'Current LSP',
@@ -657,11 +899,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(
                   _isJapanese ? '📊 ステータス目安' : '📊 Status Reference',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _isJapanese 
+                  _isJapanese
                       ? '• 1,500 LSP → JGC入会可能 ✨\n• 50,000 FOP → ラウンジアクセス'
                       : '• 1,500 LSP → JGC eligible ✨\n• 50,000 FOP → Lounge Access',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
@@ -682,8 +928,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isJapanese ? '✈️ 特典航空券マイル目安（往復・Y・L）' : '✈️ Award Miles (Round-trip/Y/L)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                  _isJapanese
+                      ? '✈️ 特典航空券マイル目安（往復・Y・L）'
+                      : '✈️ Award Miles (Round-trip/Y/L)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 _buildMileTable([
@@ -704,18 +956,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildMileTable(List<List<String>> rows) {
     return Column(
-      children: rows.map((row) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 100,
-              child: Text(row[0], style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+      children: rows
+          .map(
+            (row) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 100,
+                    child: Text(
+                      row[0],
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    ),
+                  ),
+                  Text(
+                    row[1],
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[800],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Text(row[1], style: TextStyle(fontSize: 11, color: Colors.grey[800], fontWeight: FontWeight.w500)),
-          ],
-        ),
-      )).toList(),
+          )
+          .toList(),
     );
   }
 
@@ -732,14 +998,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Text(
             _isJapanese ? '🎯 ANA目標設定' : '🎯 ANA Goals',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue[700]),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue[700],
+            ),
           ),
           Text(
-            _isJapanese ? '空欄のまま保存可能です' : 'Optional - leave blank if not needed',
+            _isJapanese
+                ? '空欄のまま保存可能です'
+                : 'Optional - leave blank if not needed',
             style: TextStyle(fontSize: 11, color: Colors.grey[500]),
           ),
           const SizedBox(height: 16),
-          
+
           // PP行
           _buildGoalRow(
             currentLabel: _isJapanese ? '現在PP' : 'Current PP',
@@ -774,11 +1046,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(
                   _isJapanese ? '📊 ステータス目安' : '📊 Status Reference',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _isJapanese 
+                  _isJapanese
                       ? '• 50,000 PP → ラウンジアクセス ✨'
                       : '• 50,000 PP → Lounge Access ✨',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
@@ -799,8 +1075,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isJapanese ? '✈️ 特典航空券マイル目安（往復・Y・L）' : '✈️ Award Miles (Round-trip/Y/L)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                  _isJapanese
+                      ? '✈️ 特典航空券マイル目安（往復・Y・L）'
+                      : '✈️ Award Miles (Round-trip/Y/L)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 _buildMileTable([

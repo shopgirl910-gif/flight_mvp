@@ -28,7 +28,7 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
   @override
   Widget build(BuildContext context) {
     final isJapanese = Localizations.localeOf(context).languageCode == 'ja';
-    
+
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
@@ -49,9 +49,9 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
           children: [
             // 価格表示
             _PriceDisplay(isJapanese: isJapanese),
-            
+
             const SizedBox(height: 16),
-            
+
             // 機能一覧
             _FeatureItem(
               icon: Icons.all_inclusive,
@@ -73,9 +73,9 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
               icon: Icons.email,
               text: isJapanese ? 'AIメール解析入力（準備中）' : 'AI email parsing (coming)',
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // 買い切り表示
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -90,19 +90,22 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      isJapanese 
-                        ? '買い切り・サブスクなし・追加費用なし'
-                        : 'One-time purchase, no subscription',
+                      isJapanese
+                          ? '買い切り・サブスクなし・追加費用なし'
+                          : 'One-time purchase, no subscription',
                       style: TextStyle(fontSize: 12, color: Colors.green[800]),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             if (_error != null) ...[
               const SizedBox(height: 8),
-              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              Text(
+                _error!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
             ],
           ],
         ),
@@ -118,17 +121,23 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
             backgroundColor: Colors.purple[700],
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: _isLoading
-            ? const SizedBox(
-                width: 20, height: 20,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-              )
-            : Text(
-                isJapanese ? '購入する' : 'Purchase',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : Text(
+                  isJapanese ? '購入する' : 'Purchase',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
         ),
       ],
     );
@@ -136,18 +145,21 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
 
   Future<void> _startCheckout(bool isJapanese) async {
     final user = Supabase.instance.client.auth.currentUser;
-    
+
     // 匿名ユーザー or 未ログイン
     if (user == null || user.isAnonymous) {
       setState(() {
-        _error = isJapanese 
-          ? 'Pro版の購入にはログインが必要です'
-          : 'Please log in to purchase Pro';
+        _error = isJapanese
+            ? 'Pro版の購入にはログインが必要です'
+            : 'Please log in to purchase Pro';
       });
       return;
     }
 
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
       // Supabase Edge Function を呼び出し
@@ -170,13 +182,12 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
 
       // Stripe Checkout ページにリダイレクト
       html.window.location.href = checkoutUrl;
-      
     } catch (e) {
       setState(() {
         _isLoading = false;
         _error = isJapanese
-          ? '決済の開始に失敗しました: ${e.toString().replaceAll('Exception: ', '')}'
-          : 'Failed to start checkout: ${e.toString().replaceAll('Exception: ', '')}';
+            ? '決済の開始に失敗しました: ${e.toString().replaceAll('Exception: ', '')}'
+            : 'Failed to start checkout: ${e.toString().replaceAll('Exception: ', '')}';
       });
     }
   }
@@ -215,7 +226,10 @@ class _PriceDisplayState extends State<_PriceDisplay> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() { _loaded = true; _remainingSlots = 0; });
+        setState(() {
+          _loaded = true;
+          _remainingSlots = 0;
+        });
       }
     }
   }
@@ -223,22 +237,26 @@ class _PriceDisplayState extends State<_PriceDisplay> {
   @override
   Widget build(BuildContext context) {
     if (!_loaded) {
-      return const Center(child: SizedBox(
-        width: 20, height: 20,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ));
+      return const Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
     }
 
     final isEarlyBird = (_remainingSlots ?? 0) > 0;
+    final showSlots = (_remainingSlots ?? 0) <= 20;
     final price = isEarlyBird ? 100 : 480;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isEarlyBird 
-            ? [Colors.purple[50]!, Colors.amber[50]!]
-            : [Colors.grey[100]!, Colors.grey[50]!],
+          colors: isEarlyBird
+              ? [Colors.purple[50]!, Colors.amber[50]!]
+              : [Colors.grey[100]!, Colors.grey[50]!],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
@@ -255,10 +273,18 @@ class _PriceDisplayState extends State<_PriceDisplay> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                widget.isJapanese 
-                  ? '🎉 リリース記念価格（残り${_remainingSlots}枠）'
-                  : '🎉 Launch price (${_remainingSlots} spots left)',
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                widget.isJapanese
+                    ? (showSlots
+                          ? '🎉 リリース記念価格（残り${_remainingSlots}枠）'
+                          : '🎉 リリース記念価格')
+                    : (showSlots
+                          ? '🎉 Launch price (${_remainingSlots} spots left)'
+                          : '🎉 Launch price'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 8),
