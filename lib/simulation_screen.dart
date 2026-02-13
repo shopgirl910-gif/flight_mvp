@@ -5,6 +5,7 @@ import 'auth_screen.dart';
 import 'plan_optimizer.dart';
 import 'pro_service.dart';
 import 'pro_purchase_screen.dart';
+import 'pro_purchase_dialog.dart';
 
 class SimulationScreen extends StatefulWidget {
   const SimulationScreen({super.key});
@@ -429,12 +430,7 @@ class _SimulationScreenState extends State<SimulationScreen>
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ProPurchaseScreen(),
-                    ),
-                  );
+                  showProPurchaseDialog(context);
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
                 child: const Text(
@@ -1057,12 +1053,7 @@ class _SimulationScreenState extends State<SimulationScreen>
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ProPurchaseScreen(),
-                    ),
-                  );
+                  showProPurchaseDialog(context);
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
                 child: const Text(
@@ -1518,12 +1509,22 @@ class _SimulationScreenState extends State<SimulationScreen>
                 if (isPro) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.purple[700],
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text('AI', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'AI',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ],
@@ -1553,7 +1554,10 @@ class _SimulationScreenState extends State<SimulationScreen>
                   ),
                   if (errorMsg != null) ...[
                     const SizedBox(height: 8),
-                    Text(errorMsg!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                    Text(
+                      errorMsg!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    ),
                   ],
                   if (!isPro) ...[
                     const SizedBox(height: 8),
@@ -1566,12 +1570,19 @@ class _SimulationScreenState extends State<SimulationScreen>
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.auto_awesome, size: 16, color: Colors.purple[700]),
+                          Icon(
+                            Icons.auto_awesome,
+                            size: 16,
+                            color: Colors.purple[700],
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Pro版ならAIがどんなメール形式でも正確に解析します',
-                              style: TextStyle(fontSize: 11, color: Colors.purple[700]),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.purple[700],
+                              ),
                             ),
                           ),
                         ],
@@ -1583,74 +1594,98 @@ class _SimulationScreenState extends State<SimulationScreen>
             ),
             actions: [
               TextButton(
-                onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+                onPressed: isLoading
+                    ? null
+                    : () => Navigator.pop(dialogContext),
                 child: const Text('キャンセル'),
               ),
               ElevatedButton(
-                onPressed: isLoading ? null : () async {
-                  if (controller.text.trim().isEmpty) {
-                    setDialogState(() => errorMsg = 'メール本文を貼り付けてください');
-                    return;
-                  }
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        if (controller.text.trim().isEmpty) {
+                          setDialogState(() => errorMsg = 'メール本文を貼り付けてください');
+                          return;
+                        }
 
-                  if (isPro) {
-                    // Pro: AI解析（Edge Function）
-                    setDialogState(() { isLoading = true; errorMsg = null; });
-                    try {
-                      final response = await Supabase.instance.client.functions.invoke(
-                        'swift-endpoint',
-                        body: {'emailText': controller.text},
-                      );
-                      if (response.status != 200) {
-                        throw Exception(response.data['error'] ?? '解析に失敗しました');
-                      }
-                      final data = response.data as Map<String, dynamic>;
-                      final parsedLegs = (data['legs'] as List<dynamic>)
-                          .map((e) => Map<String, dynamic>.from(e as Map))
-                          .map((l) {
-                            // Edge Functionのキー名をアプリ内のキー名に変換
-                            final airline = l['airline'] as String? ?? 'JAL';
-                            final rawFareType = l['fare_type'] as String? ?? '';
-                            final mappedFareType = airline == 'JAL'
-                                ? _mapJALFareType(rawFareType)
-                                : _mapANAFareType(rawFareType);
-                            // 便名にエアライン名を付加（数字のみの場合）
-                            var flightNum = (l['flight_number'] ?? '').toString();
-                            if (flightNum.isNotEmpty && RegExp(r'^\d+$').hasMatch(flightNum)) {
-                              flightNum = '$airline$flightNum';
+                        if (isPro) {
+                          // Pro: AI解析（Edge Function）
+                          setDialogState(() {
+                            isLoading = true;
+                            errorMsg = null;
+                          });
+                          try {
+                            final response = await Supabase
+                                .instance
+                                .client
+                                .functions
+                                .invoke(
+                                  'swift-endpoint',
+                                  body: {'emailText': controller.text},
+                                );
+                            if (response.status != 200) {
+                              throw Exception(
+                                response.data['error'] ?? '解析に失敗しました',
+                              );
                             }
-                            return {
-                              'airline': airline,
-                              'date': l['date'],
-                              'flightNumber': flightNum,
-                              'departure': l['departure'],
-                              'arrival': l['arrival'],
-                              'departureTime': l['departure_time'] ?? '',
-                              'arrivalTime': l['arrival_time'] ?? '',
-                              'seatClass': (l['seat_class'] == 'ファースト') ? 'ファーストクラス' : l['seat_class'],
-                              'fareType': mappedFareType,
-                              'fare': l['fare'],
-                            };
-                          })
-                          .toList();
-                      if (dialogContext.mounted) Navigator.pop(dialogContext, parsedLegs);
-                    } catch (e) {
-                      setDialogState(() {
-                        isLoading = false;
-                        errorMsg = 'AI解析エラー: $e';
-                      });
-                    }
-                  } else {
-                    // 無料版: ローカル正規表現解析
-                    final parsed = _parseEmailText(controller.text);
-                    Navigator.pop(dialogContext, parsed);
-                  }
-                },
+                            final data = response.data as Map<String, dynamic>;
+                            final parsedLegs = (data['legs'] as List<dynamic>)
+                                .map((e) => Map<String, dynamic>.from(e as Map))
+                                .map((l) {
+                                  // Edge Functionのキー名をアプリ内のキー名に変換
+                                  final airline =
+                                      l['airline'] as String? ?? 'JAL';
+                                  final rawFareType =
+                                      l['fare_type'] as String? ?? '';
+                                  final mappedFareType = airline == 'JAL'
+                                      ? _mapJALFareType(rawFareType)
+                                      : _mapANAFareType(rawFareType);
+                                  // 便名にエアライン名を付加（数字のみの場合）
+                                  var flightNum = (l['flight_number'] ?? '')
+                                      .toString();
+                                  if (flightNum.isNotEmpty &&
+                                      RegExp(r'^\d+$').hasMatch(flightNum)) {
+                                    flightNum = '$airline$flightNum';
+                                  }
+                                  return {
+                                    'airline': airline,
+                                    'date': l['date'],
+                                    'flightNumber': flightNum,
+                                    'departure': l['departure'],
+                                    'arrival': l['arrival'],
+                                    'departureTime': l['departure_time'] ?? '',
+                                    'arrivalTime': l['arrival_time'] ?? '',
+                                    'seatClass': (l['seat_class'] == 'ファースト')
+                                        ? 'ファーストクラス'
+                                        : l['seat_class'],
+                                    'fareType': mappedFareType,
+                                    'fare': l['fare'],
+                                  };
+                                })
+                                .toList();
+                            if (dialogContext.mounted)
+                              Navigator.pop(dialogContext, parsedLegs);
+                          } catch (e) {
+                            setDialogState(() {
+                              isLoading = false;
+                              errorMsg = 'AI解析エラー: $e';
+                            });
+                          }
+                        } else {
+                          // 無料版: ローカル正規表現解析
+                          final parsed = _parseEmailText(controller.text);
+                          Navigator.pop(dialogContext, parsed);
+                        }
+                      },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
                 child: isLoading
                     ? const SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : Text(
                         isPro ? 'AI解析' : '解析',
@@ -1868,7 +1903,8 @@ class _SimulationScreenState extends State<SimulationScreen>
       setState(() {
         _optResults = limitedResults;
         _optSearching = false;
-        _optResultLimited = !isPro && results.length > ProService.freeOptimizeResults;
+        _optResultLimited =
+            !isPro && results.length > ProService.freeOptimizeResults;
         if (results.isEmpty) _optError = '$_optHomeAirport発の最適ルートが見つかりませんでした';
       });
     } catch (e) {
@@ -2202,22 +2238,19 @@ class _SimulationScreenState extends State<SimulationScreen>
                       width: double.infinity,
                       height: 44,
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const ProPurchaseScreen()),
-                          ).then((_) {
-                            ProService().clearCache();
-                            // Pro化後に再検索
-                            _runOptimization();
-                          });
+                        onPressed: () async {
+                          await showProPurchaseDialog(context);
+                          ProService().clearCache();
+                          _runOptimization();
                         },
                         icon: const Icon(Icons.lock, size: 16),
                         label: const Text('Pro版でレグ最多ランキングも見る'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.purple[700],
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
@@ -3620,7 +3653,10 @@ class _SimulationScreenState extends State<SimulationScreen>
                               ),
                               Text(
                                 airline == 'JAL' ? ' FOP' : ' PP',
-                                style: TextStyle(fontSize: 10, color: airlineColor),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: airlineColor,
+                                ),
                               ),
                             ],
                           ),
@@ -3629,13 +3665,19 @@ class _SimulationScreenState extends State<SimulationScreen>
                             children: [
                               Text(
                                 '${_formatNumber(miles ?? 0)}マイル',
-                                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                ),
                               ),
                               if (airline == 'JAL' && lsp != null) ...[
                                 const SizedBox(width: 4),
                                 Text(
                                   '${lsp}LSP',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[600],
+                                  ),
                                 ),
                               ],
                             ],
