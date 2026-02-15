@@ -330,7 +330,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     _optDate =
         '${oneMonthLater.year}/${oneMonthLater.month.toString().padLeft(2, '0')}/${oneMonthLater.day.toString().padLeft(2, '0')}';
     _initAirlineAirports();
-    _addLeg();
+    _addLeg(); // 初期レグ作成（入力専用カードとして使用）
     _loadUserProfile();
   }
 
@@ -516,6 +516,59 @@ class _SimulationScreenState extends State<SimulationScreen>
       if (expandedLegId == legId)
         expandedLegId = legs.isNotEmpty ? legs.last['id'] as int : null;
     });
+  }
+
+  // すべてのレグをクリアして新しい入力レグを作成
+  void _clearAllLegs() {
+    // すべてのコントローラーをdispose
+    for (var controller in dateControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in flightNumberControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in departureTimeControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in arrivalTimeControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in fareAmountControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in departureAirportControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in arrivalAirportControllers.values) {
+      controller.dispose();
+    }
+    for (var focusNode in departureAirportFocusNodes.values) {
+      focusNode.dispose();
+    }
+    for (var focusNode in arrivalAirportFocusNodes.values) {
+      focusNode.dispose();
+    }
+    
+    // すべてのマップをクリア
+    dateControllers.clear();
+    flightNumberControllers.clear();
+    departureTimeControllers.clear();
+    arrivalTimeControllers.clear();
+    fareAmountControllers.clear();
+    departureAirportControllers.clear();
+    arrivalAirportControllers.clear();
+    departureAirportFocusNodes.clear();
+    arrivalAirportFocusNodes.clear();
+    availableFlights.clear();
+    availableDestinations.clear();
+    
+    setState(() {
+      legs.clear();
+      expandedLegId = null;
+    });
+    
+    // 新しい入力レグを作成
+    _addLeg();
   }
 
   void _clearFlightInfo(int index, int legId) {
@@ -1136,13 +1189,17 @@ class _SimulationScreenState extends State<SimulationScreen>
         errorMessage = null;
       });
       final tabName = isCompleted ? '修行済み' : '予定';
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('「$title」を$tabNameに保存しました'),
             backgroundColor: Colors.green,
           ),
         );
+        
+        // 保存成功後、すべてのレグをクリア
+        _clearAllLegs();
+      }
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -1570,20 +1627,46 @@ class _SimulationScreenState extends State<SimulationScreen>
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.purple[200]!),
                       ),
-                      child: Row(
+                      child: Column(
                         children: [
-                          Icon(
-                            Icons.auto_awesome,
-                            size: 16,
-                            color: Colors.purple[700],
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Pro版ならAIがどんなメール形式でも正確に解析します',
-                              style: TextStyle(
-                                fontSize: 11,
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.auto_awesome,
+                                size: 16,
                                 color: Colors.purple[700],
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Pro版ならAIがどんなメール形式でも正確に解析します',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.purple[700],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(dialogContext);
+                                showProPurchaseDialog(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple[600],
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                              child: const Text(
+                                'Pro版を見る',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                               ),
                             ),
                           ),
@@ -1702,31 +1785,22 @@ class _SimulationScreenState extends State<SimulationScreen>
     controller.dispose();
 
     if (result != null && result.isNotEmpty) {
-      // 既存のレグをクリア
-      while (legs.length > 1) {
-        _removeLeg(legs.length - 1);
-      }
-      if (legs.isNotEmpty) {
-        final legId = legs[0]['id'] as int;
-        _clearLeg(0, legId);
-      }
-
-      // 解析結果を入力
+      // 解析結果を既存レグに追加（削除しない）
       for (int i = 0; i < result.length; i++) {
-        if (i >= legs.length) {
-          _addLeg();
-          // コントローラー初期化を待つ
-          await Future.delayed(const Duration(milliseconds: 50));
-        }
+        // 新しいレグを追加
+        _addLeg();
+        await Future.delayed(const Duration(milliseconds: 50));
+        
         final data = result[i];
-        final legId = legs[i]['id'] as int;
+        final newIndex = legs.length - 1;
+        final legId = legs[newIndex]['id'] as int;
 
         setState(() {
-          legs[i]['airline'] = data['airline'];
-          legs[i]['departureAirport'] = data['departure'];
-          legs[i]['arrivalAirport'] = data['arrival'];
-          legs[i]['fareType'] = data['fareType'];
-          legs[i]['seatClass'] = data['seatClass'];
+          legs[newIndex]['airline'] = data['airline'];
+          legs[newIndex]['departureAirport'] = data['departure'];
+          legs[newIndex]['arrivalAirport'] = data['arrival'];
+          legs[newIndex]['fareType'] = data['fareType'];
+          legs[newIndex]['seatClass'] = data['seatClass'];
         });
 
         dateControllers[legId]?.text = data['date'] ?? '';
@@ -1739,14 +1813,14 @@ class _SimulationScreenState extends State<SimulationScreen>
           fareAmountControllers[legId]?.text = data['fare'].toString();
         }
 
-        await _fetchAvailableFlights(i);
-        _calculateSingleLeg(i);
+        await _fetchAvailableFlights(newIndex);
+        _calculateSingleLeg(newIndex);
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${result.length}件のフライトを読み込みました'),
+            content: Text('${result.length}件のフライトを追加しました'),
             backgroundColor: Colors.green,
           ),
         );
@@ -1846,9 +1920,20 @@ class _SimulationScreenState extends State<SimulationScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildSummaryBar(isMobile),
-              ...displayOrder.map(
-                (e) => _buildLegCard(context, e.value, e.key, isMobile),
-              ),
+              // 既存レグを表示
+              if (displayOrder.isNotEmpty)
+                ...displayOrder.map((e) {
+                  // 最新レグ（最後に追加されたもの）かどうかを判定
+                  final isLatest = legs.isNotEmpty && 
+                                   e.key == legs.length - 1;
+                  return _buildLegCard(
+                    context, 
+                    e.value, 
+                    e.key, 
+                    isMobile,
+                    isLatest: isLatest,
+                  );
+                }),
               if (errorMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -1863,6 +1948,8 @@ class _SimulationScreenState extends State<SimulationScreen>
       },
     );
   }
+
+  // ========== おまかせ最適化タブ ==========
 
   // ========== おまかせ最適化タブ ==========
 
@@ -3581,8 +3668,9 @@ class _SimulationScreenState extends State<SimulationScreen>
     BuildContext context,
     Map<String, dynamic> leg,
     int index,
-    bool isMobile,
-  ) {
+    bool isMobile, {
+    bool isLatest = false,
+  }) {
     final legId = leg['id'] as int,
         airline = leg['airline'] as String,
         fop = leg['calculatedFOP'] as int?,
@@ -3592,12 +3680,14 @@ class _SimulationScreenState extends State<SimulationScreen>
         isExpanded = expandedLegId == legId;
     final dep = leg['departureAirport'] as String,
         arr = leg['arrivalAirport'] as String,
-        flightNum = flightNumberControllers[legId]?.text ?? '';
+        flightNum = flightNumberControllers[legId]?.text ?? '',
+        depTime = departureTimeControllers[legId]?.text ?? '',
+        arrTime = arrivalTimeControllers[legId]?.text ?? '';
     if (isMobile) {
       return Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isLatest ? Colors.yellow[50] : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isExpanded ? airlineColor : airlineColor.withOpacity(0.3),
@@ -3655,21 +3745,43 @@ class _SimulationScreenState extends State<SimulationScreen>
                     ),
                     const SizedBox(width: 8),
                     if (dep.isNotEmpty && arr.isNotEmpty) ...[
-                      Text(
-                        '$dep → $arr',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      if (flightNum.isNotEmpty)
-                        Text(
-                          ' ($flightNum)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$dep → $arr',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              if (flightNum.isNotEmpty)
+                                Text(
+                                  ' ($flightNum)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                            ],
                           ),
-                        ),
+                          if (depTime.isNotEmpty || arrTime.isNotEmpty)
+                            Text(
+                              depTime.isNotEmpty && arrTime.isNotEmpty
+                                  ? '$depTime - $arrTime'
+                                  : depTime.isNotEmpty
+                                      ? '$depTime発'
+                                      : '$arrTime着',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                        ],
+                      ),
                     ] else
                       Text(
                         'レグ ${index + 1}',
