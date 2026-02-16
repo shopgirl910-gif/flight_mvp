@@ -415,7 +415,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 GestureDetector(
                   onTap: () => launchUrl(
                     Uri.parse(
-                      'https://mileage-run-planner.web.app/tokushoho.html',
+                      'https://mrunplanner.com/tokushoho.html',
                     ),
                   ),
                   child: Text(
@@ -433,7 +433,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 GestureDetector(
                   onTap: () => launchUrl(
                     Uri.parse(
-                      'https://mileage-run-planner.web.app/privacy.html',
+                      'https://mrunplanner.com/privacy.html',
                     ),
                   ),
                   child: Text(
@@ -449,7 +449,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 GestureDetector(
                   onTap: () => launchUrl(
                     Uri.parse(
-                      'https://mileage-run-planner.web.app/terms.html',
+                      'https://mrunplanner.com/terms.html',
                     ),
                   ),
                   child: Text(
@@ -459,6 +459,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Colors.blue[400],
                       decoration: TextDecoration.underline,
                     ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _isJapanese ? '📊 データ提供元' : '📊 Data Source',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _isJapanese
+                            ? '本アプリケーションで利用する公共交通データは、公共交通オープンデータセンターにおいて提供されるものです。公共交通事業者により提供されたデータを元にしていますが、必ずしも正確・完全なものとは限りません。\n\n本アプリケーションの表示内容について、公共交通事業者への直接の問合せは行わないでください。\n\nお問い合わせ：shopgirl910@gmail.com'
+                            : 'Public transportation data used in this application is provided by the Public Transportation Open Data Center. The data is based on information provided by transportation operators, but may not always be accurate or complete.\n\nPlease do not contact transportation operators directly.\n\nContact: shopgirl910@gmail.com',
+                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                      ),
+                    ],
                   ),
                 ),
               ],
