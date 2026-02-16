@@ -103,7 +103,7 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
       //
       // 仮実装：直接Pro化（Stripe実装後に置き換え）
       final proService = ProService();
-      await proService.activatePro();
+      await proService.activatePro(purchasePrice: _currentPrice);
 
       if (mounted) {
         setState(() {
@@ -543,7 +543,7 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Text(
-        '• 買い切り型です。月額料金は発生しません。\n'
+        '• 有効期限1年・自動更新なし・更新時も同価格\n'
         '• 購入後、すぐにすべてのPro機能が有効になります。\n'
         '• お支払いはStripeによる安全な決済です。',
         style: TextStyle(fontSize: 11, color: Colors.grey[500], height: 1.6),
