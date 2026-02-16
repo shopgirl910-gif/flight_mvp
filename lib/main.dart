@@ -8,6 +8,7 @@ import 'quiz_screen.dart';
 import 'checkin_screen.dart';
 import 'auth_screen.dart';
 import 'profile_screen.dart';
+import 'pro_purchase_dialog.dart';
 import 'dart:html' as html;
 
 void main() async {
@@ -343,6 +344,19 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
             const Divider(height: 1),
+            // Pro版
+            ListTile(
+              dense: true,
+              leading: Icon(Icons.workspace_premium, size: 20, color: Colors.amber[700]),
+              title: Text(
+                isJapanese ? 'Pro版にアップグレード' : 'Upgrade to Pro',
+                style: const TextStyle(fontSize: 14),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                showProPurchaseDialog(context);
+              },
+            ),
             // プロフィール設定
             ListTile(
               dense: true,
