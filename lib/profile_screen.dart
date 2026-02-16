@@ -445,6 +445,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () => launchUrl(
+                    Uri.parse(
+                      'https://mileage-run-planner.web.app/terms.html',
+                    ),
+                  ),
+                  child: Text(
+                    _isJapanese ? '利用規約' : 'Terms of Service',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue[400],
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
