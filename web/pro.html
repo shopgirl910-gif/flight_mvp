@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pro版 | マイル修行プランナー</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: #0a0a0a; color: #e0e0e0; line-height: 1.8; }
+    .container { max-width: 720px; margin: 0 auto; padding: 40px 24px; }
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 24px; color: #fff; border-bottom: 2px solid #1a73e8; padding-bottom: 12px; }
+    h2 { font-size: 20px; color: #90caf9; margin-top: 32px; margin-bottom: 12px; }
+    .price-section { background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); padding: 32px; border-radius: 12px; margin: 24px 0; text-align: center; }
+    .current-price { font-size: 48px; font-weight: 700; color: #fff; margin: 16px 0; }
+    .price-label { font-size: 14px; color: #90caf9; }
+    .next-price { font-size: 16px; color: #ffeb3b; margin-top: 12px; }
+    .features { background: #1a1a1a; padding: 24px; border-radius: 8px; margin: 24px 0; }
+    .features li { margin-bottom: 12px; padding-left: 24px; position: relative; list-style: none; }
+    .features li:before { content: "✓"; position: absolute; left: 0; color: #1a73e8; font-weight: bold; }
+    .cta-button { display: inline-block; background: #1a73e8; color: #fff; padding: 16px 48px; border-radius: 8px; text-decoration: none; font-size: 18px; font-weight: 700; margin: 32px 0; transition: background 0.3s; }
+    .cta-button:hover { background: #1557b0; }
+    .info-box { background: #1a1a1a; border-left: 4px solid #1a73e8; padding: 16px; margin: 16px 0; }
+    .legal-links { margin-top: 48px; padding-top: 24px; border-top: 1px solid #2a2a2a; font-size: 12px; text-align: center; }
+    .legal-links a { color: #1a73e8; text-decoration: none; margin: 0 12px; }
+    .legal-links a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎯 MRP Pro版</h1>
+    
+    <p>マイル修行プランナーのPro版で、修行計画をさらに効率化。</p>
+    
+    <div class="price-section">
+      <div class="price-label">現在価格（第1段階）</div>
+      <div class="current-price">100円</div>
+      <div class="price-label">税込・買い切り型</div>
+      <div class="next-price">※次回値上げ予定：200円</div>
+    </div>
+
+    <div class="info-box">
+      <strong>💡 段階的値上げ制について</strong><br>
+      Pro版は加入状況に応じて段階的に値上げします（100円→200円→300円→400円→480円）。<br>
+      購入後の追加料金は一切ありません。早期購入がお得です。
+    </div>
+    
+    <div class="features">
+      <h2>Pro版限定機能</h2>
+      <ul>
+        <li><strong>AIメール解析入力</strong> - 航空券予約メールから自動でフライト情報抽出</li>
+        <li><strong>CSVエクスポート</strong> - 修行ログを一括ダウンロード</li>
+        <li><strong>広告非表示</strong>（将来実装予定）</li>
+        <li><strong>優先サポート</strong></li>
+      </ul>
+    </div>
+    
+    <h2>📊 すべての機能（無料版含む）</h2>
+    <ul style="margin-left: 20px;">
+      <li>JAL/ANA FOP/PP一括計算</li>
+      <li>LSP（Life Status Points）計算対応</li>
+      <li>おまかせ最適化（DFS探索）</li>
+      <li>空港チェックイン機能（GPS連携）</li>
+      <li>デイリークイズ</li>
+      <li>修行ログ管理</li>
+    </ul>
+    
+    <h2>💳 支払方法</h2>
+    <p>クレジットカード（Visa、Mastercard、American Express、JCB）</p>
+    <p>決済はStripeで安全に処理されます。</p>
+    
+    <h2>📦 サービス提供時期</h2>
+    <p>決済完了後、即座にPro版機能が有効化されます。</p>
+    
+    <h2>🔄 返金ポリシー</h2>
+    <p>デジタルコンテンツの性質上、原則として返金には応じかねます。ただし、サービスに重大な不具合がある場合は個別に対応いたします。</p>
+
+    <div class="info-box">
+      <strong>📊 公共交通データについて</strong><br>
+      本アプリケーションで利用する公共交通データは、公共交通オープンデータセンターにおいて提供されるものです。公共交通事業者により提供されたデータを元にしていますが、必ずしも正確・完全なものとは限りません。本アプリケーションの表示内容について、公共交通事業者への直接の問合せは行わないでください。
+    </div>
+    
+    <div style="text-align: center;">
+      <a href="https://mrunplanner.com" class="cta-button">アプリで購入する →</a>
+    </div>
+    
+    <div class="legal-links">
+      <a href="https://mrunplanner.com/tokushoho.html">特定商取引法に基づく表記</a>
+      <a href="https://mrunplanner.com/privacy.html">プライバシーポリシー</a>
+      <a href="https://mrunplanner.com/terms.html">利用規約</a>
+    </div>
+  </div>
+</body>
+</html>
