@@ -33,6 +33,7 @@ class ProService {
   // ========== Pro判定 ==========
 
   /// Pro版かどうか（キャッシュ付き・5分間有効）
+  /// 有効期限も自動チェック
   String? _cachedUserId;
 
   Future<bool> isPro() async {
@@ -55,11 +56,36 @@ class ProService {
     try {
       final response = await _supabase
           .from('user_profiles')
-          .select('is_pro')
+          .select('is_pro, pro_expires_at')
           .eq('id', user.id)
           .maybeSingle();
 
-      _isPro = response?['is_pro'] == true;
+      if (response == null) {
+        _isPro = false;
+        _lastChecked = DateTime.now();
+        return false;
+      }
+
+      final isProFlag = response['is_pro'] == true;
+      final expiresAtStr = response['pro_expires_at'] as String?;
+
+      // 有効期限チェック
+      if (isProFlag && expiresAtStr != null) {
+        final expiresAt = DateTime.parse(expiresAtStr);
+        if (DateTime.now().isAfter(expiresAt)) {
+          // 期限切れ → is_proをfalseに更新
+          await _supabase
+              .from('user_profiles')
+              .update({'is_pro': false})
+              .eq('id', user.id);
+          
+          _isPro = false;
+          _lastChecked = DateTime.now();
+          return false;
+        }
+      }
+
+      _isPro = isProFlag;
       _lastChecked = DateTime.now();
       return _isPro!;
     } catch (e) {
@@ -71,6 +97,38 @@ class ProService {
   void clearCache() {
     _isPro = null;
     _lastChecked = null;
+  }
+
+  /// Pro版の有効期限を取得（Pro版でない場合はnull）
+  Future<DateTime?> getProExpiresAt() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null || user.isAnonymous) return null;
+
+    try {
+      final response = await _supabase
+          .from('user_profiles')
+          .select('pro_expires_at')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final expiresAtStr = response?['pro_expires_at'] as String?;
+      if (expiresAtStr == null) return null;
+
+      return DateTime.parse(expiresAtStr);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Pro版の残り日数を取得（Pro版でない場合は0）
+  Future<int> getRemainingDays() async {
+    final expiresAt = await getProExpiresAt();
+    if (expiresAt == null) return 0;
+
+    final now = DateTime.now();
+    if (now.isAfter(expiresAt)) return 0;
+
+    return expiresAt.difference(now).inDays;
   }
 
   // ========== 利用回数チェック ==========
@@ -164,18 +222,25 @@ class ProService {
   // ========== 購入処理 ==========
 
   /// Pro版購入を記録（Stripe決済成功後に呼ぶ）
-  Future<bool> activatePro() async {
+  /// 
+  /// [purchasePrice] 購入時の価格（円）
+  Future<bool> activatePro({required int purchasePrice}) async {
     final user = _supabase.auth.currentUser;
     if (user == null || user.isAnonymous) return false;
 
     try {
+      final now = DateTime.now();
+      final expiresAt = now.add(const Duration(days: 365));
+
       await _supabase
           .from('user_profiles')
           .update({
             'is_pro': true,
-            'pro_purchased_at': DateTime.now().toIso8601String(),
+            'pro_purchased_at': now.toIso8601String(),
+            'pro_expires_at': expiresAt.toIso8601String(),
+            'pro_purchase_price': purchasePrice,
           })
-          .eq('user_id', user.id);
+          .eq('id', user.id); // 'user_id'ではなく'id'
 
       clearCache();
       return true;

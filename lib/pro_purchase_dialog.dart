@@ -76,24 +76,24 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
 
             const SizedBox(height: 12),
 
-            // 買い切り表示
+            // 1年有効期限表示
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.green[50],
+                color: Colors.blue[50],
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green[200]!),
+                border: Border.all(color: Colors.blue[200]!),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green[700], size: 18),
+                  Icon(Icons.access_time, color: Colors.blue[700], size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       isJapanese
-                          ? '買い切り・サブスクなし・追加費用なし'
-                          : 'One-time purchase, no subscription',
-                      style: TextStyle(fontSize: 12, color: Colors.green[800]),
+                          ? '有効期限1年・自動更新なし・更新時も同価格'
+                          : '1-year validity, no auto-renewal, same price on renewal',
+                      style: TextStyle(fontSize: 12, color: Colors.blue[800]),
                     ),
                   ),
                 ],
@@ -296,7 +296,7 @@ class _PriceDisplayState extends State<_PriceDisplay> {
             children: [
               if (isEarlyBird)
                 Text(
-                  '¥480',
+                  '¥480/年',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey[500],
@@ -314,7 +314,7 @@ class _PriceDisplayState extends State<_PriceDisplay> {
               ),
               const SizedBox(width: 4),
               Text(
-                widget.isJapanese ? '（税込）' : '(tax incl.)',
+                widget.isJapanese ? '/年（税込）' : '/year (tax incl.)',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
