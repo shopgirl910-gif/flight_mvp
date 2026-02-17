@@ -40,7 +40,10 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     }
 
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
       if (_isLogin) {
@@ -83,9 +86,7 @@ class _AuthScreenState extends State<AuthScreen> {
   void _goToProfileScreen() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-        builder: (_) => const ProfileScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const ProfileScreen()),
     );
   }
 
@@ -103,7 +104,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: const Text('🔐 パスワードを設定'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -122,8 +125,11 @@ class _AuthScreenState extends State<AuthScreen> {
                     isDense: true,
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
-                      icon: Icon(showPassword ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setDialogState(() => showPassword = !showPassword),
+                      icon: Icon(
+                        showPassword ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setDialogState(() => showPassword = !showPassword),
                     ),
                   ),
                 ),
@@ -137,66 +143,105 @@ class _AuthScreenState extends State<AuthScreen> {
                     isDense: true,
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
-                      icon: Icon(showPassword ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setDialogState(() => showPassword = !showPassword),
+                      icon: Icon(
+                        showPassword ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setDialogState(() => showPassword = !showPassword),
                     ),
                   ),
                 ),
                 if (dialogError != null) ...[
                   const SizedBox(height: 12),
-                  Text(dialogError!, style: TextStyle(color: Colors.red[700], fontSize: 12)),
+                  Text(
+                    dialogError!,
+                    style: TextStyle(color: Colors.red[700], fontSize: 12),
+                  ),
                 ],
               ],
             ),
             actions: [
               TextButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext);
-                  _goToProfileScreen();
-                },
-                child: const Text('あとで設定'),
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        // アカウント削除処理
+                        final userId =
+                            Supabase.instance.client.auth.currentUser?.id;
+                        if (userId != null) {
+                          try {
+                            await Supabase.instance.client.functions.invoke(
+                              'delete-user',
+                              body: {'userId': userId},
+                            );
+                          } catch (e) {
+                            // エラーは無視
+                          }
+                        }
+
+                        // 匿名ユーザーとして再ログイン
+                        await Supabase.instance.client.auth.signInAnonymously();
+
+                        if (mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                      },
+                child: const Text('キャンセル'),
               ),
               ElevatedButton(
-                onPressed: isSaving ? null : () async {
-                  final newPass = newPasswordController.text.trim();
-                  final confirmPass = confirmPasswordController.text.trim();
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        final newPass = newPasswordController.text.trim();
+                        final confirmPass = confirmPasswordController.text
+                            .trim();
 
-                  if (newPass.isEmpty) {
-                    setDialogState(() => dialogError = 'パスワードを入力してください');
-                    return;
-                  }
-                  if (newPass.length < 6) {
-                    setDialogState(() => dialogError = 'パスワードは6文字以上必要です');
-                    return;
-                  }
-                  if (newPass != confirmPass) {
-                    setDialogState(() => dialogError = 'パスワードが一致しません');
-                    return;
-                  }
+                        if (newPass.isEmpty) {
+                          setDialogState(() => dialogError = 'パスワードを入力してください');
+                          return;
+                        }
+                        if (newPass.length < 6) {
+                          setDialogState(() => dialogError = 'パスワードは6文字以上必要です');
+                          return;
+                        }
+                        if (newPass != confirmPass) {
+                          setDialogState(() => dialogError = 'パスワードが一致しません');
+                          return;
+                        }
 
-                  setDialogState(() { isSaving = true; dialogError = null; });
+                        setDialogState(() {
+                          isSaving = true;
+                          dialogError = null;
+                        });
 
-                  try {
-                    await Supabase.instance.client.auth.updateUser(
-                      UserAttributes(password: newPass),
-                    );
-                    if (dialogContext.mounted) Navigator.pop(dialogContext);
-                    _goToProfileScreen();
-                  } catch (e) {
-                    setDialogState(() {
-                      isSaving = false;
-                      dialogError = 'エラー: $e';
-                    });
-                  }
-                },
+                        try {
+                          await Supabase.instance.client.auth.updateUser(
+                            UserAttributes(password: newPass),
+                          );
+                          if (dialogContext.mounted)
+                            Navigator.pop(dialogContext);
+                          _goToProfileScreen();
+                        } catch (e) {
+                          setDialogState(() {
+                            isSaving = false;
+                            dialogError = 'エラー: $e';
+                          });
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple[700],
                   foregroundColor: Colors.white,
                 ),
                 child: isSaving
-                  ? const SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('設定する'),
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('設定する'),
               ),
             ],
           ),
@@ -240,7 +285,10 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 if (dialogError != null) ...[
                   const SizedBox(height: 12),
-                  Text(dialogError!, style: TextStyle(color: Colors.red[700], fontSize: 12)),
+                  Text(
+                    dialogError!,
+                    style: TextStyle(color: Colors.red[700], fontSize: 12),
+                  ),
                 ],
               ],
             ),
@@ -250,41 +298,59 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: const Text('キャンセル'),
               ),
               ElevatedButton(
-                onPressed: isSending ? null : () async {
-                  final email = resetEmailController.text.trim();
-                  if (email.isEmpty) {
-                    setDialogState(() => dialogError = 'メールアドレスを入力してください');
-                    return;
-                  }
-                  if (!email.contains('@')) {
-                    setDialogState(() => dialogError = '正しいメールアドレスを入力してください');
-                    return;
-                  }
+                onPressed: isSending
+                    ? null
+                    : () async {
+                        final email = resetEmailController.text.trim();
+                        if (email.isEmpty) {
+                          setDialogState(
+                            () => dialogError = 'メールアドレスを入力してください',
+                          );
+                          return;
+                        }
+                        if (!email.contains('@')) {
+                          setDialogState(
+                            () => dialogError = '正しいメールアドレスを入力してください',
+                          );
+                          return;
+                        }
 
-                  setDialogState(() { isSending = true; dialogError = null; });
+                        setDialogState(() {
+                          isSending = true;
+                          dialogError = null;
+                        });
 
-                  try {
-                    await Supabase.instance.client.auth.resetPasswordForEmail(email);
-                    if (context.mounted) Navigator.pop(context);
-                    if (mounted) {
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        SnackBar(
-                          content: Text('$email にリセットメールを送信しました'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    setDialogState(() {
-                      isSending = false;
-                      dialogError = 'エラーが発生しました: $e';
-                    });
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple[700]),
+                        try {
+                          await Supabase.instance.client.auth
+                              .resetPasswordForEmail(email);
+                          if (context.mounted) Navigator.pop(context);
+                          if (mounted) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(
+                                content: Text('$email にリセットメールを送信しました'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          setDialogState(() {
+                            isSending = false;
+                            dialogError = 'エラーが発生しました: $e';
+                          });
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple[700],
+                ),
                 child: isSending
-                    ? const SizedBox(width: 16, height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Text('送信', style: TextStyle(color: Colors.white)),
               ),
             ],
@@ -320,13 +386,22 @@ class _AuthScreenState extends State<AuthScreen> {
               children: [
                 Icon(Icons.flight_takeoff, size: 64, color: Colors.purple[700]),
                 const SizedBox(height: 16),
-                Text(_isLogin ? 'おかえりなさい！' : 'はじめまして！',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(
+                  _isLogin ? 'おかえりなさい！' : 'はじめまして！',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   _isLogin
-                    ? (isJapanese ? 'あなたの修行記録を残そう！' : 'Keep track of your mileage run!')
-                    : (isJapanese ? 'メールアドレスだけで登録できます' : 'Just enter your email to sign up'),
+                      ? (isJapanese
+                            ? 'あなたの修行記録を残そう！'
+                            : 'Keep track of your mileage run!')
+                      : (isJapanese
+                            ? 'メールアドレスだけで登録できます'
+                            : 'Just enter your email to sign up'),
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 32),
@@ -368,11 +443,20 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                        Icon(
+                          Icons.error_outline,
+                          color: Colors.red[700],
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(_errorMessage!,
-                            style: TextStyle(color: Colors.red[700], fontSize: 13)),
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(
+                              color: Colors.red[700],
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -391,10 +475,21 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                     ),
                     child: _isLoading
-                      ? const SizedBox(width: 20, height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text(_isLogin ? 'ログイン' : 'メールで登録',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            _isLogin ? 'ログイン' : 'メールで登録',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -408,7 +503,10 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
                 TextButton(
-                  onPressed: () => setState(() { _isLogin = !_isLogin; _errorMessage = null; }),
+                  onPressed: () => setState(() {
+                    _isLogin = !_isLogin;
+                    _errorMessage = null;
+                  }),
                   child: Text(
                     _isLogin ? 'アカウントを新規作成する' : 'ログインに戻る',
                     style: TextStyle(fontSize: 14, color: Colors.purple[700]),
