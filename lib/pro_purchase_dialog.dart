@@ -421,9 +421,9 @@ class _PriceDisplayState extends State<_PriceDisplay> {
       );
     }
 
-    final isEarlyBird = (_remainingSlots ?? 0) > 0;
-    final showSlots = (_remainingSlots ?? 0) <= 20;
-    final price = isEarlyBird ? 100 : 480;
+    final isEarlyBird = false;
+    final showSlots = false;
+    final price = 100;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -440,44 +440,11 @@ class _PriceDisplayState extends State<_PriceDisplay> {
       ),
       child: Column(
         children: [
-          if (isEarlyBird) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.red[600],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                widget.isJapanese
-                    ? (showSlots
-                          ? '🎉 リリース記念価格（残り${_remainingSlots}枠）'
-                          : '🎉 リリース記念価格')
-                    : (showSlots
-                          ? '🎉 Launch price (${_remainingSlots} spots left)'
-                          : '🎉 Launch price'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              if (isEarlyBird)
-                Text(
-                  '¥480',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[500],
-                    decoration: TextDecoration.lineThrough,
-                  ),
-                ),
               if (isEarlyBird) const SizedBox(width: 8),
               Text(
                 '¥$price',

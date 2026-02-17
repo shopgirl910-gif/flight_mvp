@@ -374,17 +374,6 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (_isEarlyBird) ...[
-                  Text(
-                    '¥480',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[500],
-                      decoration: TextDecoration.lineThrough,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
                 Text(
                   '¥$_currentPrice',
                   style: TextStyle(
