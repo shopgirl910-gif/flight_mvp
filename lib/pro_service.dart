@@ -10,7 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// - AIメール解析: 不可
 ///
 /// Pro版（100円→480円）:
-/// - 全機能 無制限ｃ無制限
+/// - 全機能 無制限
 class ProService {
   static final ProService _instance = ProService._internal();
   factory ProService() => _instance;
@@ -78,7 +78,7 @@ class ProService {
               .from('user_profiles')
               .update({'is_pro': false})
               .eq('id', user.id);
-          
+
           _isPro = false;
           _lastChecked = DateTime.now();
           return false;
@@ -118,6 +118,11 @@ class ProService {
     } catch (e) {
       return null;
     }
+  }
+
+  /// Pro版有効期限を取得（main.dartから呼ばれる用）
+  Future<DateTime?> getProExpiryDate() async {
+    return getProExpiresAt();
   }
 
   /// Pro版の残り日数を取得（Pro版でない場合は0）
@@ -222,7 +227,7 @@ class ProService {
   // ========== 購入処理 ==========
 
   /// Pro版購入を記録（Stripe決済成功後に呼ぶ）
-  /// 
+  ///
   /// [purchasePrice] 購入時の価格（円）
   Future<bool> activatePro({required int purchasePrice}) async {
     final user = _supabase.auth.currentUser;
@@ -240,7 +245,7 @@ class ProService {
             'pro_expires_at': expiresAt.toIso8601String(),
             'pro_purchase_price': purchasePrice,
           })
-          .eq('id', user.id); // 'user_id'ではなく'id'
+          .eq('id', user.id);
 
       clearCache();
       return true;

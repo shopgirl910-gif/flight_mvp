@@ -9,6 +9,7 @@ import 'checkin_screen.dart';
 import 'auth_screen.dart';
 import 'profile_screen.dart';
 import 'pro_purchase_dialog.dart';
+import 'pro_service.dart';
 import 'dart:html' as html;
 
 void main() async {
@@ -16,7 +17,8 @@ void main() async {
 
   await Supabase.initialize(
     url: 'https://ipxlsygkxgmramrjazhj.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlweGxzeWdreGdtcmFtcmphemhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0Njk4MDgsImV4cCI6MjA4MDA0NTgwOH0.ZFr2MgXRA2Lx1xaDWqAPOSxf6N4kVtTq2IRbdlJrnjw',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlweGxzeWdreGdtcmFtcmphemhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0Njk4MDgsImV4cCI6MjA4MDA0NTgwOH0.ZFr2MgXRA2Lx1xaDWqAPOSxf6N4kVtTq2IRbdlJrnjw',
   );
 
   runApp(const MyApp());
@@ -301,148 +303,220 @@ class _MainScreenState extends State<MainScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        contentPadding: const EdgeInsets.symmetric(vertical: 8),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ユーザー情報
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.purple[100],
-                    child: Icon(Icons.person, color: Colors.purple[700]),
+      builder: (context) => FutureBuilder<bool>(
+        future: ProService().isPro(),
+        builder: (context, snapshot) {
+          final isPro = snapshot.data ?? false;
+
+          return AlertDialog(
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ユーザー情報
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          Supabase.instance.client.auth.currentUser?.email ??
-                              (isJapanese ? '未ログイン' : 'Not logged in'),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.purple[100],
+                        child: Icon(Icons.person, color: Colors.purple[700]),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              Supabase
+                                      .instance
+                                      .client
+                                      .auth
+                                      .currentUser
+                                      ?.email ??
+                                  (isJapanese ? '未ログイン' : 'Not logged in'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              _isLoggedIn
+                                  ? (isJapanese ? 'ログイン中' : 'Logged in')
+                                  : (isJapanese ? '未ログイン' : 'Not logged in'),
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          _isLoggedIn
-                              ? (isJapanese ? 'ログイン中' : 'Logged in')
-                              : (isJapanese ? '未ログイン' : 'Not logged in'),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // Pro版
+                if (isPro)
+                  // Pro版利用中
+                  FutureBuilder<DateTime?>(
+                    future: ProService().getProExpiryDate(),
+                    builder: (context, expirySnapshot) {
+                      final expiryDate = expirySnapshot.data;
+                      String subtitle = '';
+
+                      if (expiryDate != null) {
+                        final formatted =
+                            '${expiryDate.year}/${expiryDate.month.toString().padLeft(2, '0')}/${expiryDate.day.toString().padLeft(2, '0')}';
+                        subtitle = isJapanese
+                            ? '有効期限: $formatted'
+                            : 'Expires: $formatted';
+                      }
+
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          Icons.check_circle,
+                          size: 20,
+                          color: Colors.green[700],
+                        ),
+                        title: Text(
+                          isJapanese ? 'Pro版利用中 ✓' : 'Pro Version Active ✓',
                           style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
+                            fontSize: 14,
+                            color: Colors.green[700],
                           ),
                         ),
-                      ],
+                        subtitle: subtitle.isNotEmpty
+                            ? Text(
+                                subtitle,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                              )
+                            : null,
+                        onTap: null,
+                      );
+                    },
+                  )
+                else
+                  // Pro版にアップグレード
+                  ListTile(
+                    dense: true,
+                    leading: Icon(
+                      Icons.workspace_premium,
+                      size: 20,
+                      color: Colors.amber[700],
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            // Pro版
-            ListTile(
-              dense: true,
-              leading: Icon(Icons.workspace_premium, size: 20, color: Colors.amber[700]),
-              title: Text(
-                isJapanese ? 'Pro版にアップグレード' : 'Upgrade to Pro',
-                style: const TextStyle(fontSize: 14),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                showProPurchaseDialog(context);
-              },
-            ),
-            // プロフィール設定
-            ListTile(
-              dense: true,
-              leading: const Icon(Icons.settings, size: 20),
-              title: Text(
-                isJapanese ? 'プロフィール設定' : 'Profile Settings',
-                style: const TextStyle(fontSize: 14),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfileScreen(),
-                  ),
-                );
-              },
-            ),
-            // ログアウト
-            if (_isLoggedIn)
-              ListTile(
-                dense: true,
-                leading: const Icon(Icons.logout, color: Colors.red, size: 20),
-                title: Text(
-                  l10n.logout,
-                  style: const TextStyle(color: Colors.red, fontSize: 14),
-                ),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text(l10n.logout),
-                      content: Text(isJapanese ? 'ログアウトしますか？' : 'Logout?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: Text(l10n.cancel),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: Text(
-                            l10n.logout,
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
+                    title: Text(
+                      isJapanese ? 'Pro版にアップグレード' : 'Upgrade to Pro',
+                      style: const TextStyle(fontSize: 14),
                     ),
-                  );
-                  if (confirm == true) {
-                    await Supabase.instance.client.auth.signOut();
-                    await Supabase.instance.client.auth.signInAnonymously();
-                    if (mounted) setState(() {});
-                  }
-                },
-              ),
-            // ログイン
-            if (!_isLoggedIn)
-              ListTile(
-                dense: true,
-                leading: Icon(Icons.login, color: Colors.purple[700], size: 20),
-                title: Text(
-                  isJapanese ? 'ログイン / 新規登録' : 'Login / Sign up',
-                  style: TextStyle(
-                    color: Colors.purple[700],
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    onTap: () {
+                      Navigator.pop(context);
+                      showProPurchaseDialog(context);
+                    },
                   ),
+                // プロフィール設定
+                ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.settings, size: 20),
+                  title: Text(
+                    isJapanese ? 'プロフィール設定' : 'Profile Settings',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProfileScreen(),
+                      ),
+                    );
+                  },
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AuthScreen(
-                        onAuthSuccess: () {
-                          Navigator.pop(context);
-                          setState(() {});
-                        },
+                // ログアウト
+                if (_isLoggedIn)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.logout,
+                      color: Colors.red,
+                      size: 20,
+                    ),
+                    title: Text(
+                      l10n.logout,
+                      style: const TextStyle(color: Colors.red, fontSize: 14),
+                    ),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(l10n.logout),
+                          content: Text(isJapanese ? 'ログアウトしますか?' : 'Logout?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: Text(l10n.cancel),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: Text(
+                                l10n.logout,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        await Supabase.instance.client.auth.signOut();
+                        await Supabase.instance.client.auth.signInAnonymously();
+                        if (mounted) setState(() {});
+                      }
+                    },
+                  ),
+                // ログイン
+                if (!_isLoggedIn)
+                  ListTile(
+                    dense: true,
+                    leading: Icon(
+                      Icons.login,
+                      color: Colors.purple[700],
+                      size: 20,
+                    ),
+                    title: Text(
+                      isJapanese ? 'ログイン / 新規登録' : 'Login / Sign up',
+                      style: TextStyle(
+                        color: Colors.purple[700],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
                     ),
-                  );
-                },
-              ),
-          ],
-        ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AuthScreen(
+                            onAuthSuccess: () {
+                              Navigator.pop(context);
+                              setState(() {});
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
