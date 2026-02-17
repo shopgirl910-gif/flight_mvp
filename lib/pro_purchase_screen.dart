@@ -80,9 +80,9 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
     }
   }
 
-  bool get _isEarlyBird => _proCount < _earlyBirdLimit;
+  bool get _isEarlyBird => false; //リリース記念価格を非表示
   int get _currentPrice => _isEarlyBird ? 100 : 480;
-  int get _remainingSlots => (_earlyBirdLimit - _proCount).clamp(0, _earlyBirdLimit);
+  int get _remainingSlots => 0;
 
   bool get _isLoggedIn {
     final user = Supabase.instance.client.auth.currentUser;
@@ -137,24 +137,23 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
 
     try {
       // Supabase RPCでパスコード検証＋Pro有効化を一括実行
-      final result = await Supabase.instance.client
-          .rpc('redeem_promo_code', params: {
-        'input_code': code,
-        'input_user_id': Supabase.instance.client.auth.currentUser!.id,
-      });
+      final result = await Supabase.instance.client.rpc(
+        'redeem_promo_code',
+        params: {
+          'input_code': code,
+          'input_user_id': Supabase.instance.client.auth.currentUser!.id,
+        },
+      );
 
       if (result != null && result['success'] == true) {
         if (mounted) {
           setState(() {
             _isRedeeming = false;
             _isPro = true;
-            _passcodeSuccess = result['message'] ?? 'Pro版が有効になりました！';
           });
           _passcodeController.clear();
-          // 少し待ってから成功ダイアログ
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) _showSuccessDialog();
-          });
+          // 成功ダイアログを表示
+          _showSuccessDialog();
         }
       } else {
         setState(() {
@@ -185,14 +184,13 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
             Text('Pro版 有効化完了！'),
           ],
         ),
-        content: const Text(
-          'すべてのPro機能が利用可能になりました。\n修行計画を存分にお楽しみください！',
-        ),
+        content: const Text('すべてのPro機能が利用可能になりました。\n修行計画を存分にお楽しみください！'),
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop(); // ダイアログを閉じる
-              Navigator.of(context).pop(); // 購入画面を閉じる
+              Navigator.of(
+                context,
+              ).popUntil((route) => route.isFirst); // メイン画面まで戻る
             },
             child: const Text('OK'),
           ),
@@ -226,16 +224,21 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.red[200]!),
                       ),
-                      child: Text(_errorMessage!, style: TextStyle(color: Colors.red[700], fontSize: 13)),
+                      child: Text(
+                        _errorMessage!,
+                        style: TextStyle(color: Colors.red[700], fontSize: 13),
+                      ),
                     ),
 
                   // 既にPro版の場合
                   if (_isPro) ...[
                     _buildProActiveCard(),
                   ] else ...[
-                    // 先着カウンター
-                    if (_isEarlyBird) _buildEarlyBirdBanner(),
-                    const SizedBox(height: 16),
+                    // 先着カウンター（残り20枠以下の時のみ表示）
+                    if (_remainingSlots > 0 && _remainingSlots <= 20) ...[
+                      _buildEarlyBirdBanner(),
+                      const SizedBox(height: 16),
+                    ],
                     // 価格カード
                     _buildPriceCard(),
                     const SizedBox(height: 20),
@@ -272,7 +275,11 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
             const SizedBox(height: 12),
             Text(
               'Pro版 有効',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green[800]),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.green[800],
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -303,7 +310,11 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
               SizedBox(width: 6),
               Text(
                 'リリース記念価格',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               SizedBox(width: 6),
               Icon(Icons.local_fire_department, color: Colors.white, size: 20),
@@ -349,9 +360,15 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
         ),
         child: Column(
           children: [
-            const Text('MRP Pro', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text(
+              'MRP Pro',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 4),
-            const Text('買い切り・追加課金なし', style: TextStyle(fontSize: 13, color: Colors.grey)),
+            const Text(
+              '買い切り・追加課金なし',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -381,14 +398,21 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
             if (_isEarlyBird)
               Container(
                 margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.red[600],
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
                   '79%OFF',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ),
           ],
@@ -405,7 +429,10 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('機能比較', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              '機能比較',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 12),
             _featureRow('FOP/PP計算', '6レグ/日', '無制限', true),
             _featureRow('おまかせ最適化', '結果1件', '全ランキング', true),
@@ -420,7 +447,12 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
     );
   }
 
-  Widget _featureRow(String feature, String free, String pro, bool isProAdvantage) {
+  Widget _featureRow(
+    String feature,
+    String free,
+    String pro,
+    bool isProAdvantage,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
@@ -447,7 +479,9 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: isProAdvantage ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isProAdvantage
+                    ? FontWeight.bold
+                    : FontWeight.normal,
                 color: isProAdvantage ? Colors.purple[700] : Colors.grey[600],
               ),
             ),
@@ -502,11 +536,16 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
                 );
               },
               icon: const Icon(Icons.login),
-              label: const Text('ログインして購入', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              label: const Text(
+                'ログインして購入',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.purple[700],
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 elevation: 2,
               ),
             ),
@@ -522,18 +561,26 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.purple[700],
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           elevation: 2,
         ),
         child: _isPurchasing
             ? const SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
               )
             : Text(
                 '¥$_currentPrice で購入する',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
       ),
     );
@@ -556,7 +603,8 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
       children: [
         // 「パスコードをお持ちの方」トグルリンク
         TextButton(
-          onPressed: () => setState(() => _showPasscodeInput = !_showPasscodeInput),
+          onPressed: () =>
+              setState(() => _showPasscodeInput = !_showPasscodeInput),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -577,7 +625,9 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
         // パスコード入力フォーム（展開時）
         if (_showPasscodeInput)
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -589,12 +639,23 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
                     decoration: InputDecoration(
                       labelText: 'パスコード',
                       hintText: '',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
                       suffixIcon: _isRedeeming
                           ? const Padding(
                               padding: EdgeInsets.all(12),
-                              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
                             )
                           : null,
                     ),
@@ -604,12 +665,21 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
                   if (_passcodeError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Text(_passcodeError!, style: TextStyle(color: Colors.red[600], fontSize: 12)),
+                      child: Text(
+                        _passcodeError!,
+                        style: TextStyle(color: Colors.red[600], fontSize: 12),
+                      ),
                     ),
                   if (_passcodeSuccess != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Text(_passcodeSuccess!, style: TextStyle(color: Colors.green[600], fontSize: 12)),
+                      child: Text(
+                        _passcodeSuccess!,
+                        style: TextStyle(
+                          color: Colors.green[600],
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -619,9 +689,14 @@ class _ProPurchaseScreenState extends State<ProPurchaseScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.grey[700],
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                      child: const Text('パスコードを使用', style: TextStyle(fontSize: 14)),
+                      child: const Text(
+                        'パスコードを使用',
+                        style: TextStyle(fontSize: 14),
+                      ),
                     ),
                   ),
                 ],

@@ -85,7 +85,10 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _ensureSignedIn() async {
     final uri = Uri.base;
+    // パスワードリセットまたはStripe決済から戻ってきた場合はスキップ
     if (uri.fragment.contains('type=recovery')) return;
+    if (uri.queryParameters.containsKey('payment')) return;
+
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) {
       await Supabase.instance.client.auth.signInAnonymously();
@@ -367,32 +370,42 @@ class _MainScreenState extends State<MainScreen> {
                     builder: (context, expirySnapshot) {
                       final expiryDate = expirySnapshot.data;
                       String subtitle = '';
-                      
+
                       if (expiryDate != null) {
-                        final formatted = '${expiryDate.year}/${expiryDate.month.toString().padLeft(2, '0')}/${expiryDate.day.toString().padLeft(2, '0')}';
-                        subtitle = isJapanese 
-                          ? '有効期限: $formatted' 
-                          : 'Expires: $formatted';
+                        final formatted =
+                            '${expiryDate.year}/${expiryDate.month.toString().padLeft(2, '0')}/${expiryDate.day.toString().padLeft(2, '0')}';
+                        subtitle = isJapanese
+                            ? '有効期限: $formatted'
+                            : 'Expires: $formatted';
                       }
-                      
+
                       return ListTile(
                         dense: true,
-                        leading: Icon(Icons.check_circle, size: 20, color: Colors.green[700]),
+                        leading: Icon(
+                          Icons.check_circle,
+                          size: 20,
+                          color: Colors.green[700],
+                        ),
                         title: Text(
                           isJapanese ? 'Pro版利用中 ✓' : 'Pro Version Active ✓',
-                          style: TextStyle(fontSize: 14, color: Colors.green[700]),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.green[700],
+                          ),
                         ),
-                        subtitle: subtitle.isNotEmpty 
-                          ? Text(
-                              subtitle,
-                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                            )
-                          : null,
+                        subtitle: subtitle.isNotEmpty
+                            ? Text(
+                                subtitle,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                              )
+                            : null,
                         onTap: null,
                       );
                     },
                   )
-
                 else
                   // Pro版にアップグレード
                   ListTile(
