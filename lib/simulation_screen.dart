@@ -1611,9 +1611,17 @@ class _SimulationScreenState extends State<SimulationScreen>
 
     return results;
   }
-
-  // メールから入力ダイアログ
+// メールから入力ダイアログ（Pro版限定）
   Future<void> _showEmailImportDialog() async {
+    // Pro版チェック
+    final isPro = await ProService().isPro();
+    if (!isPro) {
+      if (mounted) {
+        showProPurchaseDialog(context);
+      }
+      return;
+    }
+
     // ログインチェック(匿名ユーザーも除外)
     final user = Supabase.instance.client.auth.currentUser;
     final isLoggedIn =
@@ -2974,7 +2982,21 @@ class _SimulationScreenState extends State<SimulationScreen>
               ElevatedButton.icon(
                 onPressed: _showEmailImportDialog,
                 icon: const Icon(Icons.email, size: 14),
-                label: const Text('メールから入力'),
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('メールから入力'),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
@@ -3262,7 +3284,21 @@ class _SimulationScreenState extends State<SimulationScreen>
           ElevatedButton.icon(
             onPressed: _showEmailImportDialog,
             icon: const Icon(Icons.email, size: 16),
-            label: const Text('メールから入力'),
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('メールから入力'),
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,
