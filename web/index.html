@@ -35,19 +35,20 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
-  <!-- アプリバージョン（更新時にここを変更）-->
-  <!--1.3.0　JAL,JTA,RACと同じ便名 を判別-->
+  <!-- アプリバージョン（更新時にここを変更） -->
+  <!--1.3.0　JAL,JTA,RACと同じ便名を識別-->
   <!--1.3.1　JTA,RACの便もプルダウンに表示されるよう変更-->
-  <!--1.3.2　Paint it Blackの空港無し県の表示変更-->
-  <!--1.3.2　位置情報の許可をユーザに求めるよう設定-->
+  <!--1.3.2　Paint it Blackの空港無料枠の表示変更-->
+  <!--1.3.2　座席情報の許可をユーザに求めるよう設定-->
   <!--1.4.0　Pro版追加-->
   <!--1.5.0　Stripe完了-->
-  <meta name="app-version" content="1.5.0">
+  <!--1.6.0　BottomNavigationBar + SW自動更新修正-->
+  <meta name="app-version" content="1.6.0">
 
   <title>MRP - Mileage Run Planner</title>
   <link rel="manifest" href="manifest.json">
   <script>
-    // PWAインストールバナーを抑制
+    // PWAインストールバナーを強制
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       window.deferredPrompt = e;  // 後で使えるように保存
@@ -195,7 +196,7 @@
   <div id="pwa-install-banner" class="pwa-banner">
     <div class="banner-content">
       <div class="banner-text">
-        <span class="banner-icon">✈️</span>
+        <span class="banner-icon">📲</span>
         <span class="banner-message">
           アプリとして使えます！<br>
           アドレスバー右の <span class="highlight">⊕</span> からインストール
@@ -210,7 +211,7 @@
     <div class="banner-content" style="flex-direction: column; align-items: stretch;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div class="banner-text">
-          <span class="banner-icon">✈️</span>
+          <span class="banner-icon">📲</span>
           <span class="banner-message">
             MRPをホーム画面に追加
           </span>
@@ -340,18 +341,39 @@
   </script>
 
   <script>
-    // Flutter Service Workerの待機状態を自動スキップ
+    // ========================================
+    // Service Worker 自動更新 + 自動リロード
+    // ========================================
+    // 修正: skipWaitingだけでなく、controllerchangeで
+    // ページを自動リロードして新キャッシュを確実に適用
+    
+    let refreshing = false;
+
     if ('serviceWorker' in navigator) {
+      // ★ 核心の修正: 新SWがactivateされたら自動リロード
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        console.log('[MRP] New service worker activated. Reloading...');
+        window.location.reload();
+      });
+
+      // 既存のSW登録を確認し、待機中のSWがあれば即activate
       navigator.serviceWorker.getRegistrations().then(registrations => {
         registrations.forEach(reg => {
+          // 既に待機中のSWがあれば即skipWaiting
           if (reg.waiting) {
             reg.waiting.postMessage('skipWaiting');
           }
+
+          // 新しいSWのインストールを監視
           reg.addEventListener('updatefound', () => {
             const newWorker = reg.installing;
             if (newWorker) {
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // 新SWがインストール完了→即activate指示
+                  console.log('[MRP] New service worker installed. Sending skipWaiting...');
                   newWorker.postMessage('skipWaiting');
                 }
               });

@@ -15,7 +15,8 @@ class FlightLogScreen extends StatefulWidget {
   State<FlightLogScreen> createState() => FlightLogScreenState();
 }
 
-class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProviderStateMixin {
+class FlightLogScreenState extends State<FlightLogScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> completedItineraries = [];
   List<Map<String, dynamic>> plannedItineraries = [];
@@ -71,10 +72,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
           .order('created_at', ascending: false);
 
       final list = List<Map<String, dynamic>>.from(response);
-      
+
       final completed = list.where((it) => it['is_completed'] == true).toList();
       final planned = list.where((it) => it['is_completed'] != true).toList();
-      
+
       _calculateTotals(completed);
 
       setState(() {
@@ -119,7 +120,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       totalLSP += (it['total_lsp'] as int?) ?? 0;
       final legs = it['legs'] as List<dynamic>? ?? [];
       totalLegs += legs.length;
-      
+
       // JAL/ANA別にカウント
       for (var leg in legs) {
         final l = leg as Map<String, dynamic>;
@@ -146,7 +147,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       _loadItineraries();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('修行済みに移動しました'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('修行済みに移動しました'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
@@ -166,25 +170,40 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
         title: Text(l10n.deleteConfirm),
         content: Text(l10n.deleteItineraryConfirm),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.cancel)),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.delete, style: const TextStyle(color: Colors.red))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );
 
     if (confirm == true) {
       try {
-        await Supabase.instance.client.from('saved_itineraries').delete().eq('id', id);
+        await Supabase.instance.client
+            .from('saved_itineraries')
+            .delete()
+            .eq('id', id);
         _loadItineraries();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.deleted), backgroundColor: Colors.green),
+            SnackBar(
+              content: Text(l10n.deleted),
+              backgroundColor: Colors.green,
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.deleteFailed(e.toString())), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text(l10n.deleteFailed(e.toString())),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }
@@ -228,7 +247,9 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
 
     final buf = StringBuffer();
     buf.write('\uFEFF');
-    buf.writeln('航空会社,日付,便名,出発空港,到着空港,出発時刻,到着時刻,運賃種別,座席クラス,運賃(円),FOP/PP,マイル,LSP');
+    buf.writeln(
+      '航空会社,日付,便名,出発空港,到着空港,出発時刻,到着時刻,運賃種別,座席クラス,運賃(円),FOP/PP,マイル,LSP',
+    );
 
     final legs = itinerary['legs'] as List<dynamic>? ?? [];
     for (var leg in legs) {
@@ -236,8 +257,8 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       final airline = l['airline'] ?? '';
       final date = l['date'] ?? '';
       final flightNum = l['flight_number'] ?? '';
-      final dep = l['departure'] ?? '';
-      final arr = l['arrival'] ?? '';
+      final dep = l['departure_airport'] ?? '';
+      final arr = l['arrival_airport'] ?? '';
       final depTime = l['departure_time'] ?? '';
       final arrTime = l['arrival_time'] ?? '';
       final fareType = (l['fare_type'] as String? ?? '').replaceAll(',', ' ');
@@ -246,15 +267,21 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       final fop = l['fop'] ?? 0;
       final miles = l['miles'] ?? 0;
       final lsp = l['lsp'] ?? 0;
-      buf.writeln('$airline,$date,$flightNum,$dep,$arr,$depTime,$arrTime,$fareType,$seatClass,$fare,$fop,$miles,$lsp');
+      buf.writeln(
+        '$airline,$date,$flightNum,$dep,$arr,$depTime,$arrTime,$fareType,$seatClass,$fare,$fop,$miles,$lsp',
+      );
     }
 
     final bytes = utf8.encode(buf.toString());
     final blob = html.Blob([bytes], 'text/csv');
     final url = html.Url.createObjectUrlFromBlob(blob);
-    final title = (itinerary['title'] as String? ?? 'flight_log').replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+    final title = (itinerary['title'] as String? ?? 'flight_log').replaceAll(
+      RegExp(r'[^a-zA-Z0-9_\-]'),
+      '_',
+    );
     final now = DateTime.now();
-    final filename = 'MRP_${title}_${now.year}${now.month.toString().padLeft(2, "0")}${now.day.toString().padLeft(2, "0")}.csv';
+    final filename =
+        'MRP_${title}_${now.year}${now.month.toString().padLeft(2, "0")}${now.day.toString().padLeft(2, "0")}.csv';
     html.AnchorElement(href: url)
       ..setAttribute('download', filename)
       ..click();
@@ -262,7 +289,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('CSVをダウンロードしました'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('CSVをダウンロードしました'),
+          backgroundColor: Colors.green,
+        ),
       );
     }
   }
@@ -301,7 +331,11 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
     try {
       final parts = dateStr.split('/');
       if (parts.length == 3) {
-        return DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+        return DateTime(
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+          int.parse(parts[2]),
+        );
       }
       return DateTime.parse(dateStr);
     } catch (e) {
@@ -331,11 +365,17 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
 
     if (errorMessage != null) {
       return Center(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text(errorMessage!, style: const TextStyle(color: Colors.red)),
-          const SizedBox(height: 16),
-          ElevatedButton(onPressed: _loadItineraries, child: Text(l10n.reload)),
-        ]),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(errorMessage!, style: const TextStyle(color: Colors.red)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadItineraries,
+              child: Text(l10n.reload),
+            ),
+          ],
+        ),
       );
     }
 
@@ -383,10 +423,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
         Expanded(
           child: TabBarView(
             controller: _tabController,
-            children: [
-              _buildCompletedTab(l10n),
-              _buildPlannedTab(l10n),
-            ],
+            children: [_buildCompletedTab(l10n), _buildPlannedTab(l10n)],
           ),
         ),
       ],
@@ -415,7 +452,11 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                 padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => _buildItineraryCard(completedItineraries[index], isMobile, isCompleted: true),
+                    (context, index) => _buildItineraryCard(
+                      completedItineraries[index],
+                      isMobile,
+                      isCompleted: true,
+                    ),
                     childCount: completedItineraries.length,
                   ),
                 ),
@@ -430,7 +471,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
 
   Widget _buildPlannedTab(AppLocalizations l10n) {
     if (plannedItineraries.isEmpty) {
-      return _buildEmptyTabView('予定の旅程はありません\nシミュレーションから追加してください', Icons.flight_takeoff);
+      return _buildEmptyTabView(
+        '予定の旅程はありません\nシミュレーションから追加してください',
+        Icons.flight_takeoff,
+      );
     }
 
     return RefreshIndicator(
@@ -444,7 +488,11 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                 padding: EdgeInsets.all(isMobile ? 12 : 16),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => _buildItineraryCard(plannedItineraries[index], isMobile, isCompleted: false),
+                    (context, index) => _buildItineraryCard(
+                      plannedItineraries[index],
+                      isMobile,
+                      isCompleted: false,
+                    ),
                     childCount: plannedItineraries.length,
                   ),
                 ),
@@ -461,22 +509,25 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              shape: BoxShape.circle,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 48, color: Colors.grey[400]),
             ),
-            child: Icon(icon, size: 48, color: Colors.grey[400]),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            message,
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            textAlign: TextAlign.center,
-          ),
-        ]),
+            const SizedBox(height: 24),
+            Text(
+              message,
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -485,28 +536,39 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.purple[50],
-              shape: BoxShape.circle,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.purple[50],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.flight_takeoff,
+                size: 48,
+                color: Colors.purple[400],
+              ),
             ),
-            child: Icon(Icons.flight_takeoff, size: 48, color: Colors.purple[400]),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            l10n.loginRequiredToSaveItineraries,
-            style: TextStyle(fontSize: 16, color: Colors.grey[700], fontWeight: FontWeight.w500),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.loginFromTopRight,
-            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-            textAlign: TextAlign.center,
-          ),
-        ]),
+            const SizedBox(height: 24),
+            Text(
+              l10n.loginRequiredToSaveItineraries,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.loginFromTopRight,
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -514,11 +576,12 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
   Widget _buildSummaryCard(AppLocalizations l10n, bool isMobile) {
     final hasJAL = totalFOP > 0 || _jalLegs > 0;
     final hasANA = totalPP > 0 || _anaLegs > 0;
-    
+
     // JALのみ
     if (hasJAL && !hasANA) {
       return _buildSingleAirlineSummary(
-        l10n, isMobile, 
+        l10n,
+        isMobile,
         isJAL: true,
         points: totalFOP,
         miles: _jalMiles,
@@ -526,11 +589,12 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
         legs: _jalLegs,
       );
     }
-    
+
     // ANAのみ
     if (hasANA && !hasJAL) {
       return _buildSingleAirlineSummary(
-        l10n, isMobile,
+        l10n,
+        isMobile,
         isJAL: false,
         points: totalPP,
         miles: _anaMiles,
@@ -538,7 +602,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
         legs: _anaLegs,
       );
     }
-    
+
     // 混在: 上下分割
     return Column(
       children: [
@@ -569,9 +633,20 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
             children: [
               Row(
                 children: [
-                  const Icon(Icons.emoji_events, color: Colors.yellow, size: 20),
+                  const Icon(
+                    Icons.emoji_events,
+                    color: Colors.yellow,
+                    size: 20,
+                  ),
                   const SizedBox(width: 6),
-                  const Text('JAL 修行実績', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'JAL 修行実績',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -615,9 +690,20 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
             children: [
               Row(
                 children: [
-                  const Icon(Icons.emoji_events, color: Colors.yellow, size: 20),
+                  const Icon(
+                    Icons.emoji_events,
+                    color: Colors.yellow,
+                    size: 20,
+                  ),
                   const SizedBox(width: 6),
-                  const Text('ANA 修行実績', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'ANA 修行実績',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -643,10 +729,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       children: [
         Text(
           '$label ',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 11,
-          ),
+          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
         ),
         Text(
           _formatNumber(value),
@@ -660,14 +743,16 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
     );
   }
 
-  Widget _buildSingleAirlineSummary(AppLocalizations l10n, bool isMobile, {
+  Widget _buildSingleAirlineSummary(
+    AppLocalizations l10n,
+    bool isMobile, {
     required bool isJAL,
     required int points,
     required int miles,
     required int lsp,
     required int legs,
   }) {
-    final colors = isJAL 
+    final colors = isJAL
         ? [Colors.red[700]!, Colors.red[500]!]
         : [Colors.blue[700]!, Colors.blue[500]!];
     final shadowColor = isJAL ? Colors.red : Colors.blue;
@@ -730,10 +815,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 11,
-          ),
+          style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11),
         ),
         const SizedBox(height: 2),
         Text(
@@ -748,7 +830,11 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
     );
   }
 
-  Widget _buildItineraryCard(Map<String, dynamic> itinerary, bool isMobile, {required bool isCompleted}) {
+  Widget _buildItineraryCard(
+    Map<String, dynamic> itinerary,
+    bool isMobile, {
+    required bool isCompleted,
+  }) {
     final l10n = AppLocalizations.of(context)!;
     final id = itinerary['id'] as String;
     final title = itinerary['title'] as String? ?? l10n.untitled;
@@ -780,7 +866,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
             color: Colors.purple[100],
             borderRadius: BorderRadius.circular(4),
           ),
-          child: Text('📅 予定', style: TextStyle(fontSize: 10, color: Colors.purple[700])),
+          child: Text(
+            '📅 予定',
+            style: TextStyle(fontSize: 10, color: Colors.purple[700]),
+          ),
         );
       } else if (isPast) {
         dateBadge = Container(
@@ -789,7 +878,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
             color: Colors.orange,
             borderRadius: BorderRadius.circular(4),
           ),
-          child: const Text('過去日付', style: TextStyle(fontSize: 10, color: Colors.white)),
+          child: const Text(
+            '過去日付',
+            style: TextStyle(fontSize: 10, color: Colors.white),
+          ),
         );
       }
     }
@@ -829,7 +921,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                       Expanded(
                         child: Text(
                           title,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -848,12 +943,40 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      if (totalFop > 0) _buildStatChip('FOP', _formatNumber(totalFop), Colors.red),
-                      if (totalPp > 0) _buildStatChip('PP', _formatNumber(totalPp), Colors.blue),
-                      _buildStatChip(l10n.miles, _formatNumber(totalMiles), Colors.orange),
-                      if (totalLsp > 0) _buildStatChip('LSP', _formatNumber(totalLsp), Colors.purple),
-                      if (totalFare > 0) _buildStatChip('', '¥${_formatNumber(totalFare)}', Colors.green),
-                      if (unitPrice != '-') _buildUnitPriceChip(unitPrice, totalFop > 0 ? 'FOP' : 'PP'),
+                      if (totalFop > 0)
+                        _buildStatChip(
+                          'FOP',
+                          _formatNumber(totalFop),
+                          Colors.red,
+                        ),
+                      if (totalPp > 0)
+                        _buildStatChip(
+                          'PP',
+                          _formatNumber(totalPp),
+                          Colors.blue,
+                        ),
+                      _buildStatChip(
+                        l10n.miles,
+                        _formatNumber(totalMiles),
+                        Colors.orange,
+                      ),
+                      if (totalLsp > 0)
+                        _buildStatChip(
+                          'LSP',
+                          _formatNumber(totalLsp),
+                          Colors.purple,
+                        ),
+                      if (totalFare > 0)
+                        _buildStatChip(
+                          '',
+                          '¥${_formatNumber(totalFare)}',
+                          Colors.green,
+                        ),
+                      if (unitPrice != '-')
+                        _buildUnitPriceChip(
+                          unitPrice,
+                          totalFop > 0 ? 'FOP' : 'PP',
+                        ),
                     ],
                   ),
                 ],
@@ -865,7 +988,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
             InkWell(
               onTap: () => _markAsCompleted(id),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green[50],
                   borderRadius: const BorderRadius.only(
@@ -886,7 +1012,11 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                     const SizedBox(width: 10),
                     Text(
                       '搭乗済み → 修行済みに移動',
-                      style: TextStyle(fontSize: 13, color: Colors.green[700], fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -900,7 +1030,9 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ...legs.map((leg) => _buildLegSummary(leg as Map<String, dynamic>)),
+                  ...legs.map(
+                    (leg) => _buildLegSummary(leg as Map<String, dynamic>),
+                  ),
                   const SizedBox(height: 12),
                   Wrap(
                     alignment: WrapAlignment.end,
@@ -916,19 +1048,32 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                             const Text('CSV'),
                             const SizedBox(width: 4),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.purple[700],
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text('PRO', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                              child: const Text(
+                                'PRO',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ],
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.purple[700],
                           side: BorderSide(color: Colors.purple[200]!),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           textStyle: const TextStyle(fontSize: 12),
                         ),
                       ),
@@ -940,7 +1085,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.black87,
                           side: BorderSide(color: Colors.grey[300]!),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           textStyle: const TextStyle(fontSize: 12),
                         ),
                       ),
@@ -952,7 +1100,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
                           side: BorderSide(color: Colors.red[200]!),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           textStyle: const TextStyle(fontSize: 12),
                         ),
                       ),
@@ -978,10 +1129,24 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
         mainAxisSize: MainAxisSize.min,
         children: [
           if (label.isNotEmpty) ...[
-            Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w500)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             const SizedBox(width: 4),
           ],
-          Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
@@ -997,7 +1162,11 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       ),
       child: Text(
         '$value/$pointType',
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.yellow[900]),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Colors.yellow[900],
+        ),
       ),
     );
   }
@@ -1017,7 +1186,8 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
     final pointLabel = airline == 'JAL' ? 'FOP' : 'PP';
 
     // 表示文字列を組み立て
-    String statsText = '$pointLabel:${_formatNumber(fop)} / ${_formatNumber(miles)}M';
+    String statsText =
+        '$pointLabel:${_formatNumber(fop)} / ${_formatNumber(miles)}M';
     if (airline == 'JAL' && lsp > 0) {
       statsText += ' / ${lsp}LSP';
     }
@@ -1036,14 +1206,21 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
             ),
             child: Text(
               airline,
-              style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 10,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const SizedBox(width: 6),
           // 便名
           SizedBox(
             width: 40,
-            child: Text(flightNumber, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+            child: Text(
+              flightNumber,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+            ),
           ),
           // 日付（あれば）
           if (date.isNotEmpty) ...[
@@ -1052,24 +1229,40 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
           ],
           // 出発時刻
           if (depTime.isNotEmpty)
-            Text('$depTime ', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            Text(
+              '$depTime ',
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            ),
           // 出発空港
-          Text(dep, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(
+            dep,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
           // 矢印
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Icon(Icons.arrow_forward, size: 14, color: Colors.grey[400]),
           ),
           // 到着空港
-          Text(arr, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(
+            arr,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
           // 到着時刻
           if (arrTime.isNotEmpty)
-            Text(' $arrTime', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            Text(
+              ' $arrTime',
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            ),
           const Spacer(),
           // FOP/PP + マイル + LSP（JALのみ）
           Text(
             statsText,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: airlineColor),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: airlineColor,
+            ),
           ),
         ],
       ),
@@ -1111,7 +1304,7 @@ class _ShareDialogState extends State<_ShareDialog> {
     final itinerary = widget.itinerary;
     final theme = _themeController.text.trim();
     final comment = _commentController.text.trim();
-    
+
     final title = itinerary['title'] as String? ?? '';
     final fop = itinerary['total_fop'] as int? ?? 0;
     final pp = itinerary['total_pp'] as int? ?? 0;
@@ -1119,7 +1312,7 @@ class _ShareDialogState extends State<_ShareDialog> {
     final lsp = itinerary['total_lsp'] as int? ?? 0;
     final fare = itinerary['total_fare'] as int? ?? 0;
     final legs = itinerary['legs'] as List<dynamic>? ?? [];
-    
+
     // 日付取得
     String dateStr = '';
     if (legs.isNotEmpty) {
@@ -1148,15 +1341,19 @@ class _ShareDialogState extends State<_ShareDialog> {
     }
     header.writeln('🛫 $title');
     header.writeln('');
-    
+
     // 統計部分
     final stats = StringBuffer();
     if (fop > 0) {
-      stats.write('📊 FOP: ${_formatNumber(fop)} / マイル: ${_formatNumber(miles)}');
+      stats.write(
+        '📊 FOP: ${_formatNumber(fop)} / マイル: ${_formatNumber(miles)}',
+      );
       if (lsp > 0) stats.write(' / ${lsp}LSP');
       stats.writeln('');
     } else if (pp > 0) {
-      stats.writeln('📊 PP: ${_formatNumber(pp)} / マイル: ${_formatNumber(miles)}');
+      stats.writeln(
+        '📊 PP: ${_formatNumber(pp)} / マイル: ${_formatNumber(miles)}',
+      );
     }
     if (fare > 0) {
       stats.write('💰 ¥${_formatNumber(fare)}');
@@ -1180,7 +1377,8 @@ class _ShareDialogState extends State<_ShareDialog> {
 
     // 詳細なしの場合
     if (!_showDetails) {
-      final text = '${header.toString()}${stats.toString()}${footer.toString()}';
+      final text =
+          '${header.toString()}${stats.toString()}${footer.toString()}';
       return [text];
     }
 
@@ -1196,7 +1394,7 @@ class _ShareDialogState extends State<_ShareDialog> {
       final depTime = l['departure_time'] as String? ?? '';
       final arrTime = l['arrival_time'] as String? ?? '';
       final legDate = l['date'] as String? ?? '';
-      
+
       String line = '$legAirline $flightNum';
       if (legDate.isNotEmpty && legs.length > 1) {
         line += ' | $legDate';
@@ -1215,22 +1413,23 @@ class _ShareDialogState extends State<_ShareDialog> {
     // 280文字で分割
     const maxLength = 270; // URLの余裕を持たせる
     final texts = <String>[];
-    
+
     // 最初のツイート
     var current = StringBuffer();
     current.write(header.toString());
     current.write(stats.toString());
-    
+
     int legIndex = 0;
     for (var legLine in legLines) {
-      if (current.length + legLine.length + 1 > maxLength && current.length > 0) {
+      if (current.length + legLine.length + 1 > maxLength &&
+          current.length > 0) {
         texts.add(current.toString());
         current = StringBuffer();
       }
       current.writeln(legLine);
       legIndex++;
     }
-    
+
     // 最後にフッターを追加
     if (current.length + footer.length > maxLength && current.length > 0) {
       texts.add(current.toString());
@@ -1253,12 +1452,12 @@ class _ShareDialogState extends State<_ShareDialog> {
   void _share() {
     final texts = _generateShareTexts();
     Navigator.pop(context);
-    
+
     // 最初のツイートを開く
     final text = Uri.encodeComponent(texts[0]);
     final url = 'https://twitter.com/intent/tweet?text=$text';
     launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    
+
     // 複数ある場合は通知
     if (texts.length > 1) {
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -1280,11 +1479,11 @@ class _ShareDialogState extends State<_ShareDialog> {
 
   void _shareNext(List<String> texts, int index) {
     if (index >= texts.length) return;
-    
+
     final text = Uri.encodeComponent(texts[index]);
     final url = 'https://twitter.com/intent/tweet?text=$text';
     launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    
+
     if (index + 1 < texts.length) {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
@@ -1308,7 +1507,7 @@ class _ShareDialogState extends State<_ShareDialog> {
     final legs = widget.itinerary['legs'] as List<dynamic>? ?? [];
     final shareTexts = _generateShareTexts();
     final hasMultipleTweets = shareTexts.length > 1;
-    
+
     return AlertDialog(
       title: const Row(
         children: [
@@ -1352,7 +1551,10 @@ class _ShareDialogState extends State<_ShareDialog> {
               value: _showDetails,
               onChanged: (v) => setState(() => _showDetails = v ?? false),
               title: const Text('フライト詳細を含める', style: TextStyle(fontSize: 14)),
-              subtitle: Text('${legs.length}レグの時刻表を表示', style: const TextStyle(fontSize: 12)),
+              subtitle: Text(
+                '${legs.length}レグの時刻表を表示',
+                style: const TextStyle(fontSize: 12),
+              ),
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
               dense: true,
@@ -1375,7 +1577,11 @@ class _ShareDialogState extends State<_ShareDialog> {
                       const SizedBox(width: 4),
                       Text(
                         'プレビュー${hasMultipleTweets ? "（${shareTexts.length}件に分割）" : ""}',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[700],
+                        ),
                       ),
                     ],
                   ),
@@ -1399,7 +1605,11 @@ class _ShareDialogState extends State<_ShareDialog> {
                               padding: const EdgeInsets.only(bottom: 4),
                               child: Text(
                                 'ツイート ${index + 1}/${shareTexts.length}',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue[700]),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[700],
+                                ),
                               ),
                             ),
                           Text(
@@ -1413,7 +1623,9 @@ class _ShareDialogState extends State<_ShareDialog> {
                               '${text.length}/280文字',
                               style: TextStyle(
                                 fontSize: 10,
-                                color: text.length > 280 ? Colors.red : Colors.grey[500],
+                                color: text.length > 280
+                                    ? Colors.red
+                                    : Colors.grey[500],
                               ),
                             ),
                           ),
@@ -1435,7 +1647,9 @@ class _ShareDialogState extends State<_ShareDialog> {
         ElevatedButton.icon(
           onPressed: _share,
           icon: const Icon(Icons.send, size: 18),
-          label: Text(hasMultipleTweets ? 'シェア (1/${shareTexts.length})' : 'シェア'),
+          label: Text(
+            hasMultipleTweets ? 'シェア (1/${shareTexts.length})' : 'シェア',
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue,
             foregroundColor: Colors.white,

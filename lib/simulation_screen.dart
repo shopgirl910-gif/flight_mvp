@@ -1889,9 +1889,23 @@ class _SimulationScreenState extends State<SimulationScreen>
     controller.dispose();
 
     if (result != null && result.isNotEmpty) {
-      // 解析結果を既存レグに追加（削除しない）
+      // 空のレグを自動削除（デフォルトレグ等）
+      for (int i = legs.length - 1; i >= 0; i--) {
+        final leg = legs[i];
+        final legId = leg['id'] as int;
+        final hasFlightNum =
+            (flightNumberControllers[legId]?.text ?? '').isNotEmpty;
+        final hasDep = (leg['departureAirport'] as String).isNotEmpty;
+        final hasArr = (leg['arrivalAirport'] as String).isNotEmpty;
+        final hasDate = (dateControllers[legId]?.text ?? '').isNotEmpty;
+        if (!hasFlightNum && !hasDep && !hasArr && !hasDate) {
+          _removeLeg(i);
+        }
+      }
+      // 新しいレグを追加
+
+      // 解析結果をレグに追加
       for (int i = 0; i < result.length; i++) {
-        // 新しいレグを追加
         _addLeg();
         await Future.delayed(const Duration(milliseconds: 50));
 
@@ -2057,9 +2071,6 @@ class _SimulationScreenState extends State<SimulationScreen>
       },
     );
   }
-
-  // ========== おまかせ最適化タブ ==========
-
   // ========== おまかせ最適化タブ ==========
 
   // 運賃種別からfareRate/bonusFopを抽出

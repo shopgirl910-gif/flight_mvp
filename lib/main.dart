@@ -70,13 +70,13 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-
+  final _flightLogKey = GlobalKey<FlightLogScreenState>();
   @override
   void initState() {
     super.initState();
     _ensureSignedIn();
     _handleAuthStateChange();
-    // リセットリンクから来た場合のチェック
+    // ãƒªã‚»ãƒƒãƒˆãƒªãƒ³ã‚¯ã‹ã‚‰æ¥ãŸå ´åˆã®ãƒã‚§ãƒƒã‚¯
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForPasswordRecovery();
       _checkPaymentResult();
@@ -85,10 +85,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _ensureSignedIn() async {
     final uri = Uri.base;
-    // パスワードリセットまたはStripe決済から戻ってきた場合はスキップ
     if (uri.fragment.contains('type=recovery')) return;
-    if (uri.queryParameters.containsKey('payment')) return;
-
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) {
       await Supabase.instance.client.auth.signInAnonymously();
@@ -132,7 +129,7 @@ class _MainScreenState extends State<MainScreen> {
                   controller: newPasswordController,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: '新しいパスワード',
+                    labelText: 'æ–°ã—ã„ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰',
                     border: OutlineInputBorder(),
                     isDense: true,
                     prefixIcon: Icon(Icons.lock),
@@ -143,7 +140,7 @@ class _MainScreenState extends State<MainScreen> {
                   controller: confirmPasswordController,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'パスワード確認',
+                    labelText: 'ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ç¢ºèª',
                     border: OutlineInputBorder(),
                     isDense: true,
                     prefixIcon: Icon(Icons.lock_outline),
@@ -168,15 +165,24 @@ class _MainScreenState extends State<MainScreen> {
                             .trim();
 
                         if (newPass.isEmpty) {
-                          setDialogState(() => dialogError = 'パスワードを入力してください');
+                          setDialogState(
+                            () => dialogError =
+                                'ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„',
+                          );
                           return;
                         }
                         if (newPass.length < 6) {
-                          setDialogState(() => dialogError = 'パスワードは6文字以上必要です');
+                          setDialogState(
+                            () => dialogError =
+                                'ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ã¯6æ–‡å­—ä»¥ä¸Šå¿…è¦ã§ã™',
+                          );
                           return;
                         }
                         if (newPass != confirmPass) {
-                          setDialogState(() => dialogError = 'パスワードが一致しません');
+                          setDialogState(
+                            () => dialogError =
+                                'ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ãŒä¸€è‡´ã—ã¾ã›ã‚“',
+                          );
                           return;
                         }
 
@@ -193,7 +199,9 @@ class _MainScreenState extends State<MainScreen> {
                           if (mounted) {
                             ScaffoldMessenger.of(this.context).showSnackBar(
                               const SnackBar(
-                                content: Text('パスワードを更新しました'),
+                                content: Text(
+                                  'ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ã‚’æ›´æ–°ã—ã¾ã—ãŸ',
+                                ),
                                 backgroundColor: Colors.green,
                               ),
                             );
@@ -207,7 +215,7 @@ class _MainScreenState extends State<MainScreen> {
                                 ).languageCode ==
                                 'ja';
                             msg = isJa
-                                ? '現在と同じパスワードは使えません'
+                                ? 'ç¾åœ¨ã¨åŒã˜ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ã¯ä½¿ãˆã¾ã›ã‚“'
                                 : 'New password must be different from the current one';
                           }
                           setDialogState(() {
@@ -228,7 +236,10 @@ class _MainScreenState extends State<MainScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text('更新', style: TextStyle(color: Colors.white)),
+                    : const Text(
+                        'æ›´æ–°',
+                        style: TextStyle(color: Colors.white),
+                      ),
               ),
             ],
           ),
@@ -242,7 +253,7 @@ class _MainScreenState extends State<MainScreen> {
     final payment = uri.queryParameters['payment'];
 
     if (payment == 'success') {
-      // URLからパラメータを消す
+      // URLã‹ã‚‰ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã‚’æ¶ˆã™
       html.window.history.replaceState(null, '', uri.path);
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -293,9 +304,9 @@ class _MainScreenState extends State<MainScreen> {
     return [l10n.tabSimulate, l10n.tabLog, l10n.tabQuiz, l10n.tabCheckin];
   }
 
-  final List<Widget> _screens = [
+  late final List<Widget> _screens = [
     const SimulationScreen(),
-    const FlightLogScreen(),
+    FlightLogScreen(key: _flightLogKey),
     const QuizScreen(),
     const CheckinScreen(),
   ];
@@ -316,7 +327,7 @@ class _MainScreenState extends State<MainScreen> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ユーザー情報
+                // ãƒ¦ãƒ¼ã‚¶ãƒ¼æƒ…å ±
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -348,7 +359,7 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                             Text(
                               _isLoggedIn
-                                  ? (isJapanese ? 'ログイン中' : 'Logged in')
+                                  ? (isJapanese ? 'ログイン中­' : 'Logged in')
                                   : (isJapanese ? '未ログイン' : 'Not logged in'),
                               style: TextStyle(
                                 color: Colors.grey[600],
@@ -362,9 +373,9 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                 ),
                 const Divider(height: 1),
-                // Pro版
+                // Proç‰ˆ
                 if (isPro)
-                  // Pro版利用中
+                  // Proç‰ˆåˆ©ç”¨ä¸­
                   FutureBuilder<DateTime?>(
                     future: ProService().getProExpiryDate(),
                     builder: (context, expirySnapshot) {
@@ -387,7 +398,7 @@ class _MainScreenState extends State<MainScreen> {
                           color: Colors.green[700],
                         ),
                         title: Text(
-                          isJapanese ? 'Pro版利用中 ✓' : 'Pro Version Active ✓',
+                          isJapanese ? 'Pro版利用中 ✔' : 'Pro Version Active ✔',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.green[700],
@@ -407,7 +418,7 @@ class _MainScreenState extends State<MainScreen> {
                     },
                   )
                 else
-                  // Pro版にアップグレード
+                  //Pro版にアップグレード
                   ListTile(
                     dense: true,
                     leading: Icon(
@@ -442,7 +453,7 @@ class _MainScreenState extends State<MainScreen> {
                     );
                   },
                 ),
-                // ログアウト
+                // ログイン中
                 if (_isLoggedIn)
                   ListTile(
                     dense: true,
@@ -529,13 +540,55 @@ class _MainScreenState extends State<MainScreen> {
     final currentLocale = Localizations.localeOf(context);
     final isJapanese = currentLocale.languageCode == 'ja';
 
+    final tabLabels = _getTabLabels(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('MRP - Mileage Run Planner'),
+        title: Row(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  'MRP',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                Text(
+                  'Mileage Run Planner',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.normal,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                isJapanese
+                    ? 'JALもANAも、FOPもPPもまとめて比較'
+                    : 'Compare JAL & ANA — FOP, PP, miles in one place.',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         backgroundColor: Colors.purple[700],
         foregroundColor: Colors.white,
         actions: [
-          // 言語切替ボタン
+          //
           GestureDetector(
             onTap: () {
               final newLocale = isJapanese
@@ -560,82 +613,64 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-          // ユーザーメニューボタン
+          //
           GestureDetector(
             onTap: () => _showUserMenu(context),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              width: 34,
+              height: 34,
               margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
+                shape: BoxShape.circle,
                 color: _isLoggedIn
-                    ? Colors.white.withOpacity(0.2)
+                    ? Colors.white.withOpacity(0.15)
                     : Colors.orange.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 2,
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _isLoggedIn ? Icons.person : Icons.person_outline,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _displayName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              child: Icon(
+                _isLoggedIn ? Icons.person : Icons.person_outline,
+                size: 18,
+                color: Colors.white,
               ),
             ),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: Container(
-            color: Colors.purple[700],
-            child: Row(
-              children: List.generate(_getTabLabels(context).length, (index) {
-                final tabLabels = _getTabLabels(context);
-                final isSelected = _selectedIndex == index;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedIndex = index),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.white : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: isSelected
-                            ? null
-                            : Border.all(color: Colors.white38, width: 1),
-                      ),
-                      child: Text(
-                        tabLabels[index],
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: isSelected ? Colors.purple[700] : Colors.white,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) {
+          setState(() => _selectedIndex = index);
+          if (index == 1) _flightLogKey.currentState?.refresh();
+        },
+        backgroundColor: Colors.white,
+        indicatorColor: Colors.purple[100],
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        height: 72,
+        destinations: [
+          NavigationDestination(
+            icon: Icon(Icons.flight, color: Colors.grey[500]),
+            selectedIcon: Icon(Icons.flight, color: Colors.purple[700]),
+            label: tabLabels[0],
           ),
-        ),
+          NavigationDestination(
+            icon: Icon(Icons.menu_book, color: Colors.grey[500]),
+            selectedIcon: Icon(Icons.menu_book, color: Colors.purple[700]),
+            label: tabLabels[1],
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.quiz, color: Colors.grey[500]),
+            selectedIcon: Icon(Icons.quiz, color: Colors.purple[700]),
+            label: tabLabels[2],
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.location_on, color: Colors.grey[500]),
+            selectedIcon: Icon(Icons.location_on, color: Colors.purple[700]),
+            label: tabLabels[3],
+          ),
+        ],
       ),
       body: IndexedStack(index: _selectedIndex, children: _screens),
     );
