@@ -41,7 +41,8 @@
   <!--1.3.2　Paint it Blackの空港無し県の表示変更-->
   <!--1.3.2　位置情報の許可をユーザに求めるよう設定-->
   <!--1.4.0　Pro版追加-->
-  <meta name="app-version" content="1.4.0">
+  <!--1.5.0　Stripe完了-->
+  <meta name="app-version" content="1.5.0">
 
   <title>MRP - Mileage Run Planner</title>
   <link rel="manifest" href="manifest.json">
@@ -336,19 +337,6 @@
       iosBanner.style.display = 'none';
     });
 
-    // Service Worker更新検知
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        // Skip banner if user just clicked update
-        if (localStorage.getItem('mrp-updating')) {
-          localStorage.removeItem('mrp-updating');
-          return;
-        }
-        if (!updateBanner.style.display || updateBanner.style.display === 'none') {
-          updateBanner.style.display = 'block';
-        }
-      });
-    }
   </script>
 
   <script>
