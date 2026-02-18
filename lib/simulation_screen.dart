@@ -3969,7 +3969,7 @@ class _SimulationScreenState extends State<SimulationScreen>
         ),
       );
     }
-    return _buildDesktopLegCard(context, leg, index);
+    return _buildDesktopLegCard(context, leg, index, isLatest: isLatest);
   }
 
   Widget _buildMobileExpandedContent(
@@ -4755,8 +4755,9 @@ class _SimulationScreenState extends State<SimulationScreen>
   Widget _buildDesktopLegCard(
     BuildContext context,
     Map<String, dynamic> leg,
-    int index,
-  ) {
+    int index, {
+    bool isLatest = false,
+  }) {
     final legId = leg['id'] as int,
         airline = leg['airline'] as String,
         fop = leg['calculatedFOP'] as int?,
@@ -4768,7 +4769,7 @@ class _SimulationScreenState extends State<SimulationScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isLatest ? Colors.yellow[50] : Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: airlineColor.withOpacity(0.3)),
         boxShadow: [
