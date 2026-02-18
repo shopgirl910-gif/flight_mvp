@@ -6,6 +6,9 @@ import 'plan_optimizer.dart';
 import 'pro_service.dart';
 import 'pro_purchase_screen.dart';
 import 'pro_purchase_dialog.dart';
+import 'dart:convert';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 class SimulationScreen extends StatefulWidget {
   const SimulationScreen({super.key});
@@ -331,6 +334,7 @@ class _SimulationScreenState extends State<SimulationScreen>
         '${oneMonthLater.year}/${oneMonthLater.month.toString().padLeft(2, '0')}/${oneMonthLater.day.toString().padLeft(2, '0')}';
     _initAirlineAirports();
     _addLeg(); // 初期レグ作成（入力専用カードとして使用）
+    _restoreLegsFromStorage();
     _loadUserProfile();
   }
 
@@ -408,6 +412,98 @@ class _SimulationScreenState extends State<SimulationScreen>
     super.dispose();
   }
 
+  /// 購入フロー用にレグデータを一時保存
+  void _saveLegsToStorage() {
+    try {
+      final legsData = legs.map((leg) {
+        final legId = leg['id'] as int;
+        return {
+          'airline': leg['airline'],
+          'departureAirport': leg['departureAirport'],
+          'arrivalAirport': leg['arrivalAirport'],
+          'fareType': leg['fareType'],
+          'seatClass': leg['seatClass'],
+          'date': dateControllers[legId]?.text ?? '',
+          'flightNumber': flightNumberControllers[legId]?.text ?? '',
+          'departureTime': departureTimeControllers[legId]?.text ?? '',
+          'arrivalTime': arrivalTimeControllers[legId]?.text ?? '',
+          'fareAmount': fareAmountControllers[legId]?.text ?? '',
+        };
+      }).toList();
+
+      html.window.localStorage['pending_checkout_legs'] = jsonEncode(legsData);
+    } catch (e) {
+      debugPrint('レグ保存エラー: $e');
+    }
+  }
+
+  /// 購入フロー後にレグデータを復元
+  void _restoreLegsFromStorage() {
+    try {
+      final stored = html.window.localStorage['pending_checkout_legs'];
+      if (stored == null || stored.isEmpty) return;
+
+      final legsData = jsonDecode(stored) as List<dynamic>;
+      if (legsData.isEmpty) return;
+
+      // 既存のレグをクリア（initStateで追加された1つ目のみ）
+      if (legs.length == 1) {
+        _removeLeg(0);
+      }
+
+      // 保存されたレグを復元
+      for (final data in legsData) {
+        final legId = _legIdCounter++;
+        dateControllers[legId] = TextEditingController(
+          text: data['date'] ?? '',
+        );
+        flightNumberControllers[legId] = TextEditingController(
+          text: data['flightNumber'] ?? '',
+        );
+        departureTimeControllers[legId] = TextEditingController(
+          text: data['departureTime'] ?? '',
+        );
+        arrivalTimeControllers[legId] = TextEditingController(
+          text: data['arrivalTime'] ?? '',
+        );
+        fareAmountControllers[legId] = TextEditingController(
+          text: data['fareAmount'] ?? '',
+        );
+        departureAirportControllers[legId] = TextEditingController(
+          text: data['departureAirport'] ?? '',
+        );
+        arrivalAirportControllers[legId] = TextEditingController(
+          text: data['arrivalAirport'] ?? '',
+        );
+        departureAirportFocusNodes[legId] = FocusNode();
+        arrivalAirportFocusNodes[legId] = FocusNode();
+
+        legs.add({
+          'id': legId,
+          'airline': data['airline'] ?? 'JAL',
+          'departureAirport': data['departureAirport'] ?? '',
+          'arrivalAirport': data['arrivalAirport'] ?? '',
+          'fareType': data['fareType'] ?? '',
+          'seatClass': data['seatClass'] ?? '',
+          'calculatedFOP': null,
+          'calculatedMiles': null,
+          'calculatedLSP': null,
+        });
+      }
+
+      if (legs.isNotEmpty) {
+        expandedLegId = legs.last['id'] as int;
+      }
+
+      // 復元後にストレージをクリア
+      html.window.localStorage.remove('pending_checkout_legs');
+
+      setState(() {});
+    } catch (e) {
+      debugPrint('レグ復元エラー: $e');
+    }
+  }
+
   void _addLeg() async {
     final proService = ProService();
     final isPro = await proService.isPro();
@@ -430,7 +526,10 @@ class _SimulationScreenState extends State<SimulationScreen>
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  showProPurchaseDialog(context);
+                  showProPurchaseDialog(
+                    context,
+                    onBeforeCheckout: _saveLegsToStorage,
+                  );
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
                 child: const Text(
@@ -470,7 +569,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     dateControllers[legId]?.text = date;
     departureAirportControllers[legId]?.text = departureAirport;
     arrivalAirportControllers[legId]?.text = arrivalAirport;
-    
+
     setState(() {
       legs.add({
         'id': legId,
@@ -485,7 +584,7 @@ class _SimulationScreenState extends State<SimulationScreen>
       });
       expandedLegId = legId;
     });
-    
+
     if (departureAirport.isNotEmpty) _fetchAvailableFlights(legs.length - 1);
   }
 
@@ -548,7 +647,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     for (var focusNode in arrivalAirportFocusNodes.values) {
       focusNode.dispose();
     }
-    
+
     // すべてのマップをクリア
     dateControllers.clear();
     flightNumberControllers.clear();
@@ -561,12 +660,12 @@ class _SimulationScreenState extends State<SimulationScreen>
     arrivalAirportFocusNodes.clear();
     availableFlights.clear();
     availableDestinations.clear();
-    
+
     setState(() {
       legs.clear();
       expandedLegId = null;
     });
-    
+
     // 新しい入力レグを作成
     _addLeg();
   }
@@ -1196,7 +1295,7 @@ class _SimulationScreenState extends State<SimulationScreen>
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // 保存成功後、すべてのレグをクリア
         _clearAllLegs();
       }
@@ -1659,14 +1758,19 @@ class _SimulationScreenState extends State<SimulationScreen>
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.purple[600],
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                               ),
                               child: const Text(
                                 'Pro版を見る',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -1790,7 +1894,7 @@ class _SimulationScreenState extends State<SimulationScreen>
         // 新しいレグを追加
         _addLeg();
         await Future.delayed(const Duration(milliseconds: 50));
-        
+
         final data = result[i];
         final newIndex = legs.length - 1;
         final legId = legs[newIndex]['id'] as int;
@@ -1876,17 +1980,21 @@ class _SimulationScreenState extends State<SimulationScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 600;
-        
+
         // 表示順序を計算: 最新レグを最上段、それ以外は時系列順
         List<MapEntry<int, Map<String, dynamic>>> displayOrder = [];
-        
+
         if (legs.isNotEmpty) {
           // 最新のレグ（最後に追加されたもの）
           final latestIndex = legs.length - 1;
           final latestEntry = MapEntry(latestIndex, legs[latestIndex]);
-          
+
           // それ以外のレグを時系列順にソート
-          final oldLegs = legs.asMap().entries.where((e) => e.key != latestIndex).toList();
+          final oldLegs = legs
+              .asMap()
+              .entries
+              .where((e) => e.key != latestIndex)
+              .toList();
           oldLegs.sort((a, b) {
             final aId = a.value['id'] as int;
             final bId = b.value['id'] as int;
@@ -1894,26 +2002,28 @@ class _SimulationScreenState extends State<SimulationScreen>
             final bDate = dateControllers[bId]?.text ?? '';
             final aTime = departureTimeControllers[aId]?.text ?? '';
             final bTime = departureTimeControllers[bId]?.text ?? '';
-            
+
             // 日付で比較
             if (aDate.isNotEmpty && bDate.isNotEmpty) {
-              final dateCompare = aDate.replaceAll('/', '').compareTo(bDate.replaceAll('/', ''));
+              final dateCompare = aDate
+                  .replaceAll('/', '')
+                  .compareTo(bDate.replaceAll('/', ''));
               if (dateCompare != 0) return dateCompare;
             }
-            
+
             // 同じ日付なら時刻で比較
             if (aTime.isNotEmpty && bTime.isNotEmpty) {
               return aTime.compareTo(bTime);
             }
-            
+
             // それ以外はIDで比較
             return aId.compareTo(bId);
           });
-          
+
           // 表示順序: 最新レグ → 時系列順のレグ
           displayOrder = [latestEntry, ...oldLegs];
         }
-        
+
         return SingleChildScrollView(
           padding: EdgeInsets.all(isMobile ? 8 : 16),
           child: Column(
@@ -1924,12 +2034,11 @@ class _SimulationScreenState extends State<SimulationScreen>
               if (displayOrder.isNotEmpty)
                 ...displayOrder.map((e) {
                   // 最新レグ（最後に追加されたもの）かどうかを判定
-                  final isLatest = legs.isNotEmpty && 
-                                   e.key == legs.length - 1;
+                  final isLatest = legs.isNotEmpty && e.key == legs.length - 1;
                   return _buildLegCard(
-                    context, 
-                    e.value, 
-                    e.key, 
+                    context,
+                    e.value,
+                    e.key,
                     isMobile,
                     isLatest: isLatest,
                   );
@@ -3773,8 +3882,8 @@ class _SimulationScreenState extends State<SimulationScreen>
                               depTime.isNotEmpty && arrTime.isNotEmpty
                                   ? '$depTime - $arrTime'
                                   : depTime.isNotEmpty
-                                      ? '$depTime発'
-                                      : '$arrTime着',
+                                  ? '$depTime発'
+                                  : '$arrTime着',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: Colors.grey[600],

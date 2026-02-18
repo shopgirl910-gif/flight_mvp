@@ -6,16 +6,21 @@ import 'auth_screen.dart';
 
 /// Pro版購入ダイアログを表示
 /// 各画面から呼び出し: showProPurchaseDialog(context);
-Future<void> showProPurchaseDialog(BuildContext context) async {
+Future<void> showProPurchaseDialog(
+  BuildContext context, {
+  VoidCallback? onBeforeCheckout,
+}) async {
   showDialog(
     context: context,
     barrierDismissible: true,
-    builder: (context) => const _ProPurchaseDialog(),
+    builder: (context) =>
+        _ProPurchaseDialog(onBeforeCheckout: onBeforeCheckout),
   );
 }
 
 class _ProPurchaseDialog extends StatefulWidget {
-  const _ProPurchaseDialog();
+  final VoidCallback? onBeforeCheckout;
+  const _ProPurchaseDialog({this.onBeforeCheckout});
 
   @override
   State<_ProPurchaseDialog> createState() => _ProPurchaseDialogState();
@@ -105,14 +110,19 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
               ),
               _FeatureItem(
                 icon: Icons.email,
-                text: isJapanese ? 'AIメール解析入力（準備中）' : 'AI email parsing (coming)',
+                text: isJapanese
+                    ? 'AIメール解析入力（準備中）'
+                    : 'AI email parsing (coming)',
               ),
 
               const SizedBox(height: 12),
 
               // 買い切り表示
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green[50],
                   borderRadius: BorderRadius.circular(8),
@@ -120,14 +130,21 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green[700], size: 18),
+                    Icon(
+                      Icons.check_circle,
+                      color: Colors.green[700],
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         isJapanese
-                          ? '1年間有効・同額で更新可・自動課金なし'
-                          : '1 year license, same price renewal, no auto-charge',
-                        style: TextStyle(fontSize: 12, color: Colors.green[800]),
+                            ? '1年間有効・同額で更新可・自動課金なし'
+                            : '1 year license, same price renewal, no auto-charge',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green[800],
+                        ),
                       ),
                     ),
                   ],
@@ -187,7 +204,8 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
       children: [
         // 「パスコードをお持ちの方」トグルリンク
         TextButton(
-          onPressed: () => setState(() => _showPasscodeInput = !_showPasscodeInput),
+          onPressed: () =>
+              setState(() => _showPasscodeInput = !_showPasscodeInput),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -223,12 +241,21 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
                   decoration: InputDecoration(
                     labelText: isJapanese ? 'パスコード' : 'Passcode',
                     hintText: '',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                     suffixIcon: _isRedeeming
                         ? const Padding(
                             padding: EdgeInsets.all(12),
-                            child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
                           )
                         : null,
                   ),
@@ -238,22 +265,32 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
                 if (_passcodeError != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(_passcodeError!, style: TextStyle(color: Colors.red[600], fontSize: 12)),
+                    child: Text(
+                      _passcodeError!,
+                      style: TextStyle(color: Colors.red[600], fontSize: 12),
+                    ),
                   ),
                 if (_passcodeSuccess != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(_passcodeSuccess!, style: TextStyle(color: Colors.green[600], fontSize: 12)),
+                    child: Text(
+                      _passcodeSuccess!,
+                      style: TextStyle(color: Colors.green[600], fontSize: 12),
+                    ),
                   ),
                 const SizedBox(height: 10),
                 SizedBox(
                   height: 36,
                   child: ElevatedButton(
-                    onPressed: _isRedeeming ? null : () => _redeemPasscode(isJapanese),
+                    onPressed: _isRedeeming
+                        ? null
+                        : () => _redeemPasscode(isJapanese),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey[700],
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: Text(
                       isJapanese ? 'パスコードを使用' : 'Use Passcode',
@@ -277,7 +314,11 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
 
     final code = _passcodeController.text.trim().toUpperCase();
     if (code.isEmpty) {
-      setState(() => _passcodeError = isJapanese ? 'パスコードを入力してください' : 'Please enter passcode');
+      setState(
+        () => _passcodeError = isJapanese
+            ? 'パスコードを入力してください'
+            : 'Please enter passcode',
+      );
       return;
     }
 
@@ -290,17 +331,18 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
     try {
       final user = Supabase.instance.client.auth.currentUser!;
       // Supabase RPCでパスコード検証＋Pro有効化を一括実行
-      final result = await Supabase.instance.client
-          .rpc('redeem_promo_code', params: {
-        'input_code': code,
-        'input_user_id': user.id,
-      });
+      final result = await Supabase.instance.client.rpc(
+        'redeem_promo_code',
+        params: {'input_code': code, 'input_user_id': user.id},
+      );
 
       if (result != null && result['success'] == true) {
         if (mounted) {
           setState(() {
             _isRedeeming = false;
-            _passcodeSuccess = result['message'] ?? (isJapanese ? 'Pro版が有効になりました！' : 'Pro activated!');
+            _passcodeSuccess =
+                result['message'] ??
+                (isJapanese ? 'Pro版が有効になりました！' : 'Pro activated!');
           });
           _passcodeController.clear();
           // 少し待ってからダイアログを閉じる
@@ -311,14 +353,18 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
       } else {
         setState(() {
           _isRedeeming = false;
-          _passcodeError = result?['message'] ?? (isJapanese ? 'パスコードが無効です' : 'Invalid passcode');
+          _passcodeError =
+              result?['message'] ??
+              (isJapanese ? 'パスコードが無効です' : 'Invalid passcode');
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isRedeeming = false;
-          _passcodeError = isJapanese ? 'パスコードの検証に失敗しました' : 'Passcode verification failed';
+          _passcodeError = isJapanese
+              ? 'パスコードの検証に失敗しました'
+              : 'Passcode verification failed';
         });
       }
     }
@@ -354,6 +400,8 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
       if (checkoutUrl == null) {
         throw Exception('Checkout URL not received');
       }
+      // リダイレクト前にコールバック実行（レグデータ保存用）
+      widget.onBeforeCheckout?.call();
 
       // Stripe Checkout ページにリダイレクト
       html.window.location.href = checkoutUrl;
