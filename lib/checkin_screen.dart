@@ -87,14 +87,14 @@ class _CheckinScreenState extends State<CheckinScreen> {
       'name': 'Platinum',
       'nameJa': 'プラチナ',
       'icon': '💎',
-      'required': 50,
+      'required': 40,
       'color': 0xFFE5E4E2,
     },
     {
       'name': 'Diamond',
       'nameJa': 'ダイヤモンド',
       'icon': '👑',
-      'required': 70,
+      'required': 50,
       'color': 0xFFB9F2FF,
     },
   ];
@@ -945,7 +945,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ãƒ˜ãƒƒãƒ€ãƒ¼ï¼šå…¨ä½“é€²æ—
+            // 空港チェックイン
+            _buildCheckinCard(),
+            const SizedBox(height: 16),
+
+            // 空港スタンプラリー
             _buildProgressHeader(checkedCount, totalAirports, progressPercent),
             const SizedBox(height: 16),
 
@@ -953,11 +957,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
             _buildPaintItBlackSection(),
             const SizedBox(height: 16),
 
-            // ãƒã‚§ãƒƒã‚¯ã‚¤ãƒ³ãƒœã‚¿ãƒ³ï¼ˆæœ€å¯„ã‚Šç©ºæ¸¯ï¼‰
-            _buildCheckinCard(),
-            const SizedBox(height: 16),
-
-            // åœ°æ–¹åˆ¥ãƒªã‚¹ãƒˆ
+            // 都道府県別リスト
             ..._buildRegionList(),
           ],
         ),
@@ -972,7 +972,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
     final nextBadge = _getNextBadge(checked);
 
     // 70ç©ºæ¸¯ã‚’100%ã¨ã—ã¦è¨ˆç®—
-    const int maxForGauge = 70;
+    const int maxForGauge = 50;
     final double gaugePercent = (checked / maxForGauge * 100).clamp(0, 100);
 
     return Container(
@@ -1031,8 +1031,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
           const SizedBox(height: 8),
           Text(
             isJa
-                ? '${gaugePercent.toStringAsFixed(1)}% (70空港で達成)'
-                : '${gaugePercent.toStringAsFixed(1)}% (70 airports to complete)',
+                ? '${gaugePercent.toStringAsFixed(1)}% (50空港で達成)'
+                : '${gaugePercent.toStringAsFixed(1)}% (50 airports to complete)',
             style: TextStyle(
               color: Colors.white.withOpacity(0.9),
               fontSize: 14,
