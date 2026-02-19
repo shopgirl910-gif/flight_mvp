@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Pro版の制限管理サービス
 ///
 /// 無料版の制限:
-/// - FOP/PP計算: 3レグ/日
+/// - FOP/PP計算: 6レグ/日
 /// - おまかせ最適化: 結果1件のみ表示
 /// - 修行ログ保存: 5旅程まで
 /// - CSVエクスポート: 不可

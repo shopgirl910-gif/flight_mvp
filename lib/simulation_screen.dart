@@ -28,7 +28,8 @@ class _SimulationScreenState extends State<SimulationScreen>
   String _optHomeAirport = 'HND';
   String _optDate = '';
   bool _optIncludeCodeshare = true;
-  String _optFareType = '';
+  String _optFareType = '運賃6 (50%) プロモーション、スカイメイト等';
+  String _optSeatClass = '普通席';
   bool _optSearching = false;
   List<OptimalPlan> _optResults = [];
   String? _optError;
@@ -272,7 +273,7 @@ class _SimulationScreenState extends State<SimulationScreen>
       '運賃3 (75%) セイバー',
       '運賃4 (75%) スペシャルセイバー',
       '運賃5 (50%) 包括旅行運賃',
-      '運賃6 (50%) スカイメイト等',
+      '運賃6 (50%) プロモーション、スカイメイト等',
     ],
     'ANA': [
       '運賃1 (150%) プレミアム運賃',
@@ -345,7 +346,7 @@ class _SimulationScreenState extends State<SimulationScreen>
       final res = await Supabase.instance.client
           .from('user_profiles')
           .select()
-          .eq('user_id', user.id)
+          .eq('id', user.id)
           .maybeSingle();
       if (res == null) return;
       final home = res['home_airport'] as String?;
@@ -365,7 +366,68 @@ class _SimulationScreenState extends State<SimulationScreen>
           _optAirline = airline;
         });
       }
-    } catch (_) {}
+      // プロフィールからカード・ステータスを読み込み（キー→表示名変換）
+      const jalCardMap = {
+        '-': '-',
+        'jmb': 'JMB会員',
+        'jal_regular': 'JALカード普通会員',
+        'jal_club_a': 'JALカードCLUB-A会員',
+        'jal_club_a_gold': 'JALカードCLUB-Aゴールド会員',
+        'jal_platinum': 'JALカードプラチナ会員',
+        'jgc_japan': 'JALグローバルクラブ会員(日本)',
+        'jgc_overseas': 'JALグローバルクラブ会員(海外)',
+        'jal_navi': 'JALカードNAVI会員',
+        'jal_est_regular': 'JAL CLUB EST 普通会員',
+        'jal_est_club_a': 'JAL CLUB EST CLUB-A会員',
+        'jal_est_gold': 'JAL CLUB EST CLUB-A GOLD会員',
+        'jal_est_platinum': 'JAL CLUB EST プラチナ会員',
+      };
+      const jalStatusMap = {
+        '-': '-',
+        'diamond': 'JMBダイヤモンド',
+        'sapphire': 'JMBサファイア',
+        'crystal': 'JMBクリスタル',
+      };
+      const anaCardMap = {
+        '-': '-',
+        'amc': 'AMCカード(提携カード含む)',
+        'ana_regular': 'ANAカード 一般',
+        'ana_student': 'ANAカード 学生用',
+        'ana_wide': 'ANAカード ワイド',
+        'ana_gold': 'ANAカード ゴールド',
+        'ana_premium': 'ANAカード プレミアム',
+        'sfc_regular': 'SFC 一般',
+        'sfc_gold': 'SFC ゴールド',
+        'sfc_premium': 'SFC プレミアム',
+      };
+      const anaStatusMap = {
+        '-': '-',
+        'diamond_1': 'ダイヤモンド(1年目)',
+        'diamond_2': 'ダイヤモンド(継続2年以上)',
+        'platinum_1': 'プラチナ(1年目)',
+        'platinum_2': 'プラチナ(継続2年以上)',
+        'bronze_1': 'ブロンズ(1年目)',
+        'bronze_2': 'ブロンズ(継続2年以上)',
+      };
+      final jalCardKey = res['jal_card'] as String? ?? '-';
+      final jalStatusKey = res['jal_status'] as String? ?? '-';
+      final anaCardKey = res['ana_card'] as String? ?? '-';
+      final anaStatusKey = res['ana_status'] as String? ?? '-';
+      final tourPrem = res['jal_tour_premium'] as bool? ?? false;
+      setState(() {
+        if (jalCardMap.containsKey(jalCardKey))
+          selectedJALCard = jalCardMap[jalCardKey];
+        if (jalStatusMap.containsKey(jalStatusKey))
+          selectedJALStatus = jalStatusMap[jalStatusKey];
+        if (anaCardMap.containsKey(anaCardKey))
+          selectedANACard = anaCardMap[anaCardKey];
+        if (anaStatusMap.containsKey(anaStatusKey))
+          selectedANAStatus = anaStatusMap[anaStatusKey];
+        jalTourPremium = tourPrem;
+      });
+    } catch (e) {
+      print('Profile load error: $e');
+    }
   }
 
   Future<void> _initAirlineAirports() async {
@@ -1093,7 +1155,27 @@ class _SimulationScreenState extends State<SimulationScreen>
               'JMBクリスタル': 0.55,
             }[selectedJALStatus ?? '-'] ??
             0.0;
-        totalMiles = flightMiles + (flightMiles * statusBonusRate).round();
+        final jalCardBonusRate =
+            {
+              '-': 0.0,
+              'JMB会員': 0.0,
+              'JALカード普通会員': 0.10,
+              'JALカードCLUB-A会員': 0.25,
+              'JALカードCLUB-Aゴールド会員': 0.25,
+              'JALカードプラチナ会員': 0.25,
+              'JALグローバルクラブ会員(日本)': 0.25,
+              'JALグローバルクラブ会員(海外)': 0.25,
+              'JALカードNAVI会員': 0.10,
+              'JAL CLUB EST 普通会員': 0.10,
+              'JAL CLUB EST CLUB-A会員': 0.25,
+              'JAL CLUB EST CLUB-A GOLD会員': 0.25,
+              'JAL CLUB EST プラチナ会員': 0.25,
+            }[selectedJALCard ?? '-'] ??
+            0.0;
+        totalMiles =
+            flightMiles +
+            (flightMiles * statusBonusRate).round() +
+            (flightMiles * jalCardBonusRate).round();
         totalPoints = (flightMiles * 2) + (jalBonusFOP[fareNumber] ?? 0);
         totalLSP = (fareRate >= 0.5) ? 5 : 0;
       } else {
@@ -1466,7 +1548,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     if (lower.contains('包括') || lower.contains('ツアー'))
       return '運賃5 (50%) 包括旅行運賃';
     if (lower.contains('スカイメイト') || lower.contains('当日'))
-      return '運賃6 (50%) スカイメイト等';
+      return '運賃6 (50%) プロモーション、スカイメイト等';
     return '運賃3 (75%) セイバー';
   }
 
@@ -2229,7 +2311,10 @@ class _SimulationScreenState extends State<SimulationScreen>
                                 .toList(),
                             onChanged: (v) => setState(() {
                               _optAirline = v!;
-                              _optFareType = '';
+                              _optFareType = (v == 'JAL')
+                                  ? '運賃6 (50%) プロモーション、スカイメイト等'
+                                  : '運賃7 (75%) スーパーバリュー、いっしょにマイル割';
+                              _optSeatClass = '普通席';
                             }),
                           ),
                         ),
@@ -2355,6 +2440,28 @@ class _SimulationScreenState extends State<SimulationScreen>
                                 .toList(),
                             onChanged: (v) =>
                                 setState(() => _optFareType = v ?? ''),
+                          ),
+                        ),
+                        _optInputSection(
+                          '座席クラス',
+                          120,
+                          DropdownButton<String>(
+                            value: _optSeatClass,
+                            isExpanded: true,
+                            underline: const SizedBox(),
+                            items: (seatClassesByAirline[_optAirline] ?? [])
+                                .map(
+                                  (e) => DropdownMenuItem(
+                                    value: e,
+                                    child: Text(
+                                      e,
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _optSeatClass = v ?? '普通席'),
                           ),
                         ),
                       ],
@@ -2679,9 +2786,9 @@ class _SimulationScreenState extends State<SimulationScreen>
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              onPressed: () => _transferToFreeDesign(plan),
+              onPressed: () => _saveOptimalPlan(plan),
               icon: const Icon(Icons.arrow_forward, size: 14),
-              label: const Text('修行ログに追加', style: TextStyle(fontSize: 12)),
+              label: const Text('予定に追加', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(foregroundColor: color),
             ),
           ),
@@ -2908,10 +3015,10 @@ class _SimulationScreenState extends State<SimulationScreen>
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
-                      onPressed: () => _transferToFreeDesign(plan),
+                      onPressed: () => _saveOptimalPlan(plan),
                       icon: const Icon(Icons.arrow_forward, size: 12),
                       label: const Text(
-                        '修行ログに追加',
+                        '予定に追加',
                         style: TextStyle(fontSize: 11),
                       ),
                       style: TextButton.styleFrom(
@@ -2927,6 +3034,209 @@ class _SimulationScreenState extends State<SimulationScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _saveOptimalPlan(OptimalPlan plan) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    final isLoggedIn =
+        user != null && user.email != null && user.email!.isNotEmpty;
+    if (!isLoggedIn) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('旅程を保存するにはログインが必要です'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      return;
+    }
+    final proService = ProService();
+    if (!await proService.canSaveLog()) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('無料版の制限'),
+            content: const Text(
+              '無料版は${ProService.freeLogLimit}旅程まで保存できます。\n'
+              'Pro版にアップグレードすると無制限に保存できます。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('閉じる'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  showProPurchaseDialog(context);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                child: const Text(
+                  'Pro版を見る',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final fareType = _optFareType;
+      final seatClass = _optSeatClass;
+      double fareRate = 1.0;
+      final rateMatch = RegExp(r'\((\d+)%\)').firstMatch(fareType);
+      if (rateMatch != null) fareRate = int.parse(rateMatch.group(1)!) / 100.0;
+      final fareNumber = fareType.split(' ').first;
+
+      final airports = <String>[];
+      final legsJson = <Map<String, dynamic>>[];
+      int totalFop = 0, totalMiles = 0, totalLsp = 0;
+
+      for (final f in plan.flights) {
+        if (airports.isEmpty || airports.last != f.departureCode)
+          airports.add(f.departureCode);
+        airports.add(f.arrivalCode);
+        final distance = f.distanceMiles;
+
+        int fop = 0, miles = 0, lsp = 0;
+        if (_optAirline == 'JAL') {
+          final seatBonusRate =
+              {'普通席': 0.0, 'クラスJ': 0.1, 'ファーストクラス': 0.5}[seatClass] ?? 0.0;
+          double effectiveFareRate = fareRate;
+          if (jalTourPremium && (fareNumber == '運賃4' || fareNumber == '運賃5'))
+            effectiveFareRate = 1.0;
+          final flightMiles = (distance * (effectiveFareRate + seatBonusRate))
+              .round();
+          final statusBonusRate =
+              {
+                '-': 0.0,
+                'JMBダイヤモンド': 1.30,
+                'JMBサファイア': 1.05,
+                'JMBクリスタル': 0.55,
+              }[selectedJALStatus ?? '-'] ??
+              0.0;
+          final jalCardBonusRate =
+              {
+                '-': 0.0,
+                'JMB会員': 0.0,
+                'JALカード普通会員': 0.10,
+                'JALカードCLUB-A会員': 0.25,
+                'JALカードCLUB-Aゴールド会員': 0.25,
+                'JALカードプラチナ会員': 0.25,
+                'JALグローバルクラブ会員(日本)': 0.25,
+                'JALグローバルクラブ会員(海外)': 0.25,
+                'JALカードNAVI会員': 0.10,
+                'JAL CLUB EST 普通会員': 0.10,
+                'JAL CLUB EST CLUB-A会員': 0.25,
+                'JAL CLUB EST CLUB-A GOLD会員': 0.25,
+                'JAL CLUB EST プラチナ会員': 0.25,
+              }[selectedJALCard ?? '-'] ??
+              0.0;
+          miles =
+              flightMiles +
+              (flightMiles * statusBonusRate).round() +
+              (flightMiles * jalCardBonusRate).round();
+          fop = (flightMiles * 2) + (jalBonusFOP[fareNumber] ?? 0);
+          lsp = (fareRate >= 0.5) ? 5 : 0;
+          totalFop += fop;
+          totalLsp += lsp;
+        } else {
+          final cardBonusRate =
+              {
+                '-': 0.0,
+                'AMCカード(提携カード含む)': 0.0,
+                'ANAカード 一般': 0.10,
+                'ANAカード 学生用': 0.10,
+                'ANAカード ワイド': 0.25,
+                'ANAカード ゴールド': 0.25,
+                'ANAカード プレミアム': 0.50,
+                'SFC 一般': 0.35,
+                'SFC ゴールド': 0.40,
+                'SFC プレミアム': 0.50,
+              }[selectedANACard ?? '-'] ??
+              0.0;
+          final statusBonusRate =
+              {
+                '-': 0.0,
+                'ダイヤモンド(1年目)': 1.15,
+                'ダイヤモンド(継続2年以上)': 1.25,
+                'プラチナ(1年目)': 0.90,
+                'プラチナ(継続2年以上)': 1.00,
+                'ブロンズ(1年目)': 0.40,
+                'ブロンズ(継続2年以上)': 0.50,
+              }[selectedANAStatus ?? '-'] ??
+              0.0;
+          final isGoldPremium = const [
+            'ANAカード ゴールド',
+            'ANAカード プレミアム',
+            'SFC ゴールド',
+            'SFC プレミアム',
+          ].contains(selectedANACard ?? '-');
+          final appliedRate = (isGoldPremium && statusBonusRate > 0)
+              ? statusBonusRate + 0.05
+              : (cardBonusRate > statusBonusRate
+                    ? cardBonusRate
+                    : statusBonusRate);
+          miles = (distance * fareRate * (1 + appliedRate)).toInt();
+          fop = (distance * fareRate * 2 + (anaBonusPoint[fareNumber] ?? 0))
+              .toInt();
+        }
+        totalMiles += miles;
+
+        legsJson.add({
+          'airline': _optAirline,
+          'date': _optDate,
+          'flight_number': f.flightNumber,
+          'departure_airport': f.departureCode,
+          'arrival_airport': f.arrivalCode,
+          'departure_time': f.departureTime,
+          'arrival_time': f.arrivalTime,
+          'fare_type': fareType,
+          'seat_class': seatClass,
+          'fare_amount': 0,
+          'fop': fop,
+          'miles': miles,
+          'lsp': lsp,
+        });
+      }
+
+      final title = '${airports.join("-")} ${plan.flights.length}レグ';
+      await Supabase.instance.client.from('saved_itineraries').insert({
+        'user_id': user!.id,
+        'title': title,
+        'legs': legsJson,
+        'total_fop': _optAirline == 'JAL' ? totalFop : 0,
+        'total_pp': _optAirline == 'ANA' ? totalFop : 0,
+        'total_miles': totalMiles,
+        'total_lsp': totalLsp,
+        'total_fare': 0,
+        'jal_card': selectedJALCard,
+        'ana_card': selectedANACard,
+        'jal_status': selectedJALStatus,
+        'ana_status': selectedANAStatus,
+        'jal_tour_premium': jalTourPremium,
+        'is_completed': false,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('「$title」を予定に保存しました'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存に失敗しました: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   void _transferToFreeDesign(OptimalPlan plan) {
@@ -2948,6 +3258,8 @@ class _SimulationScreenState extends State<SimulationScreen>
         legs[legIndex]['airline'] = _optAirline;
         legs[legIndex]['departureAirport'] = f.departureCode;
         legs[legIndex]['arrivalAirport'] = f.arrivalCode;
+        legs[legIndex]['fareType'] = _optFareType;
+        legs[legIndex]['seatClass'] = _optSeatClass;
       });
       flightNumberControllers[legId]?.text = f.flightNumber;
       departureTimeControllers[legId]?.text = f.departureTime;
