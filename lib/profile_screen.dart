@@ -301,10 +301,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => isSaving = true);
 
     try {
+      // '-'や無効な値はnullに変換
+      String? cleanValue(String? v) => (v == null || v == '-' || v == 'なし') ? null : v;
+      
       await Supabase.instance.client.from('user_profiles').upsert({
         'id': userId,
-        'jal_card': jalCard,
-        'jal_status': jalStatus,
+        'jal_card': cleanValue(jalCard),
+        'jal_status': cleanValue(jalStatus),
         'jal_tour_premium': jalTourPremium,
         'current_lsp': int.tryParse(_currentLspController.text),
         'target_lsp': int.tryParse(_targetLspController.text),
@@ -312,8 +315,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'target_fop': int.tryParse(_targetFopController.text),
         'current_jal_miles': int.tryParse(_currentJalMilesController.text),
         'target_jal_miles': int.tryParse(_targetJalMilesController.text),
-        'ana_card': anaCard,
-        'ana_status': anaStatus,
+        'ana_card': cleanValue(anaCard),
+        'ana_status': cleanValue(anaStatus),
         'current_pp': int.tryParse(_currentPpController.text),
         'target_pp': int.tryParse(_targetPpController.text),
         'current_ana_miles': int.tryParse(_currentAnaMilesController.text),
@@ -336,7 +339,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isJapanese ? '保存に失敗しました' : 'Failed to save'),
+            content: Text(_isJapanese ? '保存に失敗しました: $e' : 'Failed to save: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -360,7 +363,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           backgroundColor: Colors.purple[700],
           foregroundColor: Colors.white,
         ),
-        body: Center(
+        body: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Column(
@@ -461,6 +464,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () => launchUrl(
+                    Uri.parse(
+                      'mailto:mileagerunplanner@gmail.com?subject=MRPお問い合わせ',
+                    ),
+                  ),
+                  child: Text(
+                    _isJapanese ? 'お問い合わせ' : 'Contact Us',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue[400],
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -482,8 +501,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _isJapanese
-                            ? '本アプリケーションで利用する公共交通データは、公共交通オープンデータセンターにおいて提供されるものです。公共交通事業者により提供されたデータを元にしていますが、必ずしも正確・完全なものとは限りません。\n\n本アプリケーションの表示内容について、公共交通事業者への直接の問合せは行わないでください。\n\nお問い合わせ：shopgirl910@gmail.com'
-                            : 'Public transportation data used in this application is provided by the Public Transportation Open Data Center. The data is based on information provided by transportation operators, but may not always be accurate or complete.\n\nPlease do not contact transportation operators directly.\n\nContact: shopgirl910@gmail.com',
+                            ? '本アプリケーションで利用する公共交通データは、公共交通オープンデータセンターにおいて提供されるものです。公共交通事業者により提供されたデータを元にしていますが、必ずしも正確・完全なものとは限りません。\n\n本アプリケーションの表示内容について、公共交通事業者への直接の問合せは行わないでください。\n\nお問い合わせ:mileagerunplanner@gmail.com'
+                            : 'Public transportation data used in this application is provided by the Public Transportation Open Data Center. The data is based on information provided by transportation operators, but may not always be accurate or complete.\n\nPlease do not contact transportation operators directly.\n\nContact: mileagerunplanner@gmail.com',
                         style: TextStyle(fontSize: 10, color: Colors.grey[600]),
                       ),
                     ],
@@ -682,26 +701,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                GestureDetector(
-                  onTap: () => launchUrl(
-                    Uri.parse(
-                      'https://mileage-run-planner.web.app/privacy.html',
-                    ),
-                  ),
-                  child: Text(
-                    _isJapanese ? 'プライバシーポリシー' : 'Privacy Policy',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.blue[400],
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => launchUrl(
+                Uri.parse('https://mrunplanner.com/tokushoho.html'),
+              ),
+              child: Text(
+                _isJapanese ? '特定商取引法に基づく表記' : 'Specified Commercial Transactions Act',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.blue[400],
+                  decoration: TextDecoration.underline,
                 ),
-              ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => launchUrl(
+                Uri.parse('https://mrunplanner.com/privacy.html'),
+              ),
+              child: Text(
+                _isJapanese ? 'プライバシーポリシー' : 'Privacy Policy',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.blue[400],
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => launchUrl(
+                Uri.parse('https://mrunplanner.com/terms.html'),
+              ),
+              child: Text(
+                _isJapanese ? '利用規約' : 'Terms of Service',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.blue[400],
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => launchUrl(
+                Uri.parse('mailto:mileagerunplanner@gmail.com?subject=MRPお問い合わせ'),
+              ),
+              child: Text(
+                _isJapanese ? 'お問い合わせ' : 'Contact Us',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.blue[400],
+                  decoration: TextDecoration.underline,
+                ),
+              ),
             ),
             const SizedBox(height: 24),
           ],
@@ -973,7 +1029,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(
                   _isJapanese
-                      ? '✈️ 特典航空券マイル目安（往復・Y・L）'
+                      ? '✈️ 特典航空券マイル目安(往復・Y・L)'
                       : '✈️ Award Miles (Round-trip/Y/L)',
                   style: TextStyle(
                     fontSize: 12,
@@ -1120,7 +1176,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(
                   _isJapanese
-                      ? '✈️ 特典航空券マイル目安（往復・Y・L）'
+                      ? '✈️ 特典航空券マイル目安(往復・Y・L)'
                       : '✈️ Award Miles (Round-trip/Y/L)',
                   style: TextStyle(
                     fontSize: 12,

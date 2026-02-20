@@ -29,6 +29,8 @@ class _SimulationScreenState extends State<SimulationScreen>
   String _optDate = '';
   bool _optIncludeCodeshare = true;
   String _optFareType = '運賃6 (50%) プロモーション、スカイメイト等';
+  // JALデフォルト運賃
+  static const String _jalDefaultFare = '運賃6 (50%) プロモーション、スカイメイト等';
   String _optSeatClass = '普通席';
   bool _optSearching = false;
   List<OptimalPlan> _optResults = [];
@@ -196,7 +198,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     'CTS': '新千歳',
     'FUK': '福岡',
     'OKA': '那覇',
-    'NGS': '長崎',
+    'NGS': 'é•·å´Ž',
     'KMJ': '熊本',
     'OIT': '大分',
     'MYJ': '松山',
@@ -208,7 +210,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     'SDJ': '仙台',
     'AOJ': '青森',
     'AKJ': '旭川',
-    'AXT': '秋田',
+    'AXT': 'ç§‹ç"°',
     'GAJ': '山形',
     'KIJ': '新潟',
     'TOY': '富山',
@@ -277,17 +279,18 @@ class _SimulationScreenState extends State<SimulationScreen>
     ],
     'ANA': [
       '運賃1 (150%) プレミアム運賃',
-      '運賃2 (125%) プレミアム小児',
-      '運賃3 (100%) 片道・往復',
-      '運賃4 (100%) ビジネス',
-      '運賃5 (75%) バリュー、株主優待',
-      '運賃6 (75%) トランジット',
-      '運賃7 (75%) スーパーバリュー、いっしょにマイル割',
-      '運賃8 (150%) プレミアム株主',
-      '運賃9 (100%) 普通株主',
-      '運賃10 (70%) 特割プラス',
-      '運賃11 (50%) スマートシニア',
-      '運賃12 (30%) 個人包括',
+      '運賃2 (125%) VALUE PREMIUM、プレミアム株主優待',
+      '運賃3 (100%) ANA FLEX、ビジネスきっぷ',
+      '運賃4 (100%) アイきっぷ',
+      '運賃5 (75%) VALUE、株主優待',
+      '運賃6 (75%) VALUE TRANSIT',
+      '運賃7 (75%) SUPER VALUE、いっしょにマイル割',
+      '運賃8 (50%) 個人包括、スマートU25等',
+      '運賃9 (150%) 国際航空券プレミアム',
+      '運賃10 (100%) 国際航空券普通席 Y/B/M',
+      '運賃11 (70%) 国際航空券普通席 U/H/Q',
+      '運賃12 (50%) 国際航空券普通席 V/W/S',
+      '運賃13 (30%) 国際航空券普通席 L/K',
     ],
   };
   final Map<String, List<String>> seatClassesByAirline = {
@@ -315,6 +318,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     '運賃10': 0,
     '運賃11': 0,
     '運賃12': 0,
+    '運賃13': 0,
   };
 
   static const String _hapitasUrl =
@@ -334,7 +338,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     _optDate =
         '${oneMonthLater.year}/${oneMonthLater.month.toString().padLeft(2, '0')}/${oneMonthLater.day.toString().padLeft(2, '0')}';
     _initAirlineAirports();
-    _addLeg(); // 初期レグ作成（入力専用カードとして使用）
+    _addLeg(); // 初期レグ作成(入力専用カードとして使用)
     _restoreLegsFromStorage();
     _loadUserProfile();
   }
@@ -366,9 +370,34 @@ class _SimulationScreenState extends State<SimulationScreen>
           _optAirline = airline;
         });
       }
-      // プロフィールからカード・ステータスを読み込み（キー→表示名変換）
-      const jalCardMap = {
-        '-': '-',
+      // プロフィールのカード・ステータス設定を読み込み
+      final jalCard = res['jal_card'] as String?;
+      final jalStatus = res['jal_status'] as String?;
+      final tourPremium = res['jal_tour_premium'] as bool? ?? false;
+      final anaCard = res['ana_card'] as String?;
+      final anaStatus = res['ana_status'] as String?;
+      setState(() {
+        if (jalCard != null && jalCard.isNotEmpty) {
+          selectedJALCard = _mapProfileCardToSimulation('JAL', jalCard);
+        }
+        if (jalStatus != null && jalStatus.isNotEmpty) {
+          selectedJALStatus = _mapProfileStatusToSimulation('JAL', jalStatus);
+        }
+        jalTourPremium = tourPremium;
+        if (anaCard != null && anaCard.isNotEmpty) {
+          selectedANACard = _mapProfileCardToSimulation('ANA', anaCard);
+        }
+        if (anaStatus != null && anaStatus.isNotEmpty) {
+          selectedANAStatus = _mapProfileStatusToSimulation('ANA', anaStatus);
+        }
+      });
+    } catch (_) {}
+  }
+
+  // プロフィール画面のキーをシミュレーション画面の表示名に変換
+  String? _mapProfileCardToSimulation(String airline, String profileKey) {
+    if (airline == 'JAL') {
+      const mapping = {
         'jmb': 'JMB会員',
         'jal_regular': 'JALカード普通会員',
         'jal_club_a': 'JALカードCLUB-A会員',
@@ -382,14 +411,9 @@ class _SimulationScreenState extends State<SimulationScreen>
         'jal_est_gold': 'JAL CLUB EST CLUB-A GOLD会員',
         'jal_est_platinum': 'JAL CLUB EST プラチナ会員',
       };
-      const jalStatusMap = {
-        '-': '-',
-        'diamond': 'JMBダイヤモンド',
-        'sapphire': 'JMBサファイア',
-        'crystal': 'JMBクリスタル',
-      };
-      const anaCardMap = {
-        '-': '-',
+      return mapping[profileKey];
+    } else {
+      const mapping = {
         'amc': 'AMCカード(提携カード含む)',
         'ana_regular': 'ANAカード 一般',
         'ana_student': 'ANAカード 学生用',
@@ -400,8 +424,20 @@ class _SimulationScreenState extends State<SimulationScreen>
         'sfc_gold': 'SFC ゴールド',
         'sfc_premium': 'SFC プレミアム',
       };
-      const anaStatusMap = {
-        '-': '-',
+      return mapping[profileKey];
+    }
+  }
+
+  String? _mapProfileStatusToSimulation(String airline, String profileKey) {
+    if (airline == 'JAL') {
+      const mapping = {
+        'diamond': 'JMBダイヤモンド',
+        'sapphire': 'JMBサファイア',
+        'crystal': 'JMBクリスタル',
+      };
+      return mapping[profileKey];
+    } else {
+      const mapping = {
         'diamond_1': 'ダイヤモンド(1年目)',
         'diamond_2': 'ダイヤモンド(継続2年以上)',
         'platinum_1': 'プラチナ(1年目)',
@@ -409,24 +445,7 @@ class _SimulationScreenState extends State<SimulationScreen>
         'bronze_1': 'ブロンズ(1年目)',
         'bronze_2': 'ブロンズ(継続2年以上)',
       };
-      final jalCardKey = res['jal_card'] as String? ?? '-';
-      final jalStatusKey = res['jal_status'] as String? ?? '-';
-      final anaCardKey = res['ana_card'] as String? ?? '-';
-      final anaStatusKey = res['ana_status'] as String? ?? '-';
-      final tourPrem = res['jal_tour_premium'] as bool? ?? false;
-      setState(() {
-        if (jalCardMap.containsKey(jalCardKey))
-          selectedJALCard = jalCardMap[jalCardKey];
-        if (jalStatusMap.containsKey(jalStatusKey))
-          selectedJALStatus = jalStatusMap[jalStatusKey];
-        if (anaCardMap.containsKey(anaCardKey))
-          selectedANACard = anaCardMap[anaCardKey];
-        if (anaStatusMap.containsKey(anaStatusKey))
-          selectedANAStatus = anaStatusMap[anaStatusKey];
-        jalTourPremium = tourPrem;
-      });
-    } catch (e) {
-      print('Profile load error: $e');
+      return mapping[profileKey];
     }
   }
 
@@ -508,7 +527,7 @@ class _SimulationScreenState extends State<SimulationScreen>
       final legsData = jsonDecode(stored) as List<dynamic>;
       if (legsData.isEmpty) return;
 
-      // 既存のレグをクリア（initStateで追加された1つ目のみ）
+      // 既存のレグをクリア(initStateで追加された1つ目のみ)
       if (legs.length == 1) {
         _removeLeg(0);
       }
@@ -873,7 +892,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     return null;
   }
 
-  // JALグループ（JTA/RAC/JAC）も含めて便名検索
+  // JALグループ(JTA/RAC/JAC)も含めて便名検索
   Future<List<Map<String, dynamic>>> _fetchSchedulesByFlightNumber(
     String airline,
     String flightNumber,
@@ -1155,27 +1174,7 @@ class _SimulationScreenState extends State<SimulationScreen>
               'JMBクリスタル': 0.55,
             }[selectedJALStatus ?? '-'] ??
             0.0;
-        final jalCardBonusRate =
-            {
-              '-': 0.0,
-              'JMB会員': 0.0,
-              'JALカード普通会員': 0.10,
-              'JALカードCLUB-A会員': 0.25,
-              'JALカードCLUB-Aゴールド会員': 0.25,
-              'JALカードプラチナ会員': 0.25,
-              'JALグローバルクラブ会員(日本)': 0.25,
-              'JALグローバルクラブ会員(海外)': 0.25,
-              'JALカードNAVI会員': 0.10,
-              'JAL CLUB EST 普通会員': 0.10,
-              'JAL CLUB EST CLUB-A会員': 0.25,
-              'JAL CLUB EST CLUB-A GOLD会員': 0.25,
-              'JAL CLUB EST プラチナ会員': 0.25,
-            }[selectedJALCard ?? '-'] ??
-            0.0;
-        totalMiles =
-            flightMiles +
-            (flightMiles * statusBonusRate).round() +
-            (flightMiles * jalCardBonusRate).round();
+        totalMiles = flightMiles + (flightMiles * statusBonusRate).round();
         totalPoints = (flightMiles * 2) + (jalBonusFOP[fareNumber] ?? 0);
         totalLSP = (fareRate >= 0.5) ? 5 : 0;
       } else {
@@ -1500,7 +1499,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     '沖縄(那覇)': 'OKA',
     '石垣': 'ISG',
     '宮古': 'MMY',
-    '長崎': 'NGS',
+    'é•·å´Ž': 'NGS',
     '熊本': 'KMJ',
     '大分': 'OIT',
     '松山': 'MYJ',
@@ -1512,7 +1511,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     '仙台': 'SDJ',
     '青森': 'AOJ',
     '旭川': 'AKJ',
-    '秋田': 'AXT',
+    'ç§‹ç"°': 'AXT',
     '山形': 'GAJ',
     '新潟': 'KIJ',
     '富山': 'TOY',
@@ -1555,28 +1554,42 @@ class _SimulationScreenState extends State<SimulationScreen>
   // ANA運賃名→運賃種別マッピング
   String _mapANAFareType(String fareName) {
     final lower = fareName.toLowerCase();
+    // プレミアム株主優待は運賃2
     if (lower.contains('プレミアム') && lower.contains('株主'))
-      return '運賃8 (150%) プレミアム株主';
+      return '運賃2 (125%) VALUE PREMIUM、プレミアム株主優待';
+    // プレミアム運賃は運賃1
     if (lower.contains('プレミアム')) return '運賃1 (150%) プレミアム運賃';
-    if (lower.contains('株主') || lower.contains('優待')) return '運賃9 (100%) 普通株主';
-    if (lower.contains('片道') || lower.contains('往復') || lower.contains('フレックス'))
-      return '運賃3 (100%) 片道・往復';
-    if (lower.contains('ビジネス')) return '運賃4 (100%) ビジネス';
-    if (lower.contains('バリュー') && !lower.contains('スーパー'))
-      return '運賃5 (75%) バリュー、株主優待';
-    if (lower.contains('トランジット')) return '運賃6 (75%) トランジット';
-    if (lower.contains('スーパーバリュー') || lower.contains('いっしょに'))
-      return '運賃7 (75%) スーパーバリュー、いっしょにマイル割';
-    if (lower.contains('特割プラス')) return '運賃10 (70%) 特割プラス';
-    if (lower.contains('シニア')) return '運賃11 (50%) スマートシニア';
-    if (lower.contains('包括') || lower.contains('ツアー')) return '運賃12 (30%) 個人包括';
-    return '運賃7 (75%) スーパーバリュー、いっしょにマイル割';
+    // 株主優待は運賃5
+    if (lower.contains('株主') || lower.contains('優待'))
+      return '運賃5 (75%) VALUE、株主優待';
+    // ANA FLEX、ビジネスきっぷは運賃3
+    if (lower.contains('片道') || lower.contains('往復') || lower.contains('フレックス') || lower.contains('flex'))
+      return '運賃3 (100%) ANA FLEX、ビジネスきっぷ';
+    if (lower.contains('ビジネスきっぷ'))
+      return '運賃3 (100%) ANA FLEX、ビジネスきっぷ';
+    // アイきっぷは運賃4
+    if (lower.contains('アイきっぷ')) return '運賃4 (100%) アイきっぷ';
+    // VALUE TRANSITは運賃6
+    if (lower.contains('トランジット') || lower.contains('transit'))
+      return '運賃6 (75%) VALUE TRANSIT';
+    // SUPER VALUEは運賃7
+    if (lower.contains('スーパーバリュー') || lower.contains('super value') || lower.contains('いっしょに'))
+      return '運賃7 (75%) SUPER VALUE、いっしょにマイル割';
+    // VALUEは運賃5
+    if (lower.contains('バリュー') || lower.contains('value'))
+      return '運賃5 (75%) VALUE、株主優待';
+    // 個人包括、スマートU25、スマートシニアは運賃8
+    if (lower.contains('包括') || lower.contains('ツアー') || lower.contains('シニア') || lower.contains('u25') || lower.contains('sale'))
+      return '運賃8 (50%) 個人包括、スマートU25等';
+    // デフォルトはSUPER VALUE
+    return '運賃7 (75%) SUPER VALUE、いっしょにマイル割';
   }
 
   // ANA: 運賃種別から座席クラスを自動判定
   String _anaSeatClassForFare(String fareType) {
     final fareNumber = fareType.split(' ').first;
-    if (fareNumber == '運賃1' || fareNumber == '運賃2' || fareNumber == '運賃8')
+    // 運賃1,2,9（プレミアム系・国際航空券プレミアム）はプレミアムクラス
+    if (fareNumber == '運賃1' || fareNumber == '運賃2' || fareNumber == '運賃9')
       return 'プレミアムクラス';
     return '普通席';
   }
@@ -1693,17 +1706,9 @@ class _SimulationScreenState extends State<SimulationScreen>
 
     return results;
   }
-// メールから入力ダイアログ（Pro版限定）
-  Future<void> _showEmailImportDialog() async {
-    // Pro版チェック
-    final isPro = await ProService().isPro();
-    if (!isPro) {
-      if (mounted) {
-        showProPurchaseDialog(context);
-      }
-      return;
-    }
 
+  // メールから入力ダイアログ
+  Future<void> _showEmailImportDialog() async {
     // ログインチェック(匿名ユーザーも除外)
     final user = Supabase.instance.client.auth.currentUser;
     final isLoggedIn =
@@ -1785,7 +1790,7 @@ class _SimulationScreenState extends State<SimulationScreen>
                 children: [
                   Text(
                     isPro
-                        ? 'JAL/ANAの予約確認メールを貼り付けてください（AI解析）'
+                        ? 'JAL/ANAの予約確認メールを貼り付けてください(AI解析)'
                         : 'JAL/ANAの予約確認メールを貼り付けてください',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
@@ -1888,7 +1893,7 @@ class _SimulationScreenState extends State<SimulationScreen>
                         }
 
                         if (isPro) {
-                          // Pro: AI解析（Edge Function）
+                          // Pro: AI解析(Edge Function)
                           setDialogState(() {
                             isLoading = true;
                             errorMsg = null;
@@ -1919,7 +1924,7 @@ class _SimulationScreenState extends State<SimulationScreen>
                                   final mappedFareType = airline == 'JAL'
                                       ? _mapJALFareType(rawFareType)
                                       : _mapANAFareType(rawFareType);
-                                  // 便名にエアライン名を付加（数字のみの場合）
+                                  // 便名にエアライン名を付加(数字のみの場合)
                                   var flightNum = (l['flight_number'] ?? '')
                                       .toString();
                                   if (flightNum.isNotEmpty &&
@@ -1979,7 +1984,7 @@ class _SimulationScreenState extends State<SimulationScreen>
     controller.dispose();
 
     if (result != null && result.isNotEmpty) {
-      // 空のレグを自動削除（デフォルトレグ等）
+      // 空のレグを自動削除(デフォルトレグ等)
       for (int i = legs.length - 1; i >= 0; i--) {
         final leg = legs[i];
         final legId = leg['id'] as int;
@@ -2089,7 +2094,7 @@ class _SimulationScreenState extends State<SimulationScreen>
         List<MapEntry<int, Map<String, dynamic>>> displayOrder = [];
 
         if (legs.isNotEmpty) {
-          // 最新のレグ（最後に追加されたもの）
+          // 最新のレグ(最後に追加されたもの)
           final latestIndex = legs.length - 1;
           final latestEntry = MapEntry(latestIndex, legs[latestIndex]);
 
@@ -2137,7 +2142,7 @@ class _SimulationScreenState extends State<SimulationScreen>
               // 既存レグを表示
               if (displayOrder.isNotEmpty)
                 ...displayOrder.map((e) {
-                  // 最新レグ（最後に追加されたもの）かどうかを判定
+                  // 最新レグ(最後に追加されたもの)かどうかを判定
                   final isLatest = legs.isNotEmpty && e.key == legs.length - 1;
                   return _buildLegCard(
                     context,
@@ -2319,9 +2324,7 @@ class _SimulationScreenState extends State<SimulationScreen>
                                 .toList(),
                             onChanged: (v) => setState(() {
                               _optAirline = v!;
-                              _optFareType = (v == 'JAL')
-                                  ? '運賃6 (50%) プロモーション、スカイメイト等'
-                                  : '運賃7 (75%) スーパーバリュー、いっしょにマイル割';
+                              _optFareType = (v == 'JAL') ? _jalDefaultFare : '';
                               _optSeatClass = '普通席';
                             }),
                           ),
@@ -2423,7 +2426,7 @@ class _SimulationScreenState extends State<SimulationScreen>
                         ),
                         _optInputSection(
                           '運賃種別',
-                          200,
+                          160,
                           DropdownButton<String>(
                             value: _optFareType.isEmpty ? null : _optFareType,
                             isExpanded: true,
@@ -2446,8 +2449,19 @@ class _SimulationScreenState extends State<SimulationScreen>
                                   ),
                                 )
                                 .toList(),
-                            onChanged: (v) =>
-                                setState(() => _optFareType = v ?? ''),
+                            onChanged: (v) {
+                              setState(() {
+                                _optFareType = v ?? '';
+                                // ANA: 運賃種別1,2,9はプレミアムクラス
+                                if (_optAirline == 'ANA' && v != null) {
+                                  if (v.startsWith('運賃1 ') || v.startsWith('運賃2 ') || v.startsWith('運賃9 ')) {
+                                    _optSeatClass = 'プレミアムクラス';
+                                  } else {
+                                    _optSeatClass = '普通席';
+                                  }
+                                }
+                              });
+                            },
                           ),
                         ),
                         _optInputSection(
@@ -2457,13 +2471,15 @@ class _SimulationScreenState extends State<SimulationScreen>
                             value: _optSeatClass,
                             isExpanded: true,
                             underline: const SizedBox(),
-                            items: (seatClassesByAirline[_optAirline] ?? [])
+                            items: (_optAirline == 'JAL'
+                                    ? ['普通席', 'クラスJ', 'ファーストクラス']
+                                    : ['普通席', 'プレミアムクラス'])
                                 .map(
                                   (e) => DropdownMenuItem(
                                     value: e,
                                     child: Text(
                                       e,
-                                      style: const TextStyle(fontSize: 11),
+                                      style: const TextStyle(fontSize: 12),
                                     ),
                                   ),
                                 )
@@ -2722,7 +2738,7 @@ class _SimulationScreenState extends State<SimulationScreen>
               Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
               const SizedBox(width: 4),
               Text(
-                '${plan.departureTime} → ${plan.arrivalTime}（${plan.duration}）',
+                '${plan.departureTime} → ${plan.arrivalTime}(${plan.duration})',
                 style: TextStyle(fontSize: 12, color: Colors.grey[700]),
               ),
             ],
@@ -2794,9 +2810,9 @@ class _SimulationScreenState extends State<SimulationScreen>
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              onPressed: () => _saveOptimalPlan(plan),
+              onPressed: () => _transferToFreeDesign(plan),
               icon: const Icon(Icons.arrow_forward, size: 14),
-              label: const Text('予定に追加', style: TextStyle(fontSize: 12)),
+              label: const Text('修行ログに追加', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(foregroundColor: color),
             ),
           ),
@@ -2843,7 +2859,7 @@ class _SimulationScreenState extends State<SimulationScreen>
             ),
           ),
           children: children.map((group) {
-            // 子がchildren持ち = サブアコーディオン（💰最多FOP / ⏱️最短時間）
+            // 子がchildren持ち = サブアコーディオン(💰最多FOP / ⏱️最短時間)
             if (group.children != null && group.children!.isNotEmpty) {
               return _buildSubAccordion(group, color);
             }
@@ -3023,10 +3039,10 @@ class _SimulationScreenState extends State<SimulationScreen>
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
-                      onPressed: () => _saveOptimalPlan(plan),
+                      onPressed: () => _transferToFreeDesign(plan),
                       icon: const Icon(Icons.arrow_forward, size: 12),
                       label: const Text(
-                        '予定に追加',
+                        '修行ログに追加',
                         style: TextStyle(fontSize: 11),
                       ),
                       style: TextButton.styleFrom(
@@ -3044,212 +3060,9 @@ class _SimulationScreenState extends State<SimulationScreen>
     );
   }
 
-  Future<void> _saveOptimalPlan(OptimalPlan plan) async {
-    final user = Supabase.instance.client.auth.currentUser;
-    final isLoggedIn =
-        user != null && user.email != null && user.email!.isNotEmpty;
-    if (!isLoggedIn) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('旅程を保存するにはログインが必要です'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      return;
-    }
-    final proService = ProService();
-    if (!await proService.canSaveLog()) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('無料版の制限'),
-            content: const Text(
-              '無料版は${ProService.freeLogLimit}旅程まで保存できます。\n'
-              'Pro版にアップグレードすると無制限に保存できます。',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('閉じる'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  showProPurchaseDialog(context);
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-                child: const Text(
-                  'Pro版を見る',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-      return;
-    }
-
-    try {
-      final fareType = _optFareType;
-      final seatClass = _optSeatClass;
-      double fareRate = 1.0;
-      final rateMatch = RegExp(r'\((\d+)%\)').firstMatch(fareType);
-      if (rateMatch != null) fareRate = int.parse(rateMatch.group(1)!) / 100.0;
-      final fareNumber = fareType.split(' ').first;
-
-      final airports = <String>[];
-      final legsJson = <Map<String, dynamic>>[];
-      int totalFop = 0, totalMiles = 0, totalLsp = 0;
-
-      for (final f in plan.flights) {
-        if (airports.isEmpty || airports.last != f.departureCode)
-          airports.add(f.departureCode);
-        airports.add(f.arrivalCode);
-        final distance = f.distanceMiles;
-
-        int fop = 0, miles = 0, lsp = 0;
-        if (_optAirline == 'JAL') {
-          final seatBonusRate =
-              {'普通席': 0.0, 'クラスJ': 0.1, 'ファーストクラス': 0.5}[seatClass] ?? 0.0;
-          double effectiveFareRate = fareRate;
-          if (jalTourPremium && (fareNumber == '運賃4' || fareNumber == '運賃5'))
-            effectiveFareRate = 1.0;
-          final flightMiles = (distance * (effectiveFareRate + seatBonusRate))
-              .round();
-          final statusBonusRate =
-              {
-                '-': 0.0,
-                'JMBダイヤモンド': 1.30,
-                'JMBサファイア': 1.05,
-                'JMBクリスタル': 0.55,
-              }[selectedJALStatus ?? '-'] ??
-              0.0;
-          final jalCardBonusRate =
-              {
-                '-': 0.0,
-                'JMB会員': 0.0,
-                'JALカード普通会員': 0.10,
-                'JALカードCLUB-A会員': 0.25,
-                'JALカードCLUB-Aゴールド会員': 0.25,
-                'JALカードプラチナ会員': 0.25,
-                'JALグローバルクラブ会員(日本)': 0.25,
-                'JALグローバルクラブ会員(海外)': 0.25,
-                'JALカードNAVI会員': 0.10,
-                'JAL CLUB EST 普通会員': 0.10,
-                'JAL CLUB EST CLUB-A会員': 0.25,
-                'JAL CLUB EST CLUB-A GOLD会員': 0.25,
-                'JAL CLUB EST プラチナ会員': 0.25,
-              }[selectedJALCard ?? '-'] ??
-              0.0;
-          miles =
-              flightMiles +
-              (flightMiles * statusBonusRate).round() +
-              (flightMiles * jalCardBonusRate).round();
-          fop = (flightMiles * 2) + (jalBonusFOP[fareNumber] ?? 0);
-          lsp = (fareRate >= 0.5) ? 5 : 0;
-          totalFop += fop;
-          totalLsp += lsp;
-        } else {
-          final cardBonusRate =
-              {
-                '-': 0.0,
-                'AMCカード(提携カード含む)': 0.0,
-                'ANAカード 一般': 0.10,
-                'ANAカード 学生用': 0.10,
-                'ANAカード ワイド': 0.25,
-                'ANAカード ゴールド': 0.25,
-                'ANAカード プレミアム': 0.50,
-                'SFC 一般': 0.35,
-                'SFC ゴールド': 0.40,
-                'SFC プレミアム': 0.50,
-              }[selectedANACard ?? '-'] ??
-              0.0;
-          final statusBonusRate =
-              {
-                '-': 0.0,
-                'ダイヤモンド(1年目)': 1.15,
-                'ダイヤモンド(継続2年以上)': 1.25,
-                'プラチナ(1年目)': 0.90,
-                'プラチナ(継続2年以上)': 1.00,
-                'ブロンズ(1年目)': 0.40,
-                'ブロンズ(継続2年以上)': 0.50,
-              }[selectedANAStatus ?? '-'] ??
-              0.0;
-          final isGoldPremium = const [
-            'ANAカード ゴールド',
-            'ANAカード プレミアム',
-            'SFC ゴールド',
-            'SFC プレミアム',
-          ].contains(selectedANACard ?? '-');
-          final appliedRate = (isGoldPremium && statusBonusRate > 0)
-              ? statusBonusRate + 0.05
-              : (cardBonusRate > statusBonusRate
-                    ? cardBonusRate
-                    : statusBonusRate);
-          miles = (distance * fareRate * (1 + appliedRate)).toInt();
-          fop = (distance * fareRate * 2 + (anaBonusPoint[fareNumber] ?? 0))
-              .toInt();
-        }
-        totalMiles += miles;
-
-        legsJson.add({
-          'airline': _optAirline,
-          'date': _optDate,
-          'flight_number': f.flightNumber,
-          'departure_airport': f.departureCode,
-          'arrival_airport': f.arrivalCode,
-          'departure_time': f.departureTime,
-          'arrival_time': f.arrivalTime,
-          'fare_type': fareType,
-          'seat_class': seatClass,
-          'fare_amount': 0,
-          'fop': fop,
-          'miles': miles,
-          'lsp': lsp,
-        });
-      }
-
-      final title = '${airports.join("-")} ${plan.flights.length}レグ';
-      await Supabase.instance.client.from('saved_itineraries').insert({
-        'user_id': user!.id,
-        'title': title,
-        'legs': legsJson,
-        'total_fop': _optAirline == 'JAL' ? totalFop : 0,
-        'total_pp': _optAirline == 'ANA' ? totalFop : 0,
-        'total_miles': totalMiles,
-        'total_lsp': totalLsp,
-        'total_fare': 0,
-        'jal_card': selectedJALCard,
-        'ana_card': selectedANACard,
-        'jal_status': selectedJALStatus,
-        'ana_status': selectedANAStatus,
-        'jal_tour_premium': jalTourPremium,
-        'is_completed': false,
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('「$title」を予定に保存しました'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存に失敗しました: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
   void _transferToFreeDesign(OptimalPlan plan) {
     setState(() {
-      // 既存レグをクリア（後ろから削除）
+      // 既存レグをクリア(後ろから削除)
       while (legs.length > 1) {
         _removeLeg(legs.length - 1);
       }
@@ -3266,8 +3079,6 @@ class _SimulationScreenState extends State<SimulationScreen>
         legs[legIndex]['airline'] = _optAirline;
         legs[legIndex]['departureAirport'] = f.departureCode;
         legs[legIndex]['arrivalAirport'] = f.arrivalCode;
-        legs[legIndex]['fareType'] = _optFareType;
-        legs[legIndex]['seatClass'] = _optSeatClass;
       });
       flightNumberControllers[legId]?.text = f.flightNumber;
       departureTimeControllers[legId]?.text = f.departureTime;
@@ -3294,21 +3105,7 @@ class _SimulationScreenState extends State<SimulationScreen>
               ElevatedButton.icon(
                 onPressed: _showEmailImportDialog,
                 icon: const Icon(Icons.email, size: 14),
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('メールから入力'),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
+                label: const Text('メールから入力'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
@@ -3477,12 +3274,12 @@ class _SimulationScreenState extends State<SimulationScreen>
           _buildMiniStat('レグ', '$jalCount', Colors.red),
           _buildMiniStat(
             '総額',
-            jalFare > 0 ? '¥${_formatNumber(jalFare)}' : '-',
+            jalFare > 0 ? 'Â¥${_formatNumber(jalFare)}' : '-',
             Colors.red,
           ),
           _buildMiniStat(
             '単価',
-            jalUnitPrice != '-' ? '¥$jalUnitPrice' : '-',
+            jalUnitPrice != '-' ? 'Â¥$jalUnitPrice' : '-',
             Colors.red,
           ),
           Container(width: 1, height: 36, color: Colors.grey[300]),
@@ -3584,33 +3381,19 @@ class _SimulationScreenState extends State<SimulationScreen>
           _buildMiniStat('レグ', '$anaCount', Colors.blue),
           _buildMiniStat(
             '総額',
-            anaFare > 0 ? '¥${_formatNumber(anaFare)}' : '-',
+            anaFare > 0 ? 'Â¥${_formatNumber(anaFare)}' : '-',
             Colors.blue,
           ),
           _buildMiniStat(
             '単価',
-            anaUnitPrice != '-' ? '¥$anaUnitPrice' : '-',
+            anaUnitPrice != '-' ? 'Â¥$anaUnitPrice' : '-',
             Colors.blue,
           ),
           Container(width: 1, height: 36, color: Colors.grey[300]),
           ElevatedButton.icon(
             onPressed: _showEmailImportDialog,
             icon: const Icon(Icons.email, size: 16),
-            label: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('メールから入力'),
-                const SizedBox(width: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
+            label: const Text('メールから入力'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,
