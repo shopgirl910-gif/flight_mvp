@@ -18,7 +18,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
   String? errorMessage;
   String? _expandedId;
 
-  // 累計統計(修行済みのみ)
+  // ç´¯è¨ˆçµ±è¨ˆï¼ˆä¿®è¡Œæ¸ˆã¿ã®ã¿ï¼‰
   int totalFOP = 0;
   int totalPP = 0;
   int totalMiles = 0;
@@ -81,7 +81,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
     } catch (e) {
       setState(() {
         isLoading = false;
-        errorMessage = 'データの読み込みに失敗しました: $e';
+        errorMessage = 'ãƒ‡ãƒ¼ã‚¿ã®èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ã¾ã—ãŸ: $e';
       });
     }
   }
@@ -99,7 +99,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
     _anaLegs = 0;
   }
 
-  // JAL/ANA別の統計
+  // JAL/ANAåˆ¥ã®çµ±è¨ˆ
   int _jalMiles = 0;
   int _jalLegs = 0;
   int _anaMiles = 0;
@@ -115,7 +115,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       final legs = it['legs'] as List<dynamic>? ?? [];
       totalLegs += legs.length;
       
-      // JAL/ANA別にカウント
+      // JAL/ANAåˆ¥ã«ã‚«ã‚¦ãƒ³ãƒˆ
       for (var leg in legs) {
         final l = leg as Map<String, dynamic>;
         final airline = l['airline'] as String? ?? '';
@@ -141,13 +141,13 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       _loadItineraries();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('修行済みに移動しました'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('ä¿®è¡Œæ¸ˆã¿ã«ç§»å‹•ã—ã¾ã—ãŸ'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('移動に失敗しました: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('ç§»å‹•ã«å¤±æ•—ã—ã¾ã—ãŸ: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -229,30 +229,11 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
   }
 
   bool _isPastDate(Map<String, dynamic> itinerary) {
-    final legs = itinerary['legs'] as List<dynamic>? ?? [];
-    if (legs.isEmpty) return false;
-    final lastLeg = legs.last as Map<String, dynamic>;
-    final dateStr = lastLeg['date'] as String? ?? '';
-    final arrTime = lastLeg['arrival_time'] as String? ?? '';
-    if (dateStr.isEmpty) return false;
-    try {
-      final dateParts = dateStr.split('/');
-      if (dateParts.length != 3) return false;
-      final year = int.parse(dateParts[0]);
-      final month = int.parse(dateParts[1]);
-      final day = int.parse(dateParts[2]);
-      // 到着時刻があればその時刻で判定、なければ日付の終わり(23:59)で判定
-      int hour = 23, minute = 59;
-      if (arrTime.isNotEmpty && arrTime.contains(':')) {
-        final timeParts = arrTime.split(':');
-        hour = int.parse(timeParts[0]);
-        minute = int.parse(timeParts[1]);
-      }
-      final arrivalDateTime = DateTime(year, month, day, hour, minute);
-      return DateTime.now().isAfter(arrivalDateTime);
-    } catch (e) {
-      return false;
-    }
+    final date = _getFirstLegDate(itinerary);
+    if (date == null) return false;
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    return date.isBefore(todayOnly);
   }
 
   bool _hasDate(Map<String, dynamic> itinerary) {
@@ -301,7 +282,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                   children: [
                     const Icon(Icons.check_circle, size: 18),
                     const SizedBox(width: 6),
-                    Text('修行済み (${completedItineraries.length})'),
+                    Text('ä¿®è¡Œæ¸ˆã¿ (${completedItineraries.length})'),
                   ],
                 ),
               ),
@@ -311,7 +292,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                   children: [
                     const Icon(Icons.schedule, size: 18),
                     const SizedBox(width: 6),
-                    Text('予定 (${plannedItineraries.length})'),
+                    Text('äºˆå®š (${plannedItineraries.length})'),
                   ],
                 ),
               ),
@@ -333,7 +314,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
 
   Widget _buildCompletedTab(AppLocalizations l10n) {
     if (completedItineraries.isEmpty) {
-      return _buildEmptyTabView('修行済みの旅程はありません', Icons.flight_land);
+      return _buildEmptyTabView('ä¿®è¡Œæ¸ˆã¿ã®æ—…ç¨‹ã¯ã‚ã‚Šã¾ã›ã‚“', Icons.flight_land);
     }
 
     return RefreshIndicator(
@@ -368,7 +349,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
 
   Widget _buildPlannedTab(AppLocalizations l10n) {
     if (plannedItineraries.isEmpty) {
-      return _buildEmptyTabView('予定の旅程はありません\nシミュレーションから追加してください', Icons.flight_takeoff);
+      return _buildEmptyTabView('äºˆå®šã®æ—…ç¨‹ã¯ã‚ã‚Šã¾ã›ã‚“\nã‚·ãƒŸãƒ¥ãƒ¬ãƒ¼ã‚·ãƒ§ãƒ³ã‹ã‚‰è¿½åŠ ã—ã¦ãã ã•ã„', Icons.flight_takeoff);
     }
 
     return RefreshIndicator(
@@ -453,7 +434,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
     final hasJAL = totalFOP > 0 || _jalLegs > 0;
     final hasANA = totalPP > 0 || _anaLegs > 0;
     
-    // JALのみ
+    // JALã®ã¿
     if (hasJAL && !hasANA) {
       return _buildSingleAirlineSummary(
         l10n, isMobile, 
@@ -465,7 +446,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       );
     }
     
-    // ANAのみ
+    // ANAã®ã¿
     if (hasANA && !hasJAL) {
       return _buildSingleAirlineSummary(
         l10n, isMobile,
@@ -477,10 +458,10 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       );
     }
     
-    // 混在: 上下分割
+    // æ··åœ¨: ä¸Šä¸‹åˆ†å‰²
     return Column(
       children: [
-        // JAL(赤)
+        // JALï¼ˆèµ¤ï¼‰
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
@@ -509,7 +490,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                 children: [
                   const Icon(Icons.emoji_events, color: Colors.yellow, size: 20),
                   const SizedBox(width: 6),
-                  const Text('JAL 修行実績', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text('JAL ä¿®è¡Œå®Ÿç¸¾', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 10),
@@ -526,7 +507,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
             ],
           ),
         ),
-        // ANA(青)
+        // ANAï¼ˆé’ï¼‰
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
@@ -555,7 +536,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                 children: [
                   const Icon(Icons.emoji_events, color: Colors.yellow, size: 20),
                   const SizedBox(width: 6),
-                  const Text('ANA 修行実績', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text('ANA ä¿®è¡Œå®Ÿç¸¾', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 10),
@@ -637,7 +618,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
               const Icon(Icons.emoji_events, color: Colors.yellow, size: 24),
               const SizedBox(width: 8),
               Text(
-                '$airlineName 修行実績',
+                '$airlineName ä¿®è¡Œå®Ÿç¸¾',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.9),
                   fontSize: 14,
@@ -705,7 +686,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
     String unitPrice = '-';
     if (totalFare > 0 && (totalFop > 0 || totalPp > 0)) {
       final points = totalFop > 0 ? totalFop : totalPp;
-      unitPrice = '¥${(totalFare / points).toStringAsFixed(1)}';
+      unitPrice = 'Â¥${(totalFare / points).toStringAsFixed(1)}';
     }
 
     String dateDisplay = createdAt;
@@ -721,7 +702,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
             color: Colors.purple[100],
             borderRadius: BorderRadius.circular(4),
           ),
-          child: Text('📅 予定', style: TextStyle(fontSize: 10, color: Colors.purple[700])),
+          child: Text('ðŸ“… äºˆå®š', style: TextStyle(fontSize: 10, color: Colors.purple[700])),
         );
       } else if (isPast) {
         dateBadge = Container(
@@ -730,7 +711,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
             color: Colors.orange,
             borderRadius: BorderRadius.circular(4),
           ),
-          child: const Text('過去日付', style: TextStyle(fontSize: 10, color: Colors.white)),
+          child: const Text('éŽåŽ»æ—¥ä»˜', style: TextStyle(fontSize: 10, color: Colors.white)),
         );
       }
     }
@@ -793,7 +774,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                       if (totalPp > 0) _buildStatChip('PP', _formatNumber(totalPp), Colors.blue),
                       _buildStatChip(l10n.miles, _formatNumber(totalMiles), Colors.orange),
                       if (totalLsp > 0) _buildStatChip('LSP', _formatNumber(totalLsp), Colors.purple),
-                      if (totalFare > 0) _buildStatChip('', '¥${_formatNumber(totalFare)}', Colors.green),
+                      if (totalFare > 0) _buildStatChip('', 'Â¥${_formatNumber(totalFare)}', Colors.green),
                       if (unitPrice != '-') _buildUnitPriceChip(unitPrice, totalFop > 0 ? 'FOP' : 'PP'),
                     ],
                   ),
@@ -826,7 +807,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      '搭乗済み → 修行済みに移動',
+                      'æ­ä¹—æ¸ˆã¿ â†’ ä¿®è¡Œæ¸ˆã¿ã«ç§»å‹•',
                       style: TextStyle(fontSize: 13, color: Colors.green[700], fontWeight: FontWeight.w500),
                     ),
                   ],
@@ -859,18 +840,6 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
-                        onPressed: () => _editItinerary(itinerary),
-                        icon: const Icon(Icons.edit, size: 16),
-                        label: const Text('編集'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.purple,
-                          side: BorderSide(color: Colors.purple[200]!),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          textStyle: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
                         onPressed: () => _deleteItinerary(id),
                         icon: const Icon(Icons.delete_outline, size: 16),
                         label: Text(l10n.delete),
@@ -890,16 +859,6 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
         ],
       ),
     );
-  }
-
-  void _editItinerary(Map<String, dynamic> itinerary) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => _EditItineraryDialog(itinerary: itinerary),
-    );
-    if (result == true) {
-      _loadItineraries();
-    }
   }
 
   Widget _buildStatChip(String label, String value, Color color) {
@@ -968,7 +927,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 便名(航空会社カラーで表示、バッジなし)
+          // 便名（航空会社カラーで表示、バッジなし）
           SizedBox(
             width: isMobile ? 42 : 50,
             child: Text(
@@ -976,7 +935,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: airlineColor),
             ),
           ),
-          // 日付(あれば)
+          // 日付（あれば）
           if (displayDate.isNotEmpty) ...[
             Text(displayDate, style: TextStyle(fontSize: 10, color: Colors.grey[600])),
             const SizedBox(width: 6),
@@ -997,7 +956,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
           if (arrTime.isNotEmpty)
             Text(' $arrTime', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
           const Spacer(),
-          // FOP/PP + マイル + LSP(JALのみ)
+          // FOP/PP + マイル + LSP（JALのみ）
           Text(
             statsText,
             style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: airlineColor),
@@ -1008,7 +967,7 @@ class FlightLogScreenState extends State<FlightLogScreen> with SingleTickerProvi
   }
 }
 
-// シェアダイアログ
+// ã‚·ã‚§ã‚¢ãƒ€ã‚¤ã‚¢ãƒ­ã‚°
 class _ShareDialog extends StatefulWidget {
   final Map<String, dynamic> itinerary;
 
@@ -1051,73 +1010,73 @@ class _ShareDialogState extends State<_ShareDialog> {
     final fare = itinerary['total_fare'] as int? ?? 0;
     final legs = itinerary['legs'] as List<dynamic>? ?? [];
     
-    // 日付取得
+    // æ—¥ä»˜å–å¾—
     String dateStr = '';
     if (legs.isNotEmpty) {
       final firstLeg = legs.first as Map<String, dynamic>;
       dateStr = firstLeg['date'] as String? ?? '';
     }
 
-    // 単価計算
+    // å˜ä¾¡è¨ˆç®—
     String unitPrice = '';
     final pointLabel = fop > 0 ? 'FOP' : 'PP';
     final points = fop > 0 ? fop : pp;
     if (fare > 0 && points > 0) {
-      unitPrice = '¥${(fare / points).toStringAsFixed(1)}/$pointLabel';
+      unitPrice = 'Â¥${(fare / points).toStringAsFixed(1)}/$pointLabel';
     }
 
-    // ヘッダー部分を生成
+    // ãƒ˜ãƒƒãƒ€ãƒ¼éƒ¨åˆ†ã‚’ç”Ÿæˆ
     final header = StringBuffer();
     if (theme.isNotEmpty) {
-      header.writeln('✈️【$theme】');
+      header.writeln('âœˆï¸ã€$themeã€‘');
     } else {
-      header.writeln('✈️【修行プラン】');
+      header.writeln('âœˆï¸ã€ä¿®è¡Œãƒ—ãƒ©ãƒ³ã€‘');
     }
     header.writeln('');
     if (dateStr.isNotEmpty) {
-      header.writeln('🗓 $dateStr');
+      header.writeln('ðŸ—“ $dateStr');
     }
-    header.writeln('🛫 $title');
+    header.writeln('ðŸ›« $title');
     header.writeln('');
     
-    // 統計部分
+    // çµ±è¨ˆéƒ¨åˆ†
     final stats = StringBuffer();
     if (fop > 0) {
-      stats.write('📊 FOP: ${_formatNumber(fop)} / マイル: ${_formatNumber(miles)}');
+      stats.write('ðŸ“Š FOP: ${_formatNumber(fop)} / ãƒžã‚¤ãƒ«: ${_formatNumber(miles)}');
       if (lsp > 0) stats.write(' / ${lsp}LSP');
       stats.writeln('');
     } else if (pp > 0) {
-      stats.writeln('📊 PP: ${_formatNumber(pp)} / マイル: ${_formatNumber(miles)}');
+      stats.writeln('ðŸ“Š PP: ${_formatNumber(pp)} / ãƒžã‚¤ãƒ«: ${_formatNumber(miles)}');
     }
     if (fare > 0) {
-      stats.write('💰 ¥${_formatNumber(fare)}');
+      stats.write('ðŸ’° Â¥${_formatNumber(fare)}');
       if (unitPrice.isNotEmpty) {
-        stats.writeln('($unitPrice)');
+        stats.writeln('ï¼ˆ$unitPriceï¼‰');
       } else {
         stats.writeln('');
       }
     }
 
-    // フッター部分
+    // ãƒ•ãƒƒã‚¿ãƒ¼éƒ¨åˆ†
     final footer = StringBuffer();
     if (comment.isNotEmpty) {
       footer.writeln('');
-      footer.writeln('💬 $comment');
+      footer.writeln('ðŸ’¬ $comment');
     }
     footer.writeln('');
     final airline = fop > 0 ? 'JAL' : 'ANA';
-    footer.writeln('#MRP修行プラン #${airline}修行');
+    footer.writeln('#MRPä¿®è¡Œãƒ—ãƒ©ãƒ³ #${airline}ä¿®è¡Œ');
     footer.writeln('mileage-run-planner.web.app');
 
-    // 詳細なしの場合
+    // è©³ç´°ãªã—ã®å ´åˆ
     if (!_showDetails) {
       final text = '${header.toString()}${stats.toString()}${footer.toString()}';
       return [text];
     }
 
-    // 詳細ありの場合 - レグ情報を生成
+    // è©³ç´°ã‚ã‚Šã®å ´åˆ - ãƒ¬ã‚°æƒ…å ±ã‚’ç”Ÿæˆ
     final legLines = <String>[];
-    legLines.add('━━━━━━━━━━━━━━');
+    legLines.add('â”â”â”â”â”â”â”â”â”â”â”â”â”â”');
     for (var leg in legs) {
       final l = leg as Map<String, dynamic>;
       final legAirline = l['airline'] as String? ?? '';
@@ -1135,19 +1094,19 @@ class _ShareDialogState extends State<_ShareDialog> {
       if (depTime.isNotEmpty) {
         line += ' $depTime';
       }
-      line += ' $dep → $arr';
+      line += ' $dep â†’ $arr';
       if (arrTime.isNotEmpty) {
         line += ' $arrTime';
       }
       legLines.add(line);
     }
-    legLines.add('━━━━━━━━━━━━━━');
+    legLines.add('â”â”â”â”â”â”â”â”â”â”â”â”â”â”');
 
-    // 280文字で分割
-    const maxLength = 270; // URLの余裕を持たせる
+    // 280æ–‡å­—ã§åˆ†å‰²
+    const maxLength = 270; // URLã®ä½™è£•ã‚’æŒãŸã›ã‚‹
     final texts = <String>[];
     
-    // 最初のツイート
+    // æœ€åˆã®ãƒ„ã‚¤ãƒ¼ãƒˆ
     var current = StringBuffer();
     current.write(header.toString());
     current.write(stats.toString());
@@ -1162,7 +1121,7 @@ class _ShareDialogState extends State<_ShareDialog> {
       legIndex++;
     }
     
-    // 最後にフッターを追加
+    // æœ€å¾Œã«ãƒ•ãƒƒã‚¿ãƒ¼ã‚’è¿½åŠ 
     if (current.length + footer.length > maxLength && current.length > 0) {
       texts.add(current.toString());
       current = StringBuffer();
@@ -1170,7 +1129,7 @@ class _ShareDialogState extends State<_ShareDialog> {
     current.write(footer.toString());
     texts.add(current.toString());
 
-    // 複数に分かれた場合、番号を付ける
+    // è¤‡æ•°ã«åˆ†ã‹ã‚ŒãŸå ´åˆã€ç•ªå·ã‚’ä»˜ã‘ã‚‹
     if (texts.length > 1) {
       final total = texts.length;
       for (int i = 0; i < texts.length; i++) {
@@ -1185,21 +1144,21 @@ class _ShareDialogState extends State<_ShareDialog> {
     final texts = _generateShareTexts();
     Navigator.pop(context);
     
-    // 最初のツイートを開く
+    // æœ€åˆã®ãƒ„ã‚¤ãƒ¼ãƒˆã‚’é–‹ã
     final text = Uri.encodeComponent(texts[0]);
     final url = 'https://twitter.com/intent/tweet?text=$text';
     launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     
-    // 複数ある場合は通知
+    // è¤‡æ•°ã‚ã‚‹å ´åˆã¯é€šçŸ¥
     if (texts.length > 1) {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${texts.length}件に分割されました。続きは順番に投稿してください。'),
+              content: Text('${texts.length}ä»¶ã«åˆ†å‰²ã•ã‚Œã¾ã—ãŸã€‚ç¶šãã¯é †ç•ªã«æŠ•ç¨¿ã—ã¦ãã ã•ã„ã€‚'),
               duration: const Duration(seconds: 5),
               action: SnackBarAction(
-                label: '次へ',
+                label: 'æ¬¡ã¸',
                 onPressed: () => _shareNext(texts, 1),
               ),
             ),
@@ -1221,10 +1180,10 @@ class _ShareDialogState extends State<_ShareDialog> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('[${index + 2}/${texts.length}] を投稿してください'),
+              content: Text('[${index + 2}/${texts.length}] ã‚’æŠ•ç¨¿ã—ã¦ãã ã•ã„'),
               duration: const Duration(seconds: 5),
               action: SnackBarAction(
-                label: '次へ',
+                label: 'æ¬¡ã¸',
                 onPressed: () => _shareNext(texts, index + 1),
               ),
             ),
@@ -1245,7 +1204,7 @@ class _ShareDialogState extends State<_ShareDialog> {
         children: [
           Icon(Icons.share, color: Colors.blue),
           SizedBox(width: 8),
-          Text('Xでシェア', style: TextStyle(fontSize: 18)),
+          Text('Xã§ã‚·ã‚§ã‚¢', style: TextStyle(fontSize: 18)),
         ],
       ),
       content: SingleChildScrollView(
@@ -1253,24 +1212,24 @@ class _ShareDialogState extends State<_ShareDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // テーマ入力
+            // ãƒ†ãƒ¼ãƒžå…¥åŠ›
             TextField(
               controller: _themeController,
               decoration: const InputDecoration(
-                labelText: 'テーマ(任意)',
-                hintText: '例: W杯追っかけ修行',
+                labelText: 'ãƒ†ãƒ¼ãƒžï¼ˆä»»æ„ï¼‰',
+                hintText: 'ä¾‹: Wæ¯è¿½ã£ã‹ã‘ä¿®è¡Œ',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
-            // コメント入力
+            // ã‚³ãƒ¡ãƒ³ãƒˆå…¥åŠ›
             TextField(
               controller: _commentController,
               decoration: const InputDecoration(
-                labelText: 'コメント(任意)',
-                hintText: '例: 初修行完了!',
+                labelText: 'ã‚³ãƒ¡ãƒ³ãƒˆï¼ˆä»»æ„ï¼‰',
+                hintText: 'ä¾‹: åˆä¿®è¡Œå®Œäº†ï¼',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
@@ -1278,18 +1237,18 @@ class _ShareDialogState extends State<_ShareDialog> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
-            // 詳細表示チェック
+            // è©³ç´°è¡¨ç¤ºãƒã‚§ãƒƒã‚¯
             CheckboxListTile(
               value: _showDetails,
               onChanged: (v) => setState(() => _showDetails = v ?? false),
-              title: const Text('フライト詳細を含める', style: TextStyle(fontSize: 14)),
-              subtitle: Text('${legs.length}レグの時刻表を表示', style: const TextStyle(fontSize: 12)),
+              title: const Text('ãƒ•ãƒ©ã‚¤ãƒˆè©³ç´°ã‚’å«ã‚ã‚‹', style: TextStyle(fontSize: 14)),
+              subtitle: Text('${legs.length}ãƒ¬ã‚°ã®æ™‚åˆ»è¡¨ã‚’è¡¨ç¤º', style: const TextStyle(fontSize: 12)),
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
               dense: true,
             ),
             const SizedBox(height: 16),
-            // プレビューセクション
+            // ãƒ—ãƒ¬ãƒ“ãƒ¥ãƒ¼ã‚»ã‚¯ã‚·ãƒ§ãƒ³
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1305,7 +1264,7 @@ class _ShareDialogState extends State<_ShareDialog> {
                       Icon(Icons.preview, size: 16, color: Colors.grey[600]),
                       const SizedBox(width: 4),
                       Text(
-                        'プレビュー${hasMultipleTweets ? "(${shareTexts.length}件に分割)" : ""}',
+                        'ãƒ—ãƒ¬ãƒ“ãƒ¥ãƒ¼${hasMultipleTweets ? "ï¼ˆ${shareTexts.length}ä»¶ã«åˆ†å‰²ï¼‰" : ""}',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700]),
                       ),
                     ],
@@ -1329,7 +1288,7 @@ class _ShareDialogState extends State<_ShareDialog> {
                             Padding(
                               padding: const EdgeInsets.only(bottom: 4),
                               child: Text(
-                                'ツイート ${index + 1}/${shareTexts.length}',
+                                'ãƒ„ã‚¤ãƒ¼ãƒˆ ${index + 1}/${shareTexts.length}',
                                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue[700]),
                               ),
                             ),
@@ -1341,7 +1300,7 @@ class _ShareDialogState extends State<_ShareDialog> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: Text(
-                              '${text.length}/280文字',
+                              '${text.length}/280æ–‡å­—',
                               style: TextStyle(
                                 fontSize: 10,
                                 color: text.length > 280 ? Colors.red : Colors.grey[500],
@@ -1361,389 +1320,18 @@ class _ShareDialogState extends State<_ShareDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('キャンセル'),
+          child: const Text('ã‚­ãƒ£ãƒ³ã‚»ãƒ«'),
         ),
         ElevatedButton.icon(
           onPressed: _share,
           icon: const Icon(Icons.send, size: 18),
-          label: Text(hasMultipleTweets ? 'シェア (1/${shareTexts.length})' : 'シェア'),
+          label: Text(hasMultipleTweets ? 'ã‚·ã‚§ã‚¢ (1/${shareTexts.length})' : 'ã‚·ã‚§ã‚¢'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue,
             foregroundColor: Colors.white,
           ),
         ),
       ],
-    );
-  }
-}
-
-// 編集ダイアログ
-class _EditItineraryDialog extends StatefulWidget {
-  final Map<String, dynamic> itinerary;
-  const _EditItineraryDialog({required this.itinerary});
-
-  @override
-  State<_EditItineraryDialog> createState() => _EditItineraryDialogState();
-}
-
-class _EditItineraryDialogState extends State<_EditItineraryDialog> {
-  late List<Map<String, dynamic>> _legs;
-  bool _saving = false;
-  String? _error;
-
-  static const Map<String, List<String>> fareTypesByAirline = {
-    'JAL': [
-      '運賃1 (100%) フレックス等',
-      '運賃2 (75%) 株主割引',
-      '運賃3 (75%) セイバー',
-      '運賃4 (75%) スペシャルセイバー',
-      '運賃5 (50%) 包括旅行運賃',
-      '運賃6 (50%) プロモーション、スカイメイト等',
-    ],
-    'ANA': [
-      '運賃1 (150%) プレミアム運賃',
-      '運賃2 (125%) VALUE PREMIUM、プレミアム株主優待',
-      '運賃3 (100%) ANA FLEX、ビジネスきっぷ',
-      '運賃4 (100%) アイきっぷ',
-      '運賃5 (75%) VALUE、株主優待',
-      '運賃6 (75%) VALUE TRANSIT',
-      '運賃7 (75%) SUPER VALUE、いっしょにマイル割',
-      '運賃8 (50%) 個人包括、スマートU25等',
-      '運賃9 (150%) 国際航空券プレミアム',
-      '運賃10 (100%) 国際航空券普通席 Y/B/M',
-      '運賃11 (70%) 国際航空券普通席 U/H/Q',
-      '運賃12 (50%) 国際航空券普通席 V/W/S',
-      '運賃13 (30%) 国際航空券普通席 L/K',
-    ],
-  };
-  static const Map<String, List<String>> seatClassesByAirline = {
-    'JAL': ['普通席', 'クラスJ', 'ファーストクラス'],
-    'ANA': ['普通席', 'プレミアムクラス'],
-  };
-  static const Map<String, int> jalBonusFOP = {
-    '運賃1': 400, '運賃2': 400, '運賃3': 200,
-    '運賃4': 200, '運賃5': 0, '運賃6': 0,
-  };
-  static const Map<String, int> anaBonusPoint = {
-    '運賃1': 400, '運賃2': 400, '運賃3': 400, '運賃4': 0,
-    '運賃5': 400, '運賃6': 200, '運賃7': 0, '運賃8': 0,
-    '運賃9': 0, '運賃10': 0, '運賃11': 0, '運賃12': 0, '運賃13': 0,
-  };
-  static const List<String> anaCardTypes = [
-    '-', 'AMCカード(提携カード含む)', 'ANAカード 一般', 'ANAカード 学生用',
-    'ANAカード ワイド', 'ANAカード ゴールド', 'ANAカード プレミアム',
-    'SFC 一般', 'SFC ゴールド', 'SFC プレミアム',
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    final rawLegs = widget.itinerary['legs'] as List<dynamic>? ?? [];
-    _legs = rawLegs.map((l) => Map<String, dynamic>.from(l as Map)).toList();
-  }
-
-  String _fareShortLabel(String fareType) {
-    // "運賃3 (75%) セイバー" -> "運賃3 セイバー"
-    return fareType.replaceAll(RegExp(r'\s*\(\d+%\)\s*'), ' ').trim();
-  }
-
-  Future<void> _save() async {
-    setState(() { _saving = true; _error = null; });
-    try {
-      final jalCard = widget.itinerary['jal_card'] as String?;
-      final anaCard = widget.itinerary['ana_card'] as String?;
-      final jalStatus = widget.itinerary['jal_status'] as String?;
-      final anaStatus = widget.itinerary['ana_status'] as String?;
-      final jalTourPremium = widget.itinerary['jal_tour_premium'] as bool? ?? false;
-
-      int sumFop = 0, sumPp = 0, sumMiles = 0, sumLsp = 0, sumFare = 0;
-
-      for (var leg in _legs) {
-        final airline = leg['airline'] as String? ?? '';
-        final dep = leg['departure_airport'] as String? ?? '';
-        final arr = leg['arrival_airport'] as String? ?? '';
-        final fareType = leg['fare_type'] as String? ?? '';
-        final seatClass = leg['seat_class'] as String? ?? '';
-        final fareAmount = leg['fare_amount'] as int? ?? 0;
-
-        if (dep.isEmpty || arr.isEmpty || fareType.isEmpty) continue;
-
-        // 距離取得
-        final routeData = await Supabase.instance.client
-            .from('routes')
-            .select('distance_miles')
-            .eq('departure_code', dep)
-            .eq('arrival_code', arr)
-            .maybeSingle();
-        if (routeData == null) continue;
-        final distance = routeData['distance_miles'] as int;
-
-        double fareRate = 1.0;
-        final rateMatch = RegExp(r'\((\d+)%\)').firstMatch(fareType);
-        if (rateMatch != null) fareRate = int.parse(rateMatch.group(1)!) / 100.0;
-        final fareNumber = fareType.split(' ').first;
-
-        int fop = 0, miles = 0, lsp = 0;
-
-        if (airline == 'JAL') {
-          final seatBonusRate = {'普通席': 0.0, 'クラスJ': 0.1, 'ファーストクラス': 0.5}[seatClass] ?? 0.0;
-          double effectiveFareRate = fareRate;
-          if (jalTourPremium && (fareNumber == '運賃4' || fareNumber == '運賃5')) {
-            effectiveFareRate = 1.0;
-          }
-          final flightMiles = (distance * (effectiveFareRate + seatBonusRate)).round();
-          final statusBonusRate = {
-            '-': 0.0, 'JMBダイヤモンド': 1.30, 'JMBサファイア': 1.05, 'JMBクリスタル': 0.55,
-          }[jalStatus ?? '-'] ?? 0.0;
-          miles = flightMiles + (flightMiles * statusBonusRate).round();
-          fop = (flightMiles * 2) + (jalBonusFOP[fareNumber] ?? 0);
-          lsp = (fareRate >= 0.5) ? 5 : 0;
-          sumFop += fop;
-          sumLsp += lsp;
-        } else {
-          final cardBonusRate = {
-            '-': 0.0, 'AMCカード(提携カード含む)': 0.0,
-            'ANAカード 一般': 0.10, 'ANAカード 学生用': 0.10,
-            'ANAカード ワイド': 0.25, 'ANAカード ゴールド': 0.25,
-            'ANAカード プレミアム': 0.50, 'SFC 一般': 0.35,
-            'SFC ゴールド': 0.40, 'SFC プレミアム': 0.50,
-          }[anaCard ?? '-'] ?? 0.0;
-          final statusBonusRate = {
-            '-': 0.0, 'ダイヤモンド(1年目)': 1.15, 'ダイヤモンド(継続2年以上)': 1.25,
-            'プラチナ(1年目)': 0.90, 'プラチナ(継続2年以上)': 1.00,
-            'ブロンズ(1年目)': 0.40, 'ブロンズ(継続2年以上)': 0.50,
-          }[anaStatus ?? '-'] ?? 0.0;
-          final cardIdx = anaCardTypes.indexOf(anaCard ?? '-');
-          final isGoldPremium = cardIdx == 5 || cardIdx == 6 || cardIdx == 8 || cardIdx == 9;
-          final appliedRate = (isGoldPremium && statusBonusRate > 0)
-              ? statusBonusRate + 0.05
-              : (cardBonusRate > statusBonusRate ? cardBonusRate : statusBonusRate);
-          miles = (distance * fareRate * (1 + appliedRate)).toInt();
-          fop = (distance * fareRate * 2 + (anaBonusPoint[fareNumber] ?? 0)).toInt();
-          sumPp += fop;
-        }
-
-        leg['fop'] = fop;
-        leg['miles'] = miles;
-        leg['lsp'] = lsp;
-        sumMiles += miles;
-        sumFare += fareAmount;
-      }
-
-      await Supabase.instance.client
-          .from('saved_itineraries')
-          .update({
-            'legs': _legs,
-            'total_fop': sumFop,
-            'total_pp': sumPp,
-            'total_miles': sumMiles,
-            'total_lsp': sumLsp,
-            'total_fare': sumFare,
-          })
-          .eq('id', widget.itinerary['id']);
-
-      if (mounted) Navigator.pop(context, true);
-    } catch (e) {
-      setState(() { _saving = false; _error = '保存に失敗しました: $e'; });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-
-    return Dialog(
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 8 : 40,
-        vertical: isMobile ? 24 : 40,
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ヘッダー
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.purple[50],
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.edit, color: Colors.purple[700], size: 20),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('運賃・座席クラスを編集', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () => Navigator.pop(context, false),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-            ),
-            // レグ一覧
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    for (int i = 0; i < _legs.length; i++) _buildLegEditor(i, isMobile),
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            // フッター
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: Colors.grey[200]!)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: _saving ? null : () => Navigator.pop(context, false),
-                    child: const Text('キャンセル'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: _saving ? null : _save,
-                    icon: _saving
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.save, size: 16),
-                    label: Text(_saving ? '保存中...' : '再計算して保存'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLegEditor(int index, bool isMobile) {
-    final leg = _legs[index];
-    final airline = leg['airline'] as String? ?? '';
-    final dep = leg['departure_airport'] as String? ?? '';
-    final arr = leg['arrival_airport'] as String? ?? '';
-    final flightNum = leg['flight_number'] as String? ?? '';
-    final fareType = leg['fare_type'] as String? ?? '';
-    final seatClass = leg['seat_class'] as String? ?? '';
-    final airlineColor = airline == 'JAL' ? Colors.red : Colors.blue;
-
-    final fareTypes = fareTypesByAirline[airline] ?? [];
-    final seatClasses = seatClassesByAirline[airline] ?? [];
-
-    // 現在値がリストに無い場合のフォールバック
-    final currentFare = fareTypes.contains(fareType) ? fareType : (fareTypes.isNotEmpty ? fareTypes.first : '');
-    final currentSeat = seatClasses.contains(seatClass) ? seatClass : (seatClasses.isNotEmpty ? seatClasses.first : '');
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // レグヘッダー: 便名 + ルート
-          Row(
-            children: [
-              Text(
-                flightNum,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: airlineColor),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '$dep → $arr',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // ドロップダウン: 運賃種別 + 座席クラス
-          if (isMobile) ...[
-            // スマホ: 縦並び
-            _buildFareDropdown(index, fareTypes, currentFare, airline),
-            const SizedBox(height: 6),
-            _buildSeatDropdown(index, seatClasses, currentSeat),
-          ] else ...[
-            // PC: 横並び
-            Row(
-              children: [
-                Expanded(flex: 3, child: _buildFareDropdown(index, fareTypes, currentFare, airline)),
-                const SizedBox(width: 8),
-                Expanded(flex: 2, child: _buildSeatDropdown(index, seatClasses, currentSeat)),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFareDropdown(int index, List<String> fareTypes, String currentValue, String airline) {
-    return DropdownButtonFormField<String>(
-      value: currentValue.isEmpty ? null : currentValue,
-      decoration: InputDecoration(
-        labelText: '運賃種別',
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-      ),
-      isExpanded: true,
-      style: const TextStyle(fontSize: 12, color: Colors.black87),
-      selectedItemBuilder: (context) => fareTypes.map((f) =>
-        Align(alignment: Alignment.centerLeft, child: Text(_fareShortLabel(f), overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)))
-      ).toList(),
-      items: fareTypes.map((f) => DropdownMenuItem(
-        value: f,
-        child: Text(_fareShortLabel(f), style: const TextStyle(fontSize: 12)),
-      )).toList(),
-      onChanged: (v) {
-        if (v != null) setState(() => _legs[index]['fare_type'] = v);
-      },
-    );
-  }
-
-  Widget _buildSeatDropdown(int index, List<String> seatClasses, String currentValue) {
-    return DropdownButtonFormField<String>(
-      value: currentValue.isEmpty ? null : currentValue,
-      decoration: InputDecoration(
-        labelText: '座席クラス',
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-      ),
-      isExpanded: true,
-      style: const TextStyle(fontSize: 12, color: Colors.black87),
-      items: seatClasses.map((s) => DropdownMenuItem(
-        value: s,
-        child: Text(s, style: const TextStyle(fontSize: 12)),
-      )).toList(),
-      onChanged: (v) {
-        if (v != null) setState(() => _legs[index]['seat_class'] = v);
-      },
     );
   }
 }

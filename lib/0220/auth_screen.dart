@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'profile_screen.dart';
-import 'mrp_logo.dart';
 
 class AuthScreen extends StatefulWidget {
   final VoidCallback onAuthSuccess;
@@ -369,13 +367,6 @@ class _AuthScreenState extends State<AuthScreen> {
     return message;
   }
 
-  Future<void> _openUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isJapanese = Localizations.localeOf(context).languageCode == 'ja';
@@ -393,7 +384,7 @@ class _AuthScreenState extends State<AuthScreen> {
             constraints: const BoxConstraints(maxWidth: 400),
             child: Column(
               children: [
-                MrpLogo(size: 80),
+                Icon(Icons.flight_takeoff, size: 64, color: Colors.purple[700]),
                 const SizedBox(height: 16),
                 Text(
                   _isLogin ? 'おかえりなさい！' : 'はじめまして！',
@@ -499,57 +490,6 @@ class _AuthScreenState extends State<AuthScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                
-                // 利用規約・プライバシーポリシー同意文言
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text.rich(
-                    TextSpan(
-                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                      children: [
-                        TextSpan(
-                          text: isJapanese
-                              ? '続行することで、'
-                              : 'By continuing, you agree to our ',
-                        ),
-                        WidgetSpan(
-                          child: GestureDetector(
-                            onTap: () => _openUrl('https://mrunplanner.com/terms.html'),
-                            child: Text(
-                              isJapanese ? '利用規約' : 'Terms of Service',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.purple[700],
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-                        ),
-                        TextSpan(text: isJapanese ? 'と' : ' and '),
-                        WidgetSpan(
-                          child: GestureDetector(
-                            onTap: () => _openUrl('https://mrunplanner.com/privacy.html'),
-                            child: Text(
-                              isJapanese ? 'プライバシーポリシー' : 'Privacy Policy',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.purple[700],
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-                        ),
-                        TextSpan(
-                          text: isJapanese
-                              ? 'に同意したものとみなされます。'
-                              : '.',
-                        ),
-                      ],
-                    ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
                 const SizedBox(height: 16),

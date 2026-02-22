@@ -10,7 +10,6 @@ import 'auth_screen.dart';
 import 'profile_screen.dart';
 import 'pro_purchase_dialog.dart';
 import 'pro_service.dart';
-import 'mrp_logo.dart';
 import 'dart:html' as html;
 
 void main() async {
@@ -547,7 +546,28 @@ class _MainScreenState extends State<MainScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            MrpLogoWithText(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  'MRP',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                Text(
+                  'Mileage Run Planner',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.normal,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -565,7 +585,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ],
         ),
-        backgroundColor: Colors.black, //紫から黒に変更
+        backgroundColor: Colors.purple[700],
         foregroundColor: Colors.white,
         actions: [
           //
