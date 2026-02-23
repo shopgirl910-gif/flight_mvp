@@ -87,12 +87,17 @@ class _SimulationScreenState extends State<SimulationScreen>
     'SFC ゴールド',
     'SFC プレミアム',
   ];
-  final List<String> jalStatusTypes = [
-    '-',
-    'JMBダイヤモンド',
-    'JMBサファイア',
-    'JMBクリスタル',
-  ];
+  List<String> get jalStatusTypes {
+    final isJGC = selectedJALCard == 'JALグローバルクラブ会員(日本)' ||
+        selectedJALCard == 'JALグローバルクラブ会員(海外)';
+    return [
+      '-',
+      'JMBダイヤモンド',
+      if (isJGC) 'JGCプレミア',
+      'JMBサファイア',
+      'JMBクリスタル',
+    ];
+  }
   final List<String> anaStatusTypes = [
     '-',
     'ダイヤモンド(1年目)',
@@ -332,20 +337,118 @@ class _SimulationScreenState extends State<SimulationScreen>
     _initAirlineAirports();
     _addLeg(); // 初期レグ作成（入力専用カードとして使用）
     _loadUserProfile();
+
+    // 認証状態の変化を監視（ログイン後にプロフィールを再読み込み）
+    Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      if (event.event == AuthChangeEvent.signedIn) {
+        _loadUserProfile();
+      } else if (event.event == AuthChangeEvent.signedOut) {
+        // ログアウト時にカード・ステータスをクリア
+        setState(() {
+          selectedJALCard = null;
+          selectedANACard = null;
+          selectedJALStatus = null;
+          selectedANAStatus = null;
+          jalTourPremium = false;
+        });
+      }
+    });
   }
 
   Future<void> _loadUserProfile() async {
+    print('DEBUG: _loadUserProfile called');
     final user = Supabase.instance.client.auth.currentUser;
+    print('DEBUG: user = $user');
     if (user == null) return;
     try {
       final res = await Supabase.instance.client
           .from('user_profiles')
           .select()
-          .eq('user_id', user.id)
+          .eq('id', user.id)
           .maybeSingle();
       if (res == null) return;
       final home = res['home_airport'] as String?;
       final airline = res['default_airline'] as String?;
+      final jalCard = res['jal_card'] as String?;
+      final anaCard = res['ana_card'] as String?;
+      final jalStatus = res['jal_status'] as String?;
+      final anaStatus = res['ana_status'] as String?;
+      final tourPremium = res['jal_tour_premium'] as bool? ?? false;
+      print('DEBUG: jalCard=$jalCard, anaCard=$anaCard, jalStatus=$jalStatus, anaStatus=$anaStatus');
+      
+      // データベース値(キー形式)→ドロップダウン値(表示名)のマッピング
+      final jalCardMap = {
+        '-': '-',
+        'jmb': 'JMB会員',
+        'jal_regular': 'JALカード普通会員',
+        'jal_club_a': 'JALカードCLUB-A会員',
+        'jal_club_a_gold': 'JALカードCLUB-Aゴールド会員',
+        'jal_platinum': 'JALカードプラチナ会員',
+        'jgc_japan': 'JALグローバルクラブ会員(日本)',
+        'jgc_overseas': 'JALグローバルクラブ会員(海外)',
+        'jal_navi': 'JALカードNAVI会員',
+        'jal_est_regular': 'JAL CLUB EST 普通会員',
+        'jal_est_club_a': 'JAL CLUB EST CLUB-A会員',
+        'jal_est_gold': 'JAL CLUB EST CLUB-A GOLD会員',
+        'jal_est_platinum': 'JAL CLUB EST プラチナ会員',
+      };
+      final anaCardMap = {
+        '-': '-',
+        'amc': 'AMCカード(提携カード含む)',
+        'ana_regular': 'ANAカード 一般',
+        'ana_student': 'ANAカード 学生用',
+        'ana_wide': 'ANAカード ワイド',
+        'ana_gold': 'ANAカード ゴールド',
+        'ana_premium': 'ANAカード プレミアム',
+        'sfc_regular': 'SFC 一般',
+        'sfc_gold': 'SFC ゴールド',
+        'sfc_premium': 'SFC プレミアム',
+      };
+      final jalStatusMap = {
+        '-': '-',
+        'diamond': 'JMBダイヤモンド',
+        'sapphire': 'JMBサファイア',
+        'crystal': 'JMBクリスタル',
+      };
+      final anaStatusMap = {
+        '-': '-',
+        'diamond_1': 'ダイヤモンド(1年目)',
+        'diamond_2': 'ダイヤモンド(継続2年以上)',
+        'platinum_1': 'プラチナ(1年目)',
+        'platinum_2': 'プラチナ(継続2年以上)',
+        'bronze_1': 'ブロンズ(1年目)',
+        'bronze_2': 'ブロンズ(継続2年以上)',
+      };
+      
+      setState(() {
+        if (jalCard != null) {
+          selectedJALCard = jalCardMap[jalCard];
+          // キー形式で見つからなければ、既にDropdown形式ならそのまま使う
+          if (selectedJALCard == null && jalCardTypes.contains(jalCard)) {
+            selectedJALCard = jalCard;
+          }
+        }
+        if (anaCard != null) {
+          selectedANACard = anaCardMap[anaCard];
+          if (selectedANACard == null && anaCardTypes.contains(anaCard)) {
+            selectedANACard = anaCard;
+          }
+        }
+        if (jalStatus != null) {
+          selectedJALStatus = jalStatusMap[jalStatus];
+          if (selectedJALStatus == null && jalStatusTypes.contains(jalStatus)) {
+            selectedJALStatus = jalStatus;
+          }
+        }
+        if (anaStatus != null) {
+          selectedANAStatus = anaStatusMap[anaStatus];
+          if (selectedANAStatus == null && anaStatusTypes.contains(anaStatus)) {
+            selectedANAStatus = anaStatus;
+          }
+        }
+        jalTourPremium = tourPremium;
+      });
+      
       if (home != null && home.isNotEmpty && legs.isNotEmpty) {
         final legId = legs.first['id'] as int;
         departureAirportControllers[legId]?.text = home;
@@ -361,7 +464,9 @@ class _SimulationScreenState extends State<SimulationScreen>
           _optAirline = airline;
         });
       }
-    } catch (_) {}
+    } catch (e) {
+        print('DEBUG: error = $e');
+    }
   }
 
   Future<void> _initAirlineAirports() async {
@@ -981,21 +1086,53 @@ class _SimulationScreenState extends State<SimulationScreen>
       if (airline == 'JAL') {
         final seatBonusRate =
             {'普通席': 0.0, 'クラスJ': 0.1, 'ファーストクラス': 0.5}[seat] ?? 0.0;
-        double effectiveFareRate = fareRate;
-        if (jalTourPremium && (fareNumber == '運賃4' || fareNumber == '運賃5'))
-          effectiveFareRate = 1.0;
-        final flightMiles = (distance * (effectiveFareRate + seatBonusRate))
-            .round();
-        final statusBonusRate =
-            {
-              '-': 0.0,
-              'JMBダイヤモンド': 1.30,
-              'JMBサファイア': 1.05,
-              'JMBクリスタル': 0.55,
-            }[selectedJALStatus ?? '-'] ??
-            0.0;
-        totalMiles = flightMiles + (flightMiles * statusBonusRate).round();
+        
+        // フライトマイル = 区間マイル × (運賃率 + 座席ボーナス率)
+        final flightMiles = (distance * (fareRate + seatBonusRate)).round();
+        
+        // ツアープレミアムボーナスマイル（対象運賃のみ：区間マイルとフライトマイルの差）
+        int tourPremiumBonus = 0;
+        if (jalTourPremium && (fareNumber == '運賃4' || fareNumber == '運賃5')) {
+          tourPremiumBonus = distance - (distance * fareRate).round();
+        }
+        
+        // カードボーナス率
+        final cardBonusRate = {
+          '-': 0.0,
+          'JMB会員': 0.0,
+          'JALカード普通会員': 0.10,
+          'JALカードCLUB-A会員': 0.25,
+          'JALカードCLUB-Aゴールド会員': 0.25,
+          'JALカードプラチナ会員': 0.25,
+          'JALグローバルクラブ会員(日本)': 0.35,
+          'JALグローバルクラブ会員(海外)': 0.0,
+          'JALカードNAVI会員': 0.10,
+          'JAL CLUB EST 普通会員': 0.10,
+          'JAL CLUB EST CLUB-A会員': 0.25,
+          'JAL CLUB EST CLUB-A GOLD会員': 0.25,
+          'JAL CLUB EST プラチナ会員': 0.25,
+        }[selectedJALCard ?? '-'] ?? 0.0;
+        
+        // ステータスボーナス率
+        final statusBonusRate = {
+          '-': 0.0,
+          'JMBダイヤモンド': 1.30,
+          'JGCプレミア': 1.05,
+          'JMBサファイア': 1.05,
+          'JMBクリスタル': 0.55,
+        }[selectedJALStatus ?? '-'] ?? 0.0;
+        
+        // ボーナスマイル = フライトマイル × (カードとステータスの高い方)
+        // ※ツアプレボーナスにはボーナス率は適用されない
+        final appliedBonusRate = cardBonusRate > statusBonusRate ? cardBonusRate : statusBonusRate;
+        final bonusMiles = (flightMiles * appliedBonusRate).round();
+        
+        // 合計マイル = フライトマイル + ツアプレボーナス + ボーナスマイル
+        totalMiles = flightMiles + tourPremiumBonus + bonusMiles;
+        
+        // FOP = フライトマイル × 2 + 運賃ボーナス（ツアプレは影響しない）
         totalPoints = (flightMiles * 2) + (jalBonusFOP[fareNumber] ?? 0);
+        
         totalLSP = (fareRate >= 0.5) ? 5 : 0;
       } else {
         final cardBonusRate =
@@ -1049,7 +1186,19 @@ class _SimulationScreenState extends State<SimulationScreen>
   }
 
   void _onJALCardChanged(String? v) {
-    setState(() => selectedJALCard = v);
+    setState(() {
+      selectedJALCard = v;
+      final isJGC = v == 'JALグローバルクラブ会員(日本)' ||
+          v == 'JALグローバルクラブ会員(海外)';
+      // JGCカード以外に変更した場合、JGCプレミアステータスをリセット
+      if (!isJGC && selectedJALStatus == 'JGCプレミア') {
+        selectedJALStatus = '-';
+      }
+      // JGCカードの場合、ツアープレミアムを無効化
+      if (isJGC) {
+        jalTourPremium = false;
+      }
+    });
     _recalculateAllLegs();
   }
 
@@ -3016,25 +3165,33 @@ class _SimulationScreenState extends State<SimulationScreen>
             ),
           ),
           // ツアープレミアムのみ(ショッピングマイルP削除)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: Checkbox(
-                  value: jalTourPremium,
-                  onChanged: _onJALTourPremiumChanged,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          // JGCカードの場合は無効化
+          Builder(builder: (context) {
+            final isJGC = selectedJALCard == 'JALグローバルクラブ会員(日本)' ||
+                selectedJALCard == 'JALグローバルクラブ会員(海外)';
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: Checkbox(
+                    value: jalTourPremium,
+                    onChanged: isJGC ? null : _onJALTourPremiumChanged,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              const Text(
-                'ツアープレミアム',
-                style: TextStyle(fontSize: 9, color: Colors.red),
-              ),
-            ],
-          ),
+                const SizedBox(width: 4),
+                Text(
+                  'ツアープレミアム',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: isJGC ? Colors.grey : Colors.red,
+                  ),
+                ),
+              ],
+            );
+          }),
           _buildCompactDropdown(
             'JALステータス',
             120,
@@ -3401,7 +3558,7 @@ class _SimulationScreenState extends State<SimulationScreen>
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: DropdownButton<String>(
-                          value: selectedJALStatus,
+                          value: jalStatusTypes.contains(selectedJALStatus) ? selectedJALStatus : null,
                           isExpanded: true,
                           underline: const SizedBox(),
                           hint: const Padding(
@@ -3430,33 +3587,40 @@ class _SimulationScreenState extends State<SimulationScreen>
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // ツアープレミアム
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: jalTourPremium,
-                              onChanged: (v) {
-                                setDialogState(
-                                  () => jalTourPremium = v ?? false,
-                                );
-                                setState(() => jalTourPremium = v ?? false);
-                                _recalculateAllLegs();
-                              },
-                              activeColor: Colors.red,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
+                      // ツアープレミアム（JGCカードの場合は無効）
+                      Builder(builder: (context) {
+                        final isJGC = selectedJALCard == 'JALグローバルクラブ会員(日本)' ||
+                            selectedJALCard == 'JALグローバルクラブ会員(海外)';
+                        return Row(
+                          children: [
+                            SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Checkbox(
+                                value: jalTourPremium,
+                                onChanged: isJGC ? null : (v) {
+                                  setDialogState(
+                                    () => jalTourPremium = v ?? false,
+                                  );
+                                  setState(() => jalTourPremium = v ?? false);
+                                  _recalculateAllLegs();
+                                },
+                                activeColor: Colors.red,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'ツアープレミアム',
-                            style: TextStyle(fontSize: 11, color: Colors.red),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'ツアープレミアム',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isJGC ? Colors.grey : Colors.red,
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -3625,6 +3789,8 @@ class _SimulationScreenState extends State<SimulationScreen>
     Color labelColor,
     void Function(String?) onChanged,
   ) {
+    // valueがitemsに含まれていない場合はnullを使用
+    final validValue = (value != null && items.contains(value)) ? value : null;
     return SizedBox(
       width: width,
       child: Column(
@@ -3646,7 +3812,7 @@ class _SimulationScreenState extends State<SimulationScreen>
               borderRadius: BorderRadius.circular(4),
             ),
             child: DropdownButton<String>(
-              value: value,
+              value: validValue,
               isExpanded: true,
               underline: const SizedBox(),
               icon: Icon(

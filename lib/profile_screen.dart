@@ -90,16 +90,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   };
 
   // JALステータス
-  final List<String> jalStatusKeys = ['-', 'diamond', 'sapphire', 'crystal'];
+  List<String> get jalStatusKeys {
+    final isJGC = jalCard == 'jgc_japan' || jalCard == 'jgc_overseas';
+    return [
+      '-',
+      'diamond',
+      if (isJGC) 'jgc_premier',
+      'sapphire',
+      'crystal',
+    ];
+  }
   final Map<String, String> jalStatusNamesJa = {
     '-': '-',
     'diamond': 'JMBダイヤモンド',
+    'jgc_premier': 'JGCプレミア',
     'sapphire': 'JMBサファイア',
     'crystal': 'JMBクリスタル',
   };
   final Map<String, String> jalStatusNamesEn = {
     '-': '-',
     'diamond': 'JMB Diamond',
+    'jgc_premier': 'JGC Premier',
     'sapphire': 'JMB Sapphire',
     'crystal': 'JMB Crystal',
   };
@@ -568,7 +579,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               value: jalCard,
               items: jalCardKeys,
               displayText: _getJalCardName,
-              onChanged: (v) => setState(() => jalCard = v),
+              onChanged: (v) {
+                setState(() {
+                  jalCard = v;
+                  final isJGC = v == 'jgc_japan' || v == 'jgc_overseas';
+                  // JGCカード以外に変更した場合、JGCプレミアステータスをリセット
+                  if (!isJGC && jalStatus == 'jgc_premier') {
+                    jalStatus = '-';
+                  }
+                  // JGCカードの場合、ツアープレミアムを無効化
+                  if (isJGC) {
+                    jalTourPremium = false;
+                  }
+                });
+              },
               color: Colors.red,
             ),
             const SizedBox(height: 12),
@@ -581,12 +605,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Colors.red,
             ),
             const SizedBox(height: 12),
-            _buildCheckbox(
-              label: _isJapanese ? 'ツアープレミアム' : 'Tour Premium',
-              value: jalTourPremium,
-              onChanged: (v) => setState(() => jalTourPremium = v ?? false),
-              color: Colors.red,
-            ),
+            // ツアープレミアム（JGCカードの場合は無効）
+            Builder(builder: (context) {
+              final isJGC = jalCard == 'jgc_japan' || jalCard == 'jgc_overseas';
+              return Row(
+                children: [
+                  Checkbox(
+                    value: jalTourPremium,
+                    onChanged: isJGC ? null : (v) => setState(() => jalTourPremium = v ?? false),
+                    activeColor: Colors.red,
+                  ),
+                  Text(
+                    _isJapanese ? 'ツアープレミアム' : 'Tour Premium',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isJGC ? Colors.grey : Colors.grey[800],
+                    ),
+                  ),
+                ],
+              );
+            }),
             const SizedBox(height: 16),
 
             // JAL目標設定
