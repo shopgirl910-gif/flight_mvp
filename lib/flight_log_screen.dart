@@ -38,17 +38,18 @@ class FlightLogScreenState extends State<FlightLogScreen>
     ],
     'ANA': [
       '運賃1 (150%) プレミアム運賃',
-      '運賃2 (125%) プレミアム小児',
-      '運賃3 (100%) 片道・往復',
-      '運賃4 (100%) ビジネス',
-      '運賃5 (75%) バリュー、株主優待',
-      '運賃6 (75%) トランジット',
-      '運賃7 (75%) スーパーバリュー、いっしょにマイル割',
-      '運賃8 (150%) プレミアム株主',
-      '運賃9 (100%) 普通株主',
-      '運賃10 (70%) 特割プラス',
-      '運賃11 (50%) スマートシニア',
-      '運賃12 (30%) 個人包括',
+      '運賃2 (125%) プレミアム株主優待/VALUE PREMIUM',
+      '運賃3 (100%) ANA FLEX/ビジネスきっぷ/Biz',
+      '運賃4 (100%) 各種アイきっぷ',
+      '運賃5 (75%) ANA VALUE/株主優待',
+      '運賃6 (75%) ANA VALUE TRANSIT',
+      '運賃7 (75%) ANA SUPER VALUE/いっしょにマイル割',
+      '運賃8 (50%) 個人包括/スマートU25/スマートシニア/SALE',
+      '運賃9 (150%) 国際航空券(PC) F/A',
+      '運賃10 (100%) 国際航空券(普通) Y/B/M',
+      '運賃11 (70%) 国際航空券(普通) U/H/Q',
+      '運賃12 (50%) 国際航空券(普通) V/W/S',
+      '運賃13 (30%) 国際航空券(普通) L/K',
     ],
   };
   final Map<String, List<String>> seatClassesByAirline = {
@@ -79,6 +80,15 @@ class FlightLogScreenState extends State<FlightLogScreen>
   }
 
   void refresh() => _loadItineraries();
+
+  void showPlannedTab({String? expandId}) {
+    _loadItineraries().then((_) {
+      if (expandId != null) {
+        setState(() => _expandedId = expandId);
+      }
+    });
+    _tabController.animateTo(1);
+  }
 
   Future<void> _loadItineraries() async {
     setState(() => isLoading = true);
@@ -899,8 +909,20 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
     String unitPrice = '-';
     if (totalFare > 0 && (totalFop > 0 || totalPp > 0)) {
-      final points = totalFop > 0 ? totalFop : totalPp;
-      unitPrice = '¥${(totalFare / points).toStringAsFixed(1)}';
+      // 運賃が入力されたレグだけのポイントを合計して単価計算
+      int farePoints = 0;
+      for (final leg in legs) {
+        final legMap = leg as Map<String, dynamic>;
+        final legFare = legMap['fare_amount'] as int? ?? 0;
+        if (legFare > 0) {
+          farePoints += (legMap['pp'] as int? ?? 0) > 0
+              ? (legMap['pp'] as int? ?? 0)
+              : (legMap['fop'] as int? ?? 0);
+        }
+      }
+      if (farePoints > 0) {
+        unitPrice = '¥${(totalFare / farePoints).toStringAsFixed(1)}';
+      }
     }
 
     String dateDisplay = createdAt;
@@ -1380,14 +1402,17 @@ class FlightLogScreenState extends State<FlightLogScreen>
                       
                       if (!fareTypes.contains(currentFareType) && fareTypes.isNotEmpty) {
                         currentFareType = fareTypes.first;
+                        editableLegs[originalIndex]['fare_type'] = currentFareType;
                       }
                       if (!seatClasses.contains(currentSeatClass) && seatClasses.isNotEmpty) {
                         currentSeatClass = seatClasses.first;
+                        editableLegs[originalIndex]['seat_class'] = currentSeatClass;
                       }
 
                       final airlineColor = airline == 'JAL' ? Colors.red : Colors.blue;
 
                       return Container(
+                        key: ValueKey('leg_edit_$originalIndex'),
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -1441,8 +1466,8 @@ class FlightLogScreenState extends State<FlightLogScreen>
                             Row(
                               children: [
                                 const SizedBox(
-                                  width: 60,
-                                  child: Text('運賃:', style: TextStyle(fontSize: 12)),
+                                  width: 70,
+                                  child: Text('運賃種別:', style: TextStyle(fontSize: 12)),
                                 ),
                                 Expanded(
                                   child: Container(
@@ -1452,7 +1477,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: DropdownButton<String>(
-                                      value: fareTypes.contains(currentFareType) ? currentFareType : null,
+                                      value: currentFareType,
                                       isExpanded: true,
                                       underline: const SizedBox(),
                                       isDense: true,
@@ -1481,7 +1506,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
                             Row(
                               children: [
                                 const SizedBox(
-                                  width: 60,
+                                  width: 70,
                                   child: Text('座席:', style: TextStyle(fontSize: 12)),
                                 ),
                                 Expanded(
@@ -1492,7 +1517,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: DropdownButton<String>(
-                                      value: seatClasses.contains(currentSeatClass) ? currentSeatClass : null,
+                                      value: currentSeatClass,
                                       isExpanded: true,
                                       underline: const SizedBox(),
                                       isDense: true,
@@ -1509,6 +1534,41 @@ class FlightLogScreenState extends State<FlightLogScreen>
                                         }
                                       },
                                     ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            // 運賃（円）
+                            Row(
+                              children: [
+                                const SizedBox(
+                                  width: 70,
+                                  child: Text('運賃:', style: TextStyle(fontSize: 12)),
+                                ),
+                                SizedBox(
+                                  width: 120,
+                                  child: TextField(
+                                    keyboardType: TextInputType.number,
+                                    style: const TextStyle(fontSize: 12),
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                        borderSide: BorderSide(color: Colors.grey[300]!),
+                                      ),
+                                      suffixText: '円',
+                                      suffixStyle: const TextStyle(fontSize: 12),
+                                      hintText: '0',
+                                      hintStyle: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                                    ),
+                                    controller: TextEditingController(
+                                      text: '${leg['fare_amount'] ?? 0}' == '0' ? '' : '${leg['fare_amount'] ?? 0}',
+                                    ),
+                                    onChanged: (v) {
+                                      editableLegs[originalIndex]['fare_amount'] = int.tryParse(v) ?? 0;
+                                    },
                                   ),
                                 ),
                               ],
@@ -1609,12 +1669,19 @@ class FlightLogScreenState extends State<FlightLogScreen>
       };
     }
 
-    // 合計を再計算
-    int totalFop = 0, totalMiles = 0, totalLsp = 0;
+    // 合計を再計算（JALはFOP、ANAはPPに分離）
+    int totalFop = 0, totalPp = 0, totalMiles = 0, totalLsp = 0, totalFare = 0;
     for (final l in remainingLegs) {
-      totalFop += (l['fop'] as int? ?? 0);
+      final legAirline = l['airline'] as String? ?? '';
+      final legPoints = (l['fop'] as int? ?? 0);
+      if (legAirline == 'ANA') {
+        totalPp += legPoints;
+      } else {
+        totalFop += legPoints;
+      }
       totalMiles += (l['miles'] as int? ?? 0);
       totalLsp += (l['lsp'] as int? ?? 0);
+      totalFare += (l['fare_amount'] as int? ?? 0);
     }
 
     try {
@@ -1623,8 +1690,10 @@ class FlightLogScreenState extends State<FlightLogScreen>
           .update({
             'legs': remainingLegs,
             'total_fop': totalFop,
+            'total_pp': totalPp,
             'total_miles': totalMiles,
             'total_lsp': totalLsp,
+            'total_fare': totalFare,
           })
           .eq('id', itineraryId);
 
@@ -1650,7 +1719,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
   String _anaSeatClassForFare(String fareType) {
     final fareNumber = fareType.split(' ').first;
-    if (fareNumber == '運賃1' || fareNumber == '運賃2' || fareNumber == '運賃8') {
+    if (fareNumber == '運賃1' || fareNumber == '運賃2' || fareNumber == '運賃9') {
       return 'プレミアムクラス';
     }
     return '普通席';
@@ -1659,12 +1728,22 @@ class FlightLogScreenState extends State<FlightLogScreen>
   Future<int> _getBaseMiles(String airline, String dep, String arr) async {
     try {
       final response = await Supabase.instance.client
-          .from('flight_miles')
-          .select('miles')
-          .or('and(departure_airport.eq.$dep,arrival_airport.eq.$arr),and(departure_airport.eq.$arr,arrival_airport.eq.$dep)')
+          .from('routes')
+          .select('distance_miles')
+          .eq('departure_code', dep)
+          .eq('arrival_code', arr)
           .maybeSingle();
       if (response != null) {
-        return response['miles'] as int? ?? 0;
+        return response['distance_miles'] as int? ?? 0;
+      }
+      final reverse = await Supabase.instance.client
+          .from('routes')
+          .select('distance_miles')
+          .eq('departure_code', arr)
+          .eq('arrival_code', dep)
+          .maybeSingle();
+      if (reverse != null) {
+        return reverse['distance_miles'] as int? ?? 0;
       }
     } catch (e) {
       print('Error fetching miles: $e');
@@ -1711,10 +1790,9 @@ class FlightLogScreenState extends State<FlightLogScreen>
     String? status,
     bool tourPremium = false,
   }) {
-    // JGCカードの場合、ツアープレミアムは無効
-    final isJGC = cardType == 'JALグローバルクラブ会員(日本)' ||
-        cardType == 'JALグローバルクラブ会員(海外)';
-    final effectiveTourPremium = isJGC ? false : tourPremium;
+    // JGCカード(海外)の場合のみ、ツアープレミアムは無効
+    final isJGCOverseas = cardType == 'JALグローバルクラブ会員(海外)';
+    final effectiveTourPremium = isJGCOverseas ? false : tourPremium;
 
     double fareRate = 1.0;
     final rateMatch = RegExp(r'\((\d+)%\)').firstMatch(fareType);
@@ -1731,13 +1809,13 @@ class FlightLogScreenState extends State<FlightLogScreen>
     }
 
     // フライトマイル = 区間マイル × (運賃率 + 座席ボーナス率)
-    final flightMiles = (baseMiles * (fareRate + seatBonusRate)).truncate();
+    final flightMiles = (baseMiles * (fareRate + seatBonusRate)).round();
 
     // ツアープレミアムボーナス（対象運賃：運賃4、運賃5のみ）
     final fareNumber = fareType.split(' ').first;
     int tourPremiumBonus = 0;
     if (effectiveTourPremium && (fareNumber == '運賃4' || fareNumber == '運賃5')) {
-      tourPremiumBonus = baseMiles - (baseMiles * fareRate).truncate();
+      tourPremiumBonus = baseMiles - (baseMiles * fareRate).round();
     }
 
     // カードボーナス率
@@ -1774,7 +1852,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
     // ボーナスマイル = フライトマイル × (カードとステータスの高い方)
     // ※ツアプレボーナスにはボーナス率は適用されない
     final appliedBonusRate = cardBonusRate > statusBonusRate ? cardBonusRate : statusBonusRate;
-    final bonusMiles = (flightMiles * appliedBonusRate).truncate();
+    final bonusMiles = (flightMiles * appliedBonusRate).round();
 
     // 合計マイル = フライトマイル + ツアプレボーナス + ボーナスマイル
     final totalMiles = flightMiles + tourPremiumBonus + bonusMiles;
@@ -1792,11 +1870,8 @@ class FlightLogScreenState extends State<FlightLogScreen>
     final fareBonusFOP = fareFOPBonus[fareNumber] ?? 0;
     final totalFOP = fopBase + fareBonusFOP;
 
-    // LSP
-    int lsp = 0;
-    if (fareRate >= 0.75) {
-      lsp = (seatClass == 'ファーストクラス') ? 3 : (seatClass == 'クラスJ') ? 2 : 1;
-    }
+    // LSP: 国内線搭乗ポイント（運賃率50%以上で5ポイント）
+    int lsp = (fareRate >= 0.5) ? 5 : 0;
 
     return {'fop': totalFOP, 'miles': totalMiles, 'lsp': lsp};
   }
@@ -1816,6 +1891,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
     final flightMiles = (baseMiles * fareRate).round();
 
+    // カードボーナス率
     double cardBonusRate = 0.0;
     if (cardType != null) {
       const cardRates = {
@@ -1831,24 +1907,39 @@ class FlightLogScreenState extends State<FlightLogScreen>
       };
       cardBonusRate = cardRates[cardType] ?? 0.0;
     }
-    final cardBonus = (flightMiles * cardBonusRate).round();
 
+    // ステータスボーナス率
     double statusBonusRate = 0.0;
     if (status != null) {
       const statusRates = {
-        'ダイヤモンド(1年目)': 1.20,
-        'ダイヤモンド(継続2年以上)': 1.30,
+        'ダイヤモンド(1年目)': 1.15,
+        'ダイヤモンド(継続2年以上)': 1.25,
         'プラチナ(1年目)': 0.90,
-        'プラチナ(継続2年以上)': 1.05,
+        'プラチナ(継続2年以上)': 1.00,
         'ブロンズ(1年目)': 0.40,
-        'ブロンズ(継続2年以上)': 0.55,
+        'ブロンズ(継続2年以上)': 0.50,
       };
       statusBonusRate = statusRates[status] ?? 0.0;
     }
-    final statusBonus = (flightMiles * statusBonusRate).round();
 
-    final totalMiles = flightMiles + cardBonus + statusBonus;
+    // ゴールド/プレミアムカード + ステータスの場合 +5%
+    final anaCardTypes = [
+      '-', 'AMCカード(提携カード含む)', 'ANAカード 一般', 'ANAカード 学生用',
+      'ANAカード ワイド', 'ANAカード ゴールド', 'ANAカード プレミアム',
+      'SFC 一般', 'SFC ゴールド', 'SFC プレミアム',
+    ];
+    final cardIdx = anaCardTypes.indexOf(cardType ?? '-');
+    final isGoldPremium =
+        cardIdx == 5 || cardIdx == 6 || cardIdx == 8 || cardIdx == 9;
+    final appliedRate = (isGoldPremium && statusBonusRate > 0)
+        ? statusBonusRate + 0.05
+        : (cardBonusRate > statusBonusRate
+              ? cardBonusRate : statusBonusRate);
 
+    // 合計マイル = フライトマイル × (1 + 適用ボーナス率)
+    final totalMiles = (baseMiles * fareRate * (1 + appliedRate)).toInt();
+
+    // PP = 区間マイル × 運賃率 × 2 + 搭乗ポイント
     final fareNumber = fareType.split(' ').first;
     const farePPBonus = {
       '運賃1': 400,
@@ -1856,16 +1947,17 @@ class FlightLogScreenState extends State<FlightLogScreen>
       '運賃3': 400,
       '運賃4': 0,
       '運賃5': 400,
-      '運賃6': 400,
-      '運賃7': 400,
-      '運賃8': 400,
-      '運賃9': 400,
+      '運賃6': 200,
+      '運賃7': 0,
+      '運賃8': 0,
+      '運賃9': 0,
       '運賃10': 0,
       '運賃11': 0,
       '運賃12': 0,
+      '運賃13': 0,
     };
     final bonusPP = farePPBonus[fareNumber] ?? 0;
-    final totalPP = flightMiles * 2 + bonusPP;
+    final totalPP = (baseMiles * fareRate * 2 + bonusPP).toInt();
 
     return {'fop': totalPP, 'miles': totalMiles, 'lsp': 0};
   }
@@ -1920,12 +2012,23 @@ class _ShareDialogState extends State<_ShareDialog> {
       dateStr = firstLeg['date'] as String? ?? '';
     }
 
-    // 単価計算
+    // 単価計算（運賃入力済みレグだけのポイントで計算）
     String unitPrice = '';
-    final pointLabel = fop > 0 ? 'FOP' : 'PP';
-    final points = fop > 0 ? fop : pp;
-    if (fare > 0 && points > 0) {
-      unitPrice = '¥${(fare / points).toStringAsFixed(1)}/$pointLabel';
+    if (fare > 0 && (fop > 0 || pp > 0)) {
+      int farePoints = 0;
+      for (final leg in legs) {
+        final legMap = leg as Map<String, dynamic>;
+        final legFare = legMap['fare_amount'] as int? ?? 0;
+        if (legFare > 0) {
+          farePoints += (legMap['pp'] as int? ?? 0) > 0
+              ? (legMap['pp'] as int? ?? 0)
+              : (legMap['fop'] as int? ?? 0);
+        }
+      }
+      if (farePoints > 0) {
+        final pointLabel = pp > 0 && fop == 0 ? 'PP' : 'FOP';
+        unitPrice = '¥${(fare / farePoints).toStringAsFixed(1)}/$pointLabel';
+      }
     }
 
     // ヘッダー部分を生成
@@ -1944,7 +2047,11 @@ class _ShareDialogState extends State<_ShareDialog> {
 
     // 統計部分
     final stats = StringBuffer();
-    if (fop > 0) {
+    if (fop > 0 && pp > 0) {
+      stats.writeln(
+        '📊 FOP: ${_formatNumber(fop)} / PP: ${_formatNumber(pp)} / マイル: ${_formatNumber(miles)}',
+      );
+    } else if (fop > 0) {
       stats.write(
         '📊 FOP: ${_formatNumber(fop)} / マイル: ${_formatNumber(miles)}',
       );
@@ -1973,7 +2080,7 @@ class _ShareDialogState extends State<_ShareDialog> {
     footer.writeln('');
     final airline = fop > 0 ? 'JAL' : 'ANA';
     footer.writeln('#MRP修行プラン #${airline}修行');
-    footer.writeln('mileage-run-planner.web.app');
+    footer.writeln('mrunplanner.com');
 
     // 詳細なしの場合
     if (!_showDetails) {
@@ -1984,7 +2091,7 @@ class _ShareDialogState extends State<_ShareDialog> {
 
     // 詳細ありの場合 - レグ情報を生成
     final legLines = <String>[];
-    legLines.add('â”â”â”â”â”â”â”â”â”â”â”â”â”â”');
+    legLines.add('━━━━━━━━━━━━━━');
     for (var leg in legs) {
       final l = leg as Map<String, dynamic>;
       final legAirline = l['airline'] as String? ?? '';
@@ -2002,13 +2109,13 @@ class _ShareDialogState extends State<_ShareDialog> {
       if (depTime.isNotEmpty) {
         line += ' $depTime';
       }
-      line += ' $dep â†’ $arr';
+      line += ' $dep → $arr';
       if (arrTime.isNotEmpty) {
         line += ' $arrTime';
       }
       legLines.add(line);
     }
-    legLines.add('â”â”â”â”â”â”â”â”â”â”â”â”â”â”');
+    legLines.add('━━━━━━━━━━━━━━');
 
     // 280文字で分割
     const maxLength = 270; // URLの余裕を持たせる

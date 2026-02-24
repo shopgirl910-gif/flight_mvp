@@ -351,7 +351,7 @@ class _JapanMapPainter extends CustomPainter {
       ..strokeWidth = 0.8
       ..color = Colors.grey[400]!;
 
-    // 斜線: 左下 → 右上（高知方面へ）
+    // 斜線: 左下 → 右上(高知方面へ)
     final startX = 40.0 * sx + ox;
     final startY = 720.0 * sy + oy;
     final junctionX = 370.0 * sx + ox;
@@ -413,19 +413,41 @@ class _JapanMapPainter extends CustomPainter {
         );
       }
 
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '✈',
-          style: TextStyle(
-            fontSize: markerSize * 1.1,
-            color: isChecked ? Colors.amber : Colors.white70,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      tp.layout();
-      tp.paint(canvas, Offset(px - tp.width / 2, py - tp.height / 2));
+      final planeSize = markerSize * 1.2;
+
+      if (isChecked) {
+        _drawPlaneIcon(canvas, Offset(px, py), planeSize, Colors.amber);
+      } else {
+        _drawPlaneIcon(canvas, Offset(px, py), planeSize, Colors.white70);
+      }
     }
+  }
+
+  void _drawPlaneIcon(Canvas canvas, Offset center, double size, Color color) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final s = size * 0.5;
+    final cx = center.dx;
+    final cy = center.dy;
+
+    final path = Path()
+      ..moveTo(cx, cy - s)                    // 機首
+      ..lineTo(cx + s * 0.25, cy - s * 0.3)   // 右肩
+      ..lineTo(cx + s, cy)                    // 右翼端
+      ..lineTo(cx + s * 0.25, cy + s * 0.1)   // 右翼根元
+      ..lineTo(cx + s * 0.25, cy + s * 0.5)   // 右胴下
+      ..lineTo(cx + s * 0.5, cy + s)          // 右尾翼端
+      ..lineTo(cx, cy + s * 0.7)              // 尾部中央
+      ..lineTo(cx - s * 0.5, cy + s)          // 左尾翼端
+      ..lineTo(cx - s * 0.25, cy + s * 0.5)   // 左胴下
+      ..lineTo(cx - s * 0.25, cy + s * 0.1)   // 左翼根元
+      ..lineTo(cx - s, cy)                    // 左翼端
+      ..lineTo(cx - s * 0.25, cy - s * 0.3)   // 左肩
+      ..close();
+
+    canvas.drawPath(path, paint);
   }
 
   void _drawTooltip(
@@ -523,10 +545,10 @@ class _JapanMapPainter extends CustomPainter {
   }
 
   Color _getColor(int status) {
-    if (status == 3) return const Color(0xFF1A1A1A); // 空港なし: 黒（最初から塗り済み）
+    if (status == 3) return const Color(0xFF1A1A1A); // 空港なし: 黒(最初から塗り済み)
     if (status == 2) return const Color(0xFF1A1A1A); // 全空港制覇: 黒
     if (status >= 10 && status <= 19) {
-      // 一部訪問: グレー→黒のグラデーション（比率に応じて）
+      // 一部訪問: グレー→黒のグラデーション(比率に応じて)
       final ratio = (status - 10) / 9.0;
       final v = (0xC8 - (0xC8 - 0x1A) * ratio).round();
       return Color.fromARGB(255, v, v, v);

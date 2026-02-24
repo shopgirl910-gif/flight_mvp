@@ -340,11 +340,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
           content: Text(
             isJa
                 ? '最寄りの空港を判定するために、現在地を取得します。\n\n'
-                  '位置情報はチェックイン判定のみに使用し、サーバーには保存しません。\n\n'
-                  '次に表示されるブラウザの許可ダイアログで「許可」を選んでください。'
+                      '位置情報はチェックイン判定のみに使用し、サーバーには保存しません。\n\n'
+                      '次に表示されるブラウザの許可ダイアログで「許可」を選んでください。'
                 : 'We need your location to find the nearest airport.\n\n'
-                  'Location is used only for check-in and is not stored on our server.\n\n'
-                  'Please allow location access in the browser dialog that follows.',
+                      'Location is used only for check-in and is not stored on our server.\n\n'
+                      'Please allow location access in the browser dialog that follows.',
           ),
           actions: [
             TextButton(
@@ -572,7 +572,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
       if (_getPrefStatus(name) != 3) totalWithAirports++;
     }
     final total = totalWithAirports;
-    final percent = total > 0 ? (painted.toDouble() / total * 100).toStringAsFixed(0) : '0';
+    final percent = total > 0
+        ? (painted.toDouble() / total * 100).toStringAsFixed(0)
+        : '0';
 
     return Container(
       decoration: BoxDecoration(
@@ -605,7 +607,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                       ),
                       const Spacer(),
                       Tooltip(
-                        message: isJa 
+                        message: isJa
                             ? '空港がある$total都道府県中、${painted}都道府県の空港にチェックイン済み'
                             : '$painted of $total prefectures with airports visited',
                         child: Container(
@@ -656,7 +658,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        isJa ? '空港がある都道府県の踏破率' : 'Prefectures visited (with airports)',
+                        isJa
+                            ? '空港がある都道府県の踏破率'
+                            : 'Prefectures visited (with airports)',
                         style: TextStyle(color: Colors.black38, fontSize: 10),
                       ),
                       Text(
@@ -674,7 +678,13 @@ class _CheckinScreenState extends State<CheckinScreen> {
           if (_showPaintMap) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: _buildJapanMapView(),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: _buildJapanMapView(),
+              ),
             ),
             // 凡例
             Padding(
@@ -1169,31 +1179,31 @@ class _CheckinScreenState extends State<CheckinScreen> {
         title: Text(isJa ? '📍 位置情報について' : '📍 About Location'),
         content: SingleChildScrollView(
           child: Text(
-            isJa 
+            isJa
                 ? '位置情報はチェックインボタンを押した時のみ取得します。サーバーには保存しません。\n\n'
-                  '位置情報の許可を変更するには：\n\n'
-                  '【iPhoneホーム画面から使用の場合】\n'
-                  'ホーム画面に追加したアプリ（PWA）は「SafariのWebサイト」の設定が適用されます。\n'
-                  '設定 → プライバシーとセキュリティ → 位置情報サービス → SafariのWebサイト\n'
-                  '※ Safari単体の設定とは別です\n\n'
-                  '【iPhone Safariブラウザの場合】\n'
-                  '設定 → Safari → 位置情報\n\n'
-                  '【PC Chrome】\n'
-                  'アドレスバー左アイコン → 位置情報をONに\n\n'
-                  '【PC Edge / Firefox】\n'
-                  'アドレスバー左の🔒アイコン → このサイトに対する権限 → 場所を許可に'
+                      '位置情報の許可を変更するには：\n\n'
+                      '【iPhoneホーム画面から使用の場合】\n'
+                      'ホーム画面に追加したアプリ（PWA）は「SafariのWebサイト」の設定が適用されます。\n'
+                      '設定 → プライバシーとセキュリティ → 位置情報サービス → SafariのWebサイト\n'
+                      '※ Safari単体の設定とは別です\n\n'
+                      '【iPhone Safariブラウザの場合】\n'
+                      '設定 → Safari → 位置情報\n\n'
+                      '【PC Chrome】\n'
+                      'アドレスバー左アイコン → 位置情報をONに\n\n'
+                      '【PC Edge / Firefox】\n'
+                      'アドレスバー左の🔒アイコン → このサイトに対する権限 → 場所を許可に'
                 : 'Location is only retrieved when you press the check-in button. It is not stored on our server.\n\n'
-                  'To manage location permission:\n\n'
-                  '【iPhone Home Screen App】\n'
-                  'Apps added to home screen (PWA) use the "Safari Websites" location setting.\n'
-                  'Settings → Privacy & Security → Location Services → Safari Websites\n'
-                  '* This is separate from Safari browser settings\n\n'
-                  '【iPhone Safari Browser】\n'
-                  'Settings → Safari → Location\n\n'
-                  '【PC Chrome】\n'
-                  'Click icon in address bar → Turn on Location\n\n'
-                  '【PC Edge / Firefox】\n'
-                  'Click 🔒 icon in address bar → Permissions for this site → Allow location',
+                      'To manage location permission:\n\n'
+                      '【iPhone Home Screen App】\n'
+                      'Apps added to home screen (PWA) use the "Safari Websites" location setting.\n'
+                      'Settings → Privacy & Security → Location Services → Safari Websites\n'
+                      '* This is separate from Safari browser settings\n\n'
+                      '【iPhone Safari Browser】\n'
+                      'Settings → Safari → Location\n\n'
+                      '【PC Chrome】\n'
+                      'Click icon in address bar → Turn on Location\n\n'
+                      '【PC Edge / Firefox】\n'
+                      'Click 🔒 icon in address bar → Permissions for this site → Allow location',
           ),
         ),
         actions: [
@@ -1233,7 +1243,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
               const Spacer(),
               GestureDetector(
                 onTap: _showLocationHelp,
-                child: Icon(Icons.help_outline, size: 20, color: Colors.grey[400]),
+                child: Icon(
+                  Icons.help_outline,
+                  size: 20,
+                  color: Colors.grey[400],
+                ),
               ),
             ],
           ),
@@ -1290,7 +1304,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle, size: 16, color: Colors.green[700]),
+                    Icon(
+                      Icons.check_circle,
+                      size: 16,
+                      color: Colors.green[700],
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

@@ -72,6 +72,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   final _flightLogKey = GlobalKey<FlightLogScreenState>();
+  final _simulationKey = GlobalKey<SimulationScreenState>();
   @override
   void initState() {
     super.initState();
@@ -306,7 +307,13 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   late final List<Widget> _screens = [
-    const SimulationScreen(),
+    SimulationScreen(
+      key: _simulationKey,
+      onNavigateToFlightLog: (itineraryId) {
+        setState(() => _selectedIndex = 1);
+        _flightLogKey.currentState?.showPlannedTab(expandId: itineraryId);
+      },
+    ),
     FlightLogScreen(key: _flightLogKey),
     const QuizScreen(),
     const CheckinScreen(),
@@ -444,14 +451,17 @@ class _MainScreenState extends State<MainScreen> {
                     isJapanese ? 'プロフィール設定' : 'Profile Settings',
                     style: const TextStyle(fontSize: 14),
                   ),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(context);
-                    Navigator.push(
+                    final result = await Navigator.push<bool>(
                       context,
                       MaterialPageRoute(
                         builder: (context) => const ProfileScreen(),
                       ),
                     );
+                    if (result == true) {
+                      _simulationKey.currentState?.reloadProfile();
+                    }
                   },
                 ),
                 // ログイン中
