@@ -587,8 +587,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (!isJGC && jalStatus == 'jgc_premier') {
                     jalStatus = '-';
                   }
-                  // JGCカードの場合、ツアープレミアムを無効化
-                  if (isJGC) {
+                  // JGCカード(海外)の場合のみ、ツアープレミアムを無効化
+                  if (v == 'jgc_overseas') {
                     jalTourPremium = false;
                   }
                 });
@@ -605,21 +605,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Colors.red,
             ),
             const SizedBox(height: 12),
-            // ツアープレミアム（JGCカードの場合は無効）
+            // ツアープレミアム（JGC海外カードの場合のみ無効）
             Builder(builder: (context) {
-              final isJGC = jalCard == 'jgc_japan' || jalCard == 'jgc_overseas';
+              final isJGCOverseas = jalCard == 'jgc_overseas';
               return Row(
                 children: [
                   Checkbox(
                     value: jalTourPremium,
-                    onChanged: isJGC ? null : (v) => setState(() => jalTourPremium = v ?? false),
+                    onChanged: isJGCOverseas ? null : (v) => setState(() => jalTourPremium = v ?? false),
                     activeColor: Colors.red,
                   ),
                   Text(
                     _isJapanese ? 'ツアープレミアム' : 'Tour Premium',
                     style: TextStyle(
                       fontSize: 14,
-                      color: isJGC ? Colors.grey : Colors.grey[800],
+                      color: isJGCOverseas ? Colors.grey : Colors.grey[800],
                     ),
                   ),
                 ],
