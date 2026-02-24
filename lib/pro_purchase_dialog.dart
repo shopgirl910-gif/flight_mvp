@@ -111,8 +111,8 @@ class _ProPurchaseDialogState extends State<_ProPurchaseDialog> {
               _FeatureItem(
                 icon: Icons.email,
                 text: isJapanese
-                    ? 'AIメール解析入力（準備中）'
-                    : 'AI email parsing (coming)',
+                    ? 'AIメール解析入力'
+                    : 'AI email parsing',
               ),
 
               const SizedBox(height: 12),

@@ -544,14 +544,12 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
   Color _getPrefColor(int status) {
     if (status == 3) return const Color(0xFF1A1A1A); // 空港なし: 黒
-    if (status == 2) return const Color(0xFF000000); // 完了: 真黒
+    if (status == 2) return const Color(0xFFFFD700); // 完了: ゴールド
     if (status >= 10 && status <= 19) {
-      // 一部: グレー→黒のグラデーション
-      final ratio = (status - 10) / 9.0;
-      final grey = (0xC8 - (0xC8 * ratio)).round();
-      return Color.fromARGB(255, grey, grey, grey);
+      return const Color(0xFF7B1FA2); // 一部: 紫
     }
-    return const Color(0xFFD0D0D0); // 未踏: ライトグレー
+
+    return const Color(0xFF2A2A2A); // 未踏: ダークグレー
   }
 
   int _getPaintedCount() {
@@ -576,9 +574,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFF121212),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!, width: 1),
+        border: Border.all(color: Colors.grey[800]!, width: 1),
       ),
       child: Column(
         children: [
@@ -597,7 +595,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                       Text(
                         'PAINT IT BLACK!',
                         style: TextStyle(
-                          color: Colors.black87,
+                          color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 2,
@@ -657,11 +655,11 @@ class _CheckinScreenState extends State<CheckinScreen> {
                     children: [
                       Text(
                         isJa ? '空港がある都道府県の踏破率' : 'Prefectures visited (with airports)',
-                        style: TextStyle(color: Colors.black38, fontSize: 10),
+                        style: TextStyle(color: Colors.white, fontSize: 10),
                       ),
                       Text(
                         '$percent%',
-                        style: TextStyle(color: Colors.black38, fontSize: 11),
+                        style: TextStyle(color: Colors.white, fontSize: 11),
                       ),
                     ],
                   ),
@@ -735,7 +733,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(color: Colors.black54, fontSize: 10),
+          style: const TextStyle(color: Colors.white70, fontSize: 10),
         ),
       ],
     );

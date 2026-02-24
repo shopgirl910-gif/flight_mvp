@@ -413,18 +413,27 @@ class _JapanMapPainter extends CustomPainter {
         );
       }
 
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '✈',
-          style: TextStyle(
-            fontSize: markerSize * 1.1,
-            color: isChecked ? Colors.amber : Colors.white70,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      tp.layout();
-      tp.paint(canvas, Offset(px - tp.width / 2, py - tp.height / 2));
+      // 飛行機をCanvasで直接描画（白抜き）
+      final planeSize = markerSize * 1.2;
+      final planePaint = Paint()
+        ..color = isChecked ? Colors.white : Colors.amber
+        ..style = PaintingStyle.fill;
+      
+      canvas.save();
+      canvas.translate(px, py);
+      canvas.scale(planeSize / 24);
+      // Material Icons "flight" パス
+      final path = Path()
+        ..moveTo(21, 16)..lineTo(21, 14)..lineTo(13, 9)
+        ..lineTo(13, 3.5)..cubicTo(13, 2.67, 12.33, 2, 11.5, 2)
+        ..cubicTo(10.67, 2, 10, 2.67, 10, 3.5)..lineTo(10, 9)
+        ..lineTo(2, 14)..lineTo(2, 16)..lineTo(10, 13.5)
+        ..lineTo(10, 19)..lineTo(8, 20.5)..lineTo(8, 22)
+        ..lineTo(11.5, 21)..lineTo(15, 22)..lineTo(15, 20.5)
+        ..lineTo(13, 19)..lineTo(13, 13.5)..close();
+      canvas.translate(-12, -12);
+      canvas.drawPath(path, planePaint);
+      canvas.restore();
     }
   }
 

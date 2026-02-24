@@ -11,6 +11,7 @@ import 'profile_screen.dart';
 import 'pro_purchase_dialog.dart';
 import 'pro_service.dart';
 import 'mrp_logo.dart';
+import 'badge_widget.dart';
 import 'dart:html' as html;
 
 void main() async {
@@ -72,16 +73,69 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   final _flightLogKey = GlobalKey<FlightLogScreenState>();
+  
+  // バッジ用カウント
+  int _airportCount = 0;
+  int _legCount = 0;
+  int _quizCount = 0;
+
   @override
   void initState() {
     super.initState();
     _ensureSignedIn();
     _handleAuthStateChange();
-    // ãƒªã‚»ãƒƒãƒˆãƒªãƒ³ã‚¯ã‹ã‚‰æ¥ãŸå ´åˆã®ãƒã‚§ãƒƒã‚¯
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForPasswordRecovery();
       _checkPaymentResult();
+      _loadBadgeData();
     });
+  }
+
+  Future<void> _loadBadgeData() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null || user.isAnonymous) return;
+
+    try {
+      // 空港チェックイン数（ユニーク空港数）
+      final airports = await Supabase.instance.client
+          .from('airport_checkins')
+          .select('airport_code')
+          .eq('user_id', user.id);
+      final airportSet = <String>{};
+      for (final row in airports) {
+        airportSet.add(row['airport_code'] as String);
+      }
+
+      // 修行済みレグ数
+      final itineraries = await Supabase.instance.client
+          .from('saved_itineraries')
+          .select('legs')
+          .eq('user_id', user.id)
+          .eq('is_completed', true);
+      int totalLegs = 0;
+      for (final row in itineraries) {
+        final legs = row['legs'] as List?;
+        if (legs != null) totalLegs += legs.length;
+      }
+
+      // クイズ正解数（user_profilesから取得）
+      final quizData = await Supabase.instance.client
+          .from('user_profiles')
+          .select('quiz_total_correct')
+          .eq('id', user.id)
+          .maybeSingle();
+      final quizCorrect = (quizData?['quiz_total_correct'] as int?) ?? 0;
+
+      if (mounted) {
+        setState(() {
+          _airportCount = airportSet.length;
+          _legCount = totalLegs;
+          _quizCount = quizCorrect;
+        });
+      }
+    } catch (e) {
+      debugPrint('Badge data load error: $e');
+    }
   }
 
   Future<void> _ensureSignedIn() async {
@@ -98,7 +152,10 @@ class _MainScreenState extends State<MainScreen> {
       if (data.event == AuthChangeEvent.passwordRecovery) {
         _showNewPasswordDialog();
       }
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        _loadBadgeData(); // ログイン状態変更時にバッジ再読み込み
+      }
     });
   }
 
@@ -130,7 +187,7 @@ class _MainScreenState extends State<MainScreen> {
                   controller: newPasswordController,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'æ–°ã—ã„ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰',
+                    labelText: '新しいパスワード',
                     border: OutlineInputBorder(),
                     isDense: true,
                     prefixIcon: Icon(Icons.lock),
@@ -141,7 +198,7 @@ class _MainScreenState extends State<MainScreen> {
                   controller: confirmPasswordController,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ç¢ºèª',
+                    labelText: 'パスワード確認',
                     border: OutlineInputBorder(),
                     isDense: true,
                     prefixIcon: Icon(Icons.lock_outline),
@@ -162,27 +219,24 @@ class _MainScreenState extends State<MainScreen> {
                     ? null
                     : () async {
                         final newPass = newPasswordController.text.trim();
-                        final confirmPass = confirmPasswordController.text
-                            .trim();
+                        final confirmPass =
+                            confirmPasswordController.text.trim();
 
                         if (newPass.isEmpty) {
                           setDialogState(
-                            () => dialogError =
-                                'ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„',
+                            () => dialogError = 'パスワードを入力してください',
                           );
                           return;
                         }
                         if (newPass.length < 6) {
                           setDialogState(
-                            () => dialogError =
-                                'ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ã¯6æ–‡å­—ä»¥ä¸Šå¿…è¦ã§ã™',
+                            () => dialogError = 'パスワードは6文字以上必要です',
                           );
                           return;
                         }
                         if (newPass != confirmPass) {
                           setDialogState(
-                            () => dialogError =
-                                'ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ãŒä¸€è‡´ã—ã¾ã›ã‚“',
+                            () => dialogError = 'パスワードが一致しません',
                           );
                           return;
                         }
@@ -200,9 +254,7 @@ class _MainScreenState extends State<MainScreen> {
                           if (mounted) {
                             ScaffoldMessenger.of(this.context).showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                  'ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ã‚’æ›´æ–°ã—ã¾ã—ãŸ',
-                                ),
+                                content: Text('パスワードを更新しました'),
                                 backgroundColor: Colors.green,
                               ),
                             );
@@ -211,12 +263,11 @@ class _MainScreenState extends State<MainScreen> {
                           String msg = e.toString();
                           if (msg.contains('same_password')) {
                             final isJa =
-                                Localizations.localeOf(
-                                  this.context,
-                                ).languageCode ==
+                                Localizations.localeOf(this.context)
+                                    .languageCode ==
                                 'ja';
                             msg = isJa
-                                ? 'ç¾åœ¨ã¨åŒã˜ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰ã¯ä½¿ãˆã¾ã›ã‚“'
+                                ? '現在と同じパスワードは使えません'
                                 : 'New password must be different from the current one';
                           }
                           setDialogState(() {
@@ -238,7 +289,7 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                       )
                     : const Text(
-                        'æ›´æ–°',
+                        '更新',
                         style: TextStyle(color: Colors.white),
                       ),
               ),
@@ -254,7 +305,6 @@ class _MainScreenState extends State<MainScreen> {
     final payment = uri.queryParameters['payment'];
 
     if (payment == 'success') {
-      // URLã‹ã‚‰ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã‚’æ¶ˆã™
       html.window.history.replaceState(null, '', uri.path);
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -328,7 +378,7 @@ class _MainScreenState extends State<MainScreen> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ãƒ¦ãƒ¼ã‚¶ãƒ¼æƒ…å ±
+                // ユーザー情報
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -360,7 +410,7 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                             Text(
                               _isLoggedIn
-                                  ? (isJapanese ? 'ログイン中­' : 'Logged in')
+                                  ? (isJapanese ? 'ログイン中' : 'Logged in')
                                   : (isJapanese ? '未ログイン' : 'Not logged in'),
                               style: TextStyle(
                                 color: Colors.grey[600],
@@ -374,9 +424,9 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                 ),
                 const Divider(height: 1),
-                // Proç‰ˆ
+                // Pro版
                 if (isPro)
-                  // Proç‰ˆåˆ©ç”¨ä¸­
+                  // Pro版利用中
                   FutureBuilder<DateTime?>(
                     future: ProService().getProExpiryDate(),
                     builder: (context, expirySnapshot) {
@@ -419,7 +469,7 @@ class _MainScreenState extends State<MainScreen> {
                     },
                   )
                 else
-                  //Pro版にアップグレード
+                  // Pro版にアップグレード
                   ListTile(
                     dense: true,
                     leading: Icon(
@@ -565,15 +615,22 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ],
         ),
-        backgroundColor: Colors.black, //紫から黒に変更
+        backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
-          //
+          // バッジ（ログイン時のみ表示）
+          if (_isLoggedIn)
+            BadgeRow(
+              airportCount: _airportCount,
+              legCount: _legCount,
+              quizCount: _quizCount,
+              isJapanese: isJapanese,
+            ),
+          // 言語切替
           GestureDetector(
             onTap: () {
-              final newLocale = isJapanese
-                  ? const Locale('en')
-                  : const Locale('ja');
+              final newLocale =
+                  isJapanese ? const Locale('en') : const Locale('ja');
               MyApp.setLocale(context, newLocale);
             },
             child: Container(
@@ -593,7 +650,7 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-          //
+          // ユーザーメニュー
           GestureDetector(
             onTap: () => _showUserMenu(context),
             child: Container(
