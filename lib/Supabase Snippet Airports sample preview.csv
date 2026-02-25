@@ -1,0 +1,6 @@
+code,name_ja,name_en,region,display_order,is_active,country_code,latitude,longitude,prefecture
+UEO,久米島,Kumejima,沖縄,0,true,JP,26.363500,126.713900,沖縄県
+KTD,北大東,Kita Daito,沖縄,0,true,JP,25.944700,131.326900,沖縄県
+MMD,南大東,Minami Daito,沖縄,0,true,JP,25.846500,131.262800,沖縄県
+KIJ,新潟,Niigata,null,0,true,JP,37.955800,139.108600,新潟県
+NKM,県営名古屋,Nagoya Komaki,null,0,true,JP,35.255100,136.924100,愛知県

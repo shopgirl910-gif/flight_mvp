@@ -10,6 +10,8 @@ import 'dart:ui' as ui;
 import 'dart:js_util' as js_util;
 import 'package:flutter/rendering.dart';
 import 'pro_purchase_screen.dart';
+import 'pro_purchase_dialog.dart';
+import 'auth_screen.dart';
 
 class FlightLogScreen extends StatefulWidget {
   const FlightLogScreen({super.key});
@@ -286,6 +288,338 @@ class FlightLogScreenState extends State<FlightLogScreen>
             ),
           );
         }
+      }
+    }
+  }
+
+  // メールから入力（Pro版限定）
+  Future<void> _showEmailImportDialog() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    final isLoggedIn = user != null && user.email != null && user.email!.isNotEmpty;
+
+    if (!isLoggedIn) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('メールから入力するにはログインが必要です'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AuthScreen(
+              onAuthSuccess: () {
+                Navigator.pop(context);
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (mounted) _showEmailImportDialogInternal();
+                });
+              },
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    _showEmailImportDialogInternal();
+  }
+
+  Future<void> _showEmailImportDialogInternal() async {
+    final isPro = await ProService().isPro();
+    
+    if (!isPro) {
+      if (mounted) {
+        await showProPurchaseDialog(context);
+      }
+      return;
+    }
+
+    final controller = TextEditingController();
+    if (!mounted) return;
+    
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (dialogContext) {
+        bool isLoading = false;
+        String? errorMsg;
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.email, color: Colors.purple),
+                const SizedBox(width: 8),
+                const Text('メールから入力', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.purple[700],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'AI',
+                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'JAL/ANAの予約確認メールを貼り付けてください（AI解析）',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: controller,
+                    maxLines: 10,
+                    decoration: const InputDecoration(
+                      hintText: 'メール本文をここに貼り付け...',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.all(8),
+                    ),
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  if (errorMsg != null) ...[
+                    const SizedBox(height: 8),
+                    Text(errorMsg!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+                child: const Text('キャンセル'),
+              ),
+              ElevatedButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        if (controller.text.trim().isEmpty) {
+                          setDialogState(() => errorMsg = 'メール本文を貼り付けてください');
+                          return;
+                        }
+                        setDialogState(() {
+                          isLoading = true;
+                          errorMsg = null;
+                        });
+                        try {
+                          final response = await Supabase.instance.client.functions.invoke(
+                            'swift-endpoint',
+                            body: {'emailText': controller.text},
+                          );
+                          if (response.status != 200) {
+                            throw Exception(response.data['error'] ?? '解析に失敗しました');
+                          }
+                          final data = response.data as Map<String, dynamic>;
+                          final parsedLegs = (data['legs'] as List<dynamic>)
+                              .map((e) => Map<String, dynamic>.from(e as Map))
+                              .map((l) {
+                                final airline = l['airline'] as String? ?? 'JAL';
+                                var flightNum = (l['flight_number'] ?? '').toString();
+                                if (flightNum.isNotEmpty && RegExp(r'^\d+$').hasMatch(flightNum)) {
+                                  flightNum = '$airline$flightNum';
+                                }
+                                return {
+                                  'airline': airline,
+                                  'date': l['date'],
+                                  'flightNumber': flightNum,
+                                  'departure': l['departure'],
+                                  'arrival': l['arrival'],
+                                  'departureTime': l['departure_time'] ?? '',
+                                  'arrivalTime': l['arrival_time'] ?? '',
+                                  'seatClass': (l['seat_class'] == 'ファースト') ? 'ファーストクラス' : (l['seat_class'] ?? '普通席'),
+                                  'fareType': _mapFareType(airline, l['fare_type'] as String? ?? ''),
+                                  'fare': l['fare'] ?? 0,
+                                };
+                              })
+                              .toList();
+                          if (dialogContext.mounted) Navigator.pop(dialogContext, parsedLegs);
+                        } catch (e) {
+                          setDialogState(() {
+                            isLoading = false;
+                            errorMsg = 'AI解析エラー: $e';
+                          });
+                        }
+                      },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('AI解析', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    controller.dispose();
+
+    if (result != null && result.isNotEmpty) {
+      await _saveEmailImportResult(result);
+    } else if (result != null && result.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('フライト情報が見つかりませんでした'), backgroundColor: Colors.orange),
+        );
+      }
+    }
+  }
+
+  String _mapFareType(String airline, String rawFareType) {
+    if (airline == 'JAL') {
+      final fareTypes = fareTypesByAirline['JAL']!;
+      for (final ft in fareTypes) {
+        if (ft.contains(rawFareType) || rawFareType.contains(ft.split(' ').last)) {
+          return ft;
+        }
+      }
+      if (rawFareType.contains('セイバー') || rawFareType.contains('saver')) return fareTypes[3];
+      if (rawFareType.contains('株主')) return fareTypes[1];
+      return fareTypes[3]; // デフォルト: スペシャルセイバー
+    } else {
+      final fareTypes = fareTypesByAirline['ANA']!;
+      for (final ft in fareTypes) {
+        if (ft.contains(rawFareType) || rawFareType.contains(ft.split(' ').last)) {
+          return ft;
+        }
+      }
+      if (rawFareType.contains('SUPER VALUE') || rawFareType.contains('いっしょにマイル')) return fareTypes[6];
+      if (rawFareType.contains('VALUE')) return fareTypes[4];
+      if (rawFareType.contains('株主')) return fareTypes[4];
+      return fareTypes[6]; // デフォルト: ANA SUPER VALUE
+    }
+  }
+
+  Future<void> _saveEmailImportResult(List<Map<String, dynamic>> legs) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      // ユーザープロファイルを取得
+      final profileRes = await Supabase.instance.client
+          .from('user_profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final profile = profileRes ?? {};
+      final jalStatus = profile['jal_status'] as String? ?? '-';
+      final jalCardType = profile['jal_card_type'] as String? ?? '-';
+      final jalTourPremium = profile['jal_tour_premium'] as bool? ?? false;
+      final anaStatus = profile['ana_status'] as String? ?? '-';
+      final anaCardType = profile['ana_card_type'] as String? ?? '-';
+
+      // 各レグのFOP/PP/マイルを計算
+      int totalFop = 0;
+      int totalPp = 0;
+      int totalMiles = 0;
+      int totalLsp = 0;
+      int totalFare = 0;
+
+      final processedLegs = <Map<String, dynamic>>[];
+      for (final leg in legs) {
+        final airline = leg['airline'] as String;
+        final departure = leg['departure'] as String? ?? '';
+        final arrival = leg['arrival'] as String? ?? '';
+        final fareType = leg['fareType'] as String? ?? '';
+        final seatClass = leg['seatClass'] as String? ?? '普通席';
+        final fare = leg['fare'] as int? ?? 0;
+
+        // 距離を取得
+        final routeRes = await Supabase.instance.client
+            .from('routes')
+            .select('distance_miles')
+            .eq('departure_code', departure)
+            .eq('arrival_code', arrival)
+            .maybeSingle();
+        final distance = routeRes?['distance_miles'] as int? ?? 0;
+
+        final calculated = _calculateLeg(
+          airline: airline,
+          baseMiles: distance,
+          fareType: fareType,
+          seatClass: seatClass,
+          jalStatus: jalStatus,
+          jalCard: jalCardType,
+          jalTourPremium: jalTourPremium,
+          anaStatus: anaStatus,
+          anaCard: anaCardType,
+        );
+
+        final fop = calculated['fop'] ?? 0;
+        final miles = calculated['miles'] ?? 0;
+        final lsp = calculated['lsp'] ?? 0;
+
+        if (airline == 'JAL') {
+          totalFop += fop;
+        } else {
+          totalPp += fop; // ANAの場合、fopにPP値が入っている
+        }
+        totalMiles += miles;
+        totalLsp += lsp;
+        totalFare += fare;
+
+        processedLegs.add({
+          'airline': airline,
+          'departure': departure,
+          'arrival': arrival,
+          'flightNumber': leg['flightNumber'] ?? '',
+          'date': leg['date'] ?? '',
+          'departureTime': leg['departureTime'] ?? '',
+          'arrivalTime': leg['arrivalTime'] ?? '',
+          'fareType': fareType,
+          'seatClass': seatClass,
+          'fare': fare,
+          'fop': fop,
+          'miles': miles,
+          'lsp': lsp,
+          'distance': distance,
+        });
+      }
+
+      // タイトル生成
+      final routeCodes = processedLegs.map((l) => l['departure']).toList();
+      if (processedLegs.isNotEmpty) routeCodes.add(processedLegs.last['arrival']);
+      final title = '${routeCodes.join('-')} ${processedLegs.length}レグ';
+
+      // 保存
+      final response = await Supabase.instance.client.from('saved_itineraries').insert({
+        'user_id': user.id,
+        'title': title,
+        'legs': processedLegs,
+        'total_fop': totalFop,
+        'total_pp': totalPp,
+        'total_miles': totalMiles,
+        'total_lsp': totalLsp,
+        'total_fare': totalFare,
+        'is_completed': false,
+      }).select().single();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${processedLegs.length}件のフライトを予定に追加しました'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadItineraries();
+        setState(() => _expandedId = response['id']);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存に失敗しました: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -576,9 +910,46 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
   Widget _buildPlannedTab(AppLocalizations l10n) {
     if (plannedItineraries.isEmpty) {
-      return _buildEmptyTabView(
-        '予定の旅程はありません\nシミュレーションから追加してください',
-        Icons.flight_takeoff,
+      return Column(
+        children: [
+          // メールから入力ボタン
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _showEmailImportDialog,
+                icon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.email, size: 18),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                label: const Text('予約メールから入力'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _buildEmptyTabView(
+              '予定の旅程はありません\nシミュレーションから追加してください',
+              Icons.flight_takeoff,
+            ),
+          ),
+        ],
       );
     }
 
@@ -589,8 +960,38 @@ class FlightLogScreenState extends State<FlightLogScreen>
           final isMobile = constraints.maxWidth < 600;
           return CustomScrollView(
             slivers: [
+              // メールから入力ボタン
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(isMobile ? 12 : 16, isMobile ? 12 : 16, isMobile ? 12 : 16, 8),
+                  child: ElevatedButton.icon(
+                    onPressed: _showEmailImportDialog,
+                    icon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.email, size: 18),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    label: const Text('予約メールから入力'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ),
               SliverPadding(
-                padding: EdgeInsets.all(isMobile ? 12 : 16),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => _buildItineraryCard(
@@ -957,20 +1358,33 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
     String unitPrice = '-';
     if (totalFare > 0 && (totalFop > 0 || totalPp > 0)) {
-      // 運賃が入力されたレグだけのポイントを合計して単価計算
-      int farePoints = 0;
+      // レグ運賃の入力状況を確認
+      int legFareSum = 0;
+      int legFareCount = 0;
+      int farePointsSum = 0;
       for (final leg in legs) {
         final legMap = leg as Map<String, dynamic>;
         final legFare = legMap['fare_amount'] as int? ?? 0;
         if (legFare > 0) {
-          farePoints += (legMap['pp'] as int? ?? 0) > 0
+          legFareSum += legFare;
+          legFareCount++;
+          farePointsSum += (legMap['pp'] as int? ?? 0) > 0
               ? (legMap['pp'] as int? ?? 0)
               : (legMap['fop'] as int? ?? 0);
         }
       }
-      if (farePoints > 0) {
-        unitPrice = '¥${(totalFare / farePoints).toStringAsFixed(1)}';
+
+      if (legFareCount == 0 && totalFare > 0) {
+        // 旅程総額入力モード: total_fareを全レグのポイント合計で割る
+        final allPoints = totalFop > 0 ? totalFop : totalPp;
+        if (allPoints > 0) {
+          unitPrice = '¥${(totalFare / allPoints).toStringAsFixed(1)}';
+        }
+      } else if (legFareCount == legs.length && farePointsSum > 0) {
+        // 全レグ運賃入力モード: 合算して単価表示
+        unitPrice = '¥${(legFareSum / farePointsSum).toStringAsFixed(1)}';
       }
+      // 一部レグのみ入力: 旅程単価は表示しない（unitPrice = '-'のまま）
     }
 
     String dateDisplay = createdAt;
@@ -1314,70 +1728,86 @@ class FlightLogScreenState extends State<FlightLogScreen>
     final fop = leg['fop'] as int? ?? 0;
     final miles = leg['miles'] as int? ?? 0;
     final lsp = leg['lsp'] as int? ?? 0;
+    final fareAmount = leg['fare_amount'] as int? ?? 0;
     final airlineColor = airline == 'JAL' ? Colors.red : Colors.blue;
     final pointLabel = airline == 'JAL' ? 'FOP' : 'PP';
 
-    String statsText =
-        '$pointLabel:${_formatNumber(fop)} / ${_formatNumber(miles)}M';
-    if (airline == 'JAL' && lsp > 0) {
-      statsText += ' / ${lsp}LSP';
-    }
-
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // JALは赤、ANAは青で便名を表示
-          SizedBox(
-            width: 50,
-            child: Text(
-              flightNumber,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: airlineColor,
+          // 行1: 日付 便名 出発地 出発時刻 → 到着地 到着時刻
+          Row(
+            children: [
+              if (date.isNotEmpty) ...[
+                Text(
+                  _formatDateShort(date),
+                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                ),
+                const SizedBox(width: 4),
+              ],
+              SizedBox(
+                width: 46,
+                child: Text(
+                  flightNumber,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: airlineColor,
+                  ),
+                ),
+              ),
+              Text(dep, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              if (depTime.isNotEmpty)
+                Text(' $depTime', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Icon(Icons.arrow_forward, size: 14, color: Colors.grey[400]),
+              ),
+              Text(arr, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              if (arrTime.isNotEmpty)
+                Text(' $arrTime', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+            ],
+          ),
+          const SizedBox(height: 2),
+          // 行2: FOP/PP マイル LSP
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Row(
+              children: [
+                Text(
+                  '$pointLabel ${_formatNumber(fop)}',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: airlineColor),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'マイル ${_formatNumber(miles)}',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange[800]),
+                ),
+                if (airline == 'JAL' && lsp > 0) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    '${lsp}LSP',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purple[700]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // 行3（運賃入力済みレグのみ）: 運賃・単価
+          if (fareAmount > 0 && fop > 0) ...[
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Text(
+                '¥${_formatNumber(fareAmount)}'
+                '  ${(fareAmount / fop).toStringAsFixed(1)}円/$pointLabel'
+                '${miles > 0 ? "  ${(fareAmount / miles).toStringAsFixed(1)}円/マイル" : ""}',
+                style: TextStyle(fontSize: 10, color: Colors.green[700]),
               ),
             ),
-          ),
-          if (date.isNotEmpty) ...[
-            Text(
-              _formatDateShort(date),
-              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-            ),
-            const SizedBox(width: 6),
           ],
-          if (depTime.isNotEmpty)
-            Text(
-              '$depTime ',
-              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-            ),
-          Text(
-            dep,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Icon(Icons.arrow_forward, size: 14, color: Colors.grey[400]),
-          ),
-          Text(
-            arr,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-          if (arrTime.isNotEmpty)
-            Text(
-              ' $arrTime',
-              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-            ),
-          const Spacer(),
-          Text(
-            statsText,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: airlineColor,
-            ),
-          ),
         ],
       ),
     );
@@ -1398,6 +1828,26 @@ class FlightLogScreenState extends State<FlightLogScreen>
     // 削除予定のインデックスを追跡
     Set<int> deletedIndices = {};
 
+    // 旅程総額の初期値を判定
+    // レグに運賃が入っている → レグ入力モード
+    // total_fareがあるがレグ運賃が全て0 → 旅程総額モード
+    final existingTotalFare = itinerary['total_fare'] as int? ?? 0;
+    final hasAnyLegFare = editableLegs.any(
+      (l) => (l['fare_amount'] as int? ?? 0) > 0,
+    );
+    int itineraryFareAmount = (!hasAnyLegFare && existingTotalFare > 0)
+        ? existingTotalFare
+        : 0;
+    final itineraryFareController = TextEditingController(
+      text: itineraryFareAmount > 0 ? '$itineraryFareAmount' : '',
+    );
+
+    // レグ運賃用のcontrollerを事前生成（rebuild時の再生成を防止）
+    final legFareControllers = List.generate(editableLegs.length, (i) {
+      final fare = editableLegs[i]['fare_amount'] as int? ?? 0;
+      return TextEditingController(text: fare > 0 ? '$fare' : '');
+    });
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1408,6 +1858,37 @@ class FlightLogScreenState extends State<FlightLogScreen>
               .entries
               .where((e) => !deletedIndices.contains(e.key))
               .toList();
+
+          // レグ運賃の合計と入力済み数を計算
+          int legFareSum = 0;
+          int legFareCount = 0;
+          for (final entry in visibleLegs) {
+            final fare = entry.value['fare_amount'] as int? ?? 0;
+            if (fare > 0) {
+              legFareSum += fare;
+              legFareCount++;
+            }
+          }
+          final hasLegFares = legFareCount > 0;
+          final hasItineraryFare = itineraryFareAmount > 0;
+
+          // 排他制御: レグ運賃入力あり→旅程総額はロック（自動合算表示）
+          //          旅程総額入力あり→レグ運賃はロック
+          final isItineraryFareLocked = hasLegFares;
+          final isLegFareLocked = hasItineraryFare;
+
+          // 旅程総額の表示テキスト
+          String itineraryFareDisplayNote = '';
+          Color itineraryFareNoteColor = Colors.grey[600]!;
+          if (isItineraryFareLocked) {
+            if (legFareCount == visibleLegs.length) {
+              itineraryFareDisplayNote = '（${visibleLegs.length}レグ合計）';
+              itineraryFareNoteColor = Colors.green[700]!;
+            } else {
+              itineraryFareDisplayNote = '（$legFareCount/${visibleLegs.length}レグ入力済み）';
+              itineraryFareNoteColor = Colors.orange[800]!;
+            }
+          }
 
           return AlertDialog(
             title: Row(
@@ -1432,7 +1913,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
                   children: [
                     if (title.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.only(bottom: 4),
                         child: Text(
                           title,
                           style: TextStyle(
@@ -1442,6 +1923,87 @@ class FlightLogScreenState extends State<FlightLogScreen>
                           ),
                         ),
                       ),
+                    // ── 旅程総額入力フィールド ──
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.green[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green[200]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                '旅程総額:',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(width: 8),
+                              if (isItineraryFareLocked) ...[
+                                // レグ運賃入力済み→自動合算表示（ロック）
+                                Text(
+                                  '¥${_formatNumber(legFareSum)}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green[800],
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(Icons.lock, size: 14, color: Colors.grey[400]),
+                              ] else ...[
+                                // 旅程総額を直接入力
+                                SizedBox(
+                                  width: 120,
+                                  child: TextField(
+                                    controller: itineraryFareController,
+                                    keyboardType: TextInputType.number,
+                                    style: const TextStyle(fontSize: 12),
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 8,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                        borderSide: BorderSide(color: Colors.grey[300]!),
+                                      ),
+                                      suffixText: '円',
+                                      suffixStyle: const TextStyle(fontSize: 12),
+                                      hintText: '0',
+                                      hintStyle: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                                    ),
+                                    onChanged: (v) {
+                                      setDialogState(() {
+                                        itineraryFareAmount = int.tryParse(v) ?? 0;
+                                        // 旅程総額入力時、レグ運賃をクリア
+                                        if (itineraryFareAmount > 0) {
+                                          for (int i = 0; i < editableLegs.length; i++) {
+                                            editableLegs[i]['fare_amount'] = 0;
+                                            legFareControllers[i].clear();
+                                          }
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (itineraryFareDisplayNote.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              itineraryFareDisplayNote,
+                              style: TextStyle(fontSize: 10, color: itineraryFareNoteColor),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    // ── レグ一覧 ──
                     ...visibleLegs.map((entry) {
                       final originalIndex = entry.key;
                       final leg = entry.value;
@@ -1652,21 +2214,28 @@ class FlightLogScreenState extends State<FlightLogScreen>
                               ],
                             ),
                             const SizedBox(height: 6),
-                            // 運賃（円）
+                            // 運賃（円）— 旅程総額入力時はグレーアウト
                             Row(
                               children: [
-                                const SizedBox(
+                                SizedBox(
                                   width: 70,
                                   child: Text(
                                     '運賃:',
-                                    style: TextStyle(fontSize: 12),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isLegFareLocked ? Colors.grey[400] : null,
+                                    ),
                                   ),
                                 ),
                                 SizedBox(
                                   width: 120,
                                   child: TextField(
+                                    enabled: !isLegFareLocked,
                                     keyboardType: TextInputType.number,
-                                    style: const TextStyle(fontSize: 12),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isLegFareLocked ? Colors.grey[400] : null,
+                                    ),
                                     decoration: InputDecoration(
                                       isDense: true,
                                       contentPadding:
@@ -1680,27 +2249,43 @@ class FlightLogScreenState extends State<FlightLogScreen>
                                           color: Colors.grey[300]!,
                                         ),
                                       ),
-                                      suffixText: '円',
-                                      suffixStyle: const TextStyle(
-                                        fontSize: 12,
+                                      disabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey[200]!,
+                                        ),
                                       ),
-                                      hintText: '0',
+                                      filled: isLegFareLocked,
+                                      fillColor: Colors.grey[100],
+                                      suffixText: '円',
+                                      suffixStyle: TextStyle(
+                                        fontSize: 12,
+                                        color: isLegFareLocked ? Colors.grey[400] : null,
+                                      ),
+                                      hintText: isLegFareLocked ? '──' : '0',
                                       hintStyle: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey[400],
                                       ),
                                     ),
-                                    controller: TextEditingController(
-                                      text: '${leg['fare_amount'] ?? 0}' == '0'
-                                          ? ''
-                                          : '${leg['fare_amount'] ?? 0}',
-                                    ),
+                                    controller: legFareControllers[originalIndex],
                                     onChanged: (v) {
-                                      editableLegs[originalIndex]['fare_amount'] =
-                                          int.tryParse(v) ?? 0;
+                                      setDialogState(() {
+                                        editableLegs[originalIndex]['fare_amount'] =
+                                            int.tryParse(v) ?? 0;
+                                        // レグ運賃入力時、旅程総額をクリア
+                                        if ((int.tryParse(v) ?? 0) > 0) {
+                                          itineraryFareAmount = 0;
+                                          itineraryFareController.clear();
+                                        }
+                                      });
                                     },
                                   ),
                                 ),
+                                if (isLegFareLocked) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.lock, size: 14, color: Colors.grey[400]),
+                                ],
                               ],
                             ),
                           ],
@@ -1748,7 +2333,12 @@ class FlightLogScreenState extends State<FlightLogScreen>
         editableLegs,
         deletedIndices,
         itinerary,
+        itineraryFareAmount: itineraryFareAmount,
       );
+    }
+    itineraryFareController.dispose();
+    for (final c in legFareControllers) {
+      c.dispose();
     }
   }
 
@@ -1757,8 +2347,9 @@ class FlightLogScreenState extends State<FlightLogScreen>
     String itineraryId,
     List<Map<String, dynamic>> editableLegs,
     Set<int> deletedIndices,
-    Map<String, dynamic> itinerary,
-  ) async {
+    Map<String, dynamic> itinerary, {
+    int itineraryFareAmount = 0,
+  }) async {
     // 削除されていないレグのみ残す
     final remainingLegs = <Map<String, dynamic>>[];
     for (int i = 0; i < editableLegs.length; i++) {
@@ -1823,6 +2414,14 @@ class FlightLogScreenState extends State<FlightLogScreen>
       totalMiles += (l['miles'] as int? ?? 0);
       totalLsp += (l['lsp'] as int? ?? 0);
       totalFare += (l['fare_amount'] as int? ?? 0);
+    }
+
+    // 旅程総額が直接入力されている場合はそちらを使用し、レグ運賃をクリア
+    if (itineraryFareAmount > 0) {
+      totalFare = itineraryFareAmount;
+      for (int i = 0; i < remainingLegs.length; i++) {
+        remainingLegs[i]['fare_amount'] = 0;
+      }
     }
 
     try {

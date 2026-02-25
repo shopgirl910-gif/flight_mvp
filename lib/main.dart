@@ -603,21 +603,24 @@ class _MainScreenState extends State<MainScreen> {
         title: Row(
           children: [
             MrpLogoWithText(),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                isJapanese
-                    ? 'JALもANAも、FOPもPPもまとめて比較'
-                    : 'Compare JAL & ANA — FOP, PP, miles in one place.',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+            // モバイル版ではキャッチコピー非表示
+            if (MediaQuery.of(context).size.width >= 600) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  isJapanese
+                      ? 'JALもANAも、FOPもPPもまとめて比較'
+                      : 'Compare JAL & ANA — FOP, PP, miles in one place.',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
+            ],
           ],
         ),
         backgroundColor: Colors.black,

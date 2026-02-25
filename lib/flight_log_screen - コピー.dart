@@ -10,6 +10,8 @@ import 'dart:ui' as ui;
 import 'dart:js_util' as js_util;
 import 'package:flutter/rendering.dart';
 import 'pro_purchase_screen.dart';
+import 'pro_purchase_dialog.dart';
+import 'auth_screen.dart';
 
 class FlightLogScreen extends StatefulWidget {
   const FlightLogScreen({super.key});
@@ -286,6 +288,338 @@ class FlightLogScreenState extends State<FlightLogScreen>
             ),
           );
         }
+      }
+    }
+  }
+
+  // メールから入力（Pro版限定）
+  Future<void> _showEmailImportDialog() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    final isLoggedIn = user != null && user.email != null && user.email!.isNotEmpty;
+
+    if (!isLoggedIn) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('メールから入力するにはログインが必要です'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AuthScreen(
+              onAuthSuccess: () {
+                Navigator.pop(context);
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (mounted) _showEmailImportDialogInternal();
+                });
+              },
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    _showEmailImportDialogInternal();
+  }
+
+  Future<void> _showEmailImportDialogInternal() async {
+    final isPro = await ProService().isPro();
+    
+    if (!isPro) {
+      if (mounted) {
+        await showProPurchaseDialog(context);
+      }
+      return;
+    }
+
+    final controller = TextEditingController();
+    if (!mounted) return;
+    
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (dialogContext) {
+        bool isLoading = false;
+        String? errorMsg;
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.email, color: Colors.purple),
+                const SizedBox(width: 8),
+                const Text('メールから入力', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.purple[700],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'AI',
+                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'JAL/ANAの予約確認メールを貼り付けてください（AI解析）',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: controller,
+                    maxLines: 10,
+                    decoration: const InputDecoration(
+                      hintText: 'メール本文をここに貼り付け...',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.all(8),
+                    ),
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  if (errorMsg != null) ...[
+                    const SizedBox(height: 8),
+                    Text(errorMsg!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+                child: const Text('キャンセル'),
+              ),
+              ElevatedButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        if (controller.text.trim().isEmpty) {
+                          setDialogState(() => errorMsg = 'メール本文を貼り付けてください');
+                          return;
+                        }
+                        setDialogState(() {
+                          isLoading = true;
+                          errorMsg = null;
+                        });
+                        try {
+                          final response = await Supabase.instance.client.functions.invoke(
+                            'swift-endpoint',
+                            body: {'emailText': controller.text},
+                          );
+                          if (response.status != 200) {
+                            throw Exception(response.data['error'] ?? '解析に失敗しました');
+                          }
+                          final data = response.data as Map<String, dynamic>;
+                          final parsedLegs = (data['legs'] as List<dynamic>)
+                              .map((e) => Map<String, dynamic>.from(e as Map))
+                              .map((l) {
+                                final airline = l['airline'] as String? ?? 'JAL';
+                                var flightNum = (l['flight_number'] ?? '').toString();
+                                if (flightNum.isNotEmpty && RegExp(r'^\d+$').hasMatch(flightNum)) {
+                                  flightNum = '$airline$flightNum';
+                                }
+                                return {
+                                  'airline': airline,
+                                  'date': l['date'],
+                                  'flightNumber': flightNum,
+                                  'departure': l['departure'],
+                                  'arrival': l['arrival'],
+                                  'departureTime': l['departure_time'] ?? '',
+                                  'arrivalTime': l['arrival_time'] ?? '',
+                                  'seatClass': (l['seat_class'] == 'ファースト') ? 'ファーストクラス' : (l['seat_class'] ?? '普通席'),
+                                  'fareType': _mapFareType(airline, l['fare_type'] as String? ?? ''),
+                                  'fare': l['fare'] ?? 0,
+                                };
+                              })
+                              .toList();
+                          if (dialogContext.mounted) Navigator.pop(dialogContext, parsedLegs);
+                        } catch (e) {
+                          setDialogState(() {
+                            isLoading = false;
+                            errorMsg = 'AI解析エラー: $e';
+                          });
+                        }
+                      },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('AI解析', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    controller.dispose();
+
+    if (result != null && result.isNotEmpty) {
+      await _saveEmailImportResult(result);
+    } else if (result != null && result.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('フライト情報が見つかりませんでした'), backgroundColor: Colors.orange),
+        );
+      }
+    }
+  }
+
+  String _mapFareType(String airline, String rawFareType) {
+    if (airline == 'JAL') {
+      final fareTypes = fareTypesByAirline['JAL']!;
+      for (final ft in fareTypes) {
+        if (ft.contains(rawFareType) || rawFareType.contains(ft.split(' ').last)) {
+          return ft;
+        }
+      }
+      if (rawFareType.contains('セイバー') || rawFareType.contains('saver')) return fareTypes[3];
+      if (rawFareType.contains('株主')) return fareTypes[1];
+      return fareTypes[3]; // デフォルト: スペシャルセイバー
+    } else {
+      final fareTypes = fareTypesByAirline['ANA']!;
+      for (final ft in fareTypes) {
+        if (ft.contains(rawFareType) || rawFareType.contains(ft.split(' ').last)) {
+          return ft;
+        }
+      }
+      if (rawFareType.contains('SUPER VALUE') || rawFareType.contains('いっしょにマイル')) return fareTypes[6];
+      if (rawFareType.contains('VALUE')) return fareTypes[4];
+      if (rawFareType.contains('株主')) return fareTypes[4];
+      return fareTypes[6]; // デフォルト: ANA SUPER VALUE
+    }
+  }
+
+  Future<void> _saveEmailImportResult(List<Map<String, dynamic>> legs) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      // ユーザープロファイルを取得
+      final profileRes = await Supabase.instance.client
+          .from('user_profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final profile = profileRes ?? {};
+      final jalStatus = profile['jal_status'] as String? ?? '-';
+      final jalCardType = profile['jal_card_type'] as String? ?? '-';
+      final jalTourPremium = profile['jal_tour_premium'] as bool? ?? false;
+      final anaStatus = profile['ana_status'] as String? ?? '-';
+      final anaCardType = profile['ana_card_type'] as String? ?? '-';
+
+      // 各レグのFOP/PP/マイルを計算
+      int totalFop = 0;
+      int totalPp = 0;
+      int totalMiles = 0;
+      int totalLsp = 0;
+      int totalFare = 0;
+
+      final processedLegs = <Map<String, dynamic>>[];
+      for (final leg in legs) {
+        final airline = leg['airline'] as String;
+        final departure = leg['departure'] as String? ?? '';
+        final arrival = leg['arrival'] as String? ?? '';
+        final fareType = leg['fareType'] as String? ?? '';
+        final seatClass = leg['seatClass'] as String? ?? '普通席';
+        final fare = leg['fare'] as int? ?? 0;
+
+        // 距離を取得
+        final routeRes = await Supabase.instance.client
+            .from('routes')
+            .select('distance_miles')
+            .eq('departure_code', departure)
+            .eq('arrival_code', arrival)
+            .maybeSingle();
+        final distance = routeRes?['distance_miles'] as int? ?? 0;
+
+        final calculated = _calculateLeg(
+          airline: airline,
+          baseMiles: distance,
+          fareType: fareType,
+          seatClass: seatClass,
+          jalStatus: jalStatus,
+          jalCard: jalCardType,
+          jalTourPremium: jalTourPremium,
+          anaStatus: anaStatus,
+          anaCard: anaCardType,
+        );
+
+        final fop = calculated['fop'] ?? 0;
+        final miles = calculated['miles'] ?? 0;
+        final lsp = calculated['lsp'] ?? 0;
+
+        if (airline == 'JAL') {
+          totalFop += fop;
+        } else {
+          totalPp += fop; // ANAの場合、fopにPP値が入っている
+        }
+        totalMiles += miles;
+        totalLsp += lsp;
+        totalFare += fare;
+
+        processedLegs.add({
+          'airline': airline,
+          'departure': departure,
+          'arrival': arrival,
+          'flightNumber': leg['flightNumber'] ?? '',
+          'date': leg['date'] ?? '',
+          'departureTime': leg['departureTime'] ?? '',
+          'arrivalTime': leg['arrivalTime'] ?? '',
+          'fareType': fareType,
+          'seatClass': seatClass,
+          'fare': fare,
+          'fop': fop,
+          'miles': miles,
+          'lsp': lsp,
+          'distance': distance,
+        });
+      }
+
+      // タイトル生成
+      final routeCodes = processedLegs.map((l) => l['departure']).toList();
+      if (processedLegs.isNotEmpty) routeCodes.add(processedLegs.last['arrival']);
+      final title = '${routeCodes.join('-')} ${processedLegs.length}レグ';
+
+      // 保存
+      final response = await Supabase.instance.client.from('saved_itineraries').insert({
+        'user_id': user.id,
+        'title': title,
+        'legs': processedLegs,
+        'total_fop': totalFop,
+        'total_pp': totalPp,
+        'total_miles': totalMiles,
+        'total_lsp': totalLsp,
+        'total_fare': totalFare,
+        'is_completed': false,
+      }).select().single();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${processedLegs.length}件のフライトを予定に追加しました'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadItineraries();
+        setState(() => _expandedId = response['id']);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存に失敗しました: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -576,9 +910,46 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
   Widget _buildPlannedTab(AppLocalizations l10n) {
     if (plannedItineraries.isEmpty) {
-      return _buildEmptyTabView(
-        '予定の旅程はありません\nシミュレーションから追加してください',
-        Icons.flight_takeoff,
+      return Column(
+        children: [
+          // メールから入力ボタン
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _showEmailImportDialog,
+                icon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.email, size: 18),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                label: const Text('予約メールから入力'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _buildEmptyTabView(
+              '予定の旅程はありません\nシミュレーションから追加してください',
+              Icons.flight_takeoff,
+            ),
+          ),
+        ],
       );
     }
 
@@ -589,8 +960,38 @@ class FlightLogScreenState extends State<FlightLogScreen>
           final isMobile = constraints.maxWidth < 600;
           return CustomScrollView(
             slivers: [
+              // メールから入力ボタン
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(isMobile ? 12 : 16, isMobile ? 12 : 16, isMobile ? 12 : 16, 8),
+                  child: ElevatedButton.icon(
+                    onPressed: _showEmailImportDialog,
+                    icon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.email, size: 18),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    label: const Text('予約メールから入力'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ),
               SliverPadding(
-                padding: EdgeInsets.all(isMobile ? 12 : 16),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => _buildItineraryCard(
@@ -1330,7 +1731,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
         children: [
           // JALは赤、ANAは青で便名を表示
           SizedBox(
-            width: 50,
+            width: 40,
             child: Text(
               flightNumber,
               style: TextStyle(
@@ -1345,7 +1746,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
               _formatDateShort(date),
               style: TextStyle(fontSize: 10, color: Colors.grey[600]),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 4),
           ],
           if (depTime.isNotEmpty)
             Text(
@@ -2034,7 +2435,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
       fareRate = int.parse(rateMatch.group(1)!) / 100.0;
     }
 
-    final flightMiles = (baseMiles * fareRate).round();
+    final flightMiles = (baseMiles * fareRate).toInt();
 
     // カードボーナス率
     double cardBonusRate = 0.0;
@@ -2087,8 +2488,9 @@ class FlightLogScreenState extends State<FlightLogScreen>
         ? statusBonusRate + 0.05
         : (cardBonusRate > statusBonusRate ? cardBonusRate : statusBonusRate);
 
-    // 合計マイル = フライトマイル × (1 + 適用ボーナス率)
-    final totalMiles = (baseMiles * fareRate * (1 + appliedRate)).toInt();
+    // ANA公式準拠: マイルは2段階切り捨て、PPは1式切り捨て
+    final bonusMiles = (flightMiles * appliedRate).toInt();
+    final totalMiles = flightMiles + bonusMiles;
 
     // PP = 区間マイル × 運賃率 × 2 + 搭乗ポイント
     final fareNumber = fareType.split(' ').first;

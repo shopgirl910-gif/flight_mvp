@@ -31,6 +31,7 @@ class SimulationScreenState extends State<SimulationScreen>
   List<OptimalPlan> _optResults = [];
   String? _optError;
   bool _optResultLimited = false;
+  bool _optIsPro = false;
 
   List<Map<String, dynamic>> legs = [];
   int? expandedLegId;
@@ -2214,14 +2215,15 @@ class SimulationScreenState extends State<SimulationScreen>
         airline: _optAirline,
       );
       final isPro = await ProService().isPro();
-      final limitedResults = isPro
-          ? results
-          : results.take(ProService.freeOptimizeResults).toList();
       setState(() {
-        _optResults = limitedResults;
+        _optResults = results;
+        _optIsPro = isPro;
         _optSearching = false;
-        _optResultLimited =
-            !isPro && results.length > ProService.freeOptimizeResults;
+        // 2位以降のデータがあるかチェック（Pro版でTOP3表示のため）
+        _optResultLimited = !isPro && results.any((plan) =>
+          (plan.children != null && plan.children!.length > 1) ||
+          (plan.children != null && plan.children!.any((c) => 
+            c.children != null && c.children!.length > 1)));
         if (results.isEmpty) _optError = '$_optHomeAirport発の最適ルートが見つかりませんでした';
       });
     } catch (e) {
@@ -2573,7 +2575,7 @@ class SimulationScreenState extends State<SimulationScreen>
                           _runOptimization();
                         },
                         icon: const Icon(Icons.lock, size: 16),
-                        label: const Text('Pro版でレグ最多ランキングも見る'),
+                        label: const Text('Pro版でTOP3を見る'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.purple[700],
                           foregroundColor: Colors.white,
@@ -2584,6 +2586,14 @@ class SimulationScreenState extends State<SimulationScreen>
                       ),
                     ),
                   ),
+                // 免責表示
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    '時刻表、マイル、FOP/PPは参考情報です。最新情報は公式サイトでご確認ください。',
+                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                  ),
+                ),
               ],
             ],
           ),
@@ -2809,7 +2819,8 @@ class SimulationScreenState extends State<SimulationScreen>
               ),
             ),
           ),
-          children: children.map((group) {
+          // 無料版は1位のみ、Pro版はTOP3
+          children: (_optIsPro ? children : children.take(1)).map((group) {
             // 子がchildren持ち = サブアコーディオン（💰最多FOP / ⏱️最短時間）
             if (group.children != null && group.children!.isNotEmpty) {
               return _buildSubAccordion(group, color);
@@ -2868,7 +2879,8 @@ class SimulationScreenState extends State<SimulationScreen>
                 ),
             ],
           ),
-          children: subChildren
+          // 無料版は1位のみ、Pro版はTOP3
+          children: (_optIsPro ? subChildren : subChildren.take(1))
               .map((ranked) => _buildRankedPlanTile(ranked, color))
               .toList(),
         ),
@@ -2887,38 +2899,48 @@ class SimulationScreenState extends State<SimulationScreen>
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-          title: Row(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                plan.label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
+              // 1行目: ラベル + ルート（全表示）
+              Row(
+                children: [
+                  Text(
+                    plan.label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _routeToJapanese(plan.route),
+                      style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  _routeToJapanese(plan.route),
-                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${_formatNumber(plan.totalFop)} ${_optAirline == "JAL" ? "FOP" : "PP"}',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                plan.duration,
-                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+              const SizedBox(height: 2),
+              // 2行目: FOP/PP + 所要時間
+              Row(
+                children: [
+                  Text(
+                    '${_formatNumber(plan.totalFop)} ${_optAirline == "JAL" ? "FOP" : "PP"}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    plan.duration,
+                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                  ),
+                ],
               ),
             ],
           ),
@@ -2941,18 +2963,9 @@ class SimulationScreenState extends State<SimulationScreen>
                       ),
                       child: Row(
                         children: [
+                          // 便名
                           SizedBox(
-                            width: 18,
-                            child: Text(
-                              '${i + 1}.',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 50,
+                            width: 45,
                             child: Text(
                               f.flightNumber,
                               style: const TextStyle(
@@ -2961,19 +2974,40 @@ class SimulationScreenState extends State<SimulationScreen>
                               ),
                             ),
                           ),
+                          // 出発時間
                           Text(
-                            '${f.departureCode}→${f.arrivalCode}',
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${f.departureTime}-${f.arrivalTime}',
+                            f.departureTime,
                             style: TextStyle(
                               fontSize: 10,
                               color: Colors.grey[600],
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
+                          // 出発空港
+                          Text(
+                            f.departureCode,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: Icon(Icons.arrow_forward, size: 12, color: Colors.grey[400]),
+                          ),
+                          // 到着空港
+                          Text(
+                            f.arrivalCode,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 4),
+                          // 到着時間
+                          Text(
+                            f.arrivalTime,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const Spacer(),
+                          // FOP/PP
                           Text(
                             '${f.fop}${_optAirline == "JAL" ? "FOP" : "PP"}',
                             style: TextStyle(
@@ -3238,78 +3272,14 @@ class SimulationScreenState extends State<SimulationScreen>
           hasANA = legs.any((l) => l['airline'] == 'ANA');
       return Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              ElevatedButton.icon(
-                onPressed: _showEmailImportDialog,
-                // 変更後
-                icon: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.email, size: 16),
-                    SizedBox(width: 2),
-                    Icon(
-                      Icons.workspace_premium,
-                      size: 14,
-                      color: Colors.amber,
-                    ),
-                  ],
-                ),
-                // 変更後
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('メールから入力'),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.purple[700],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'Pro',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  textStyle: const TextStyle(fontSize: 11),
-                ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: _saveItinerary,
-                icon: const Icon(Icons.save, size: 14),
-                label: const Text('修行ログに保存'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  textStyle: const TextStyle(fontSize: 11),
-                ),
-              ),
-            ],
+          // 免責表示
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              '時刻表、マイル、FOP/PPは参考情報です。最新情報は公式サイトでご確認ください。',
+              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+            ),
           ),
-          const SizedBox(height: 8),
           if (hasJAL) _buildMobileSummaryCard('JAL', Colors.red),
           if (hasJAL && hasANA) const SizedBox(height: 6),
           if (hasANA) _buildMobileSummaryCard('ANA', Colors.blue),
@@ -3580,60 +3550,10 @@ class SimulationScreenState extends State<SimulationScreen>
             Colors.blue,
           ),
           Container(width: 1, height: 36, color: Colors.grey[300]),
-          ElevatedButton.icon(
-            onPressed: _showEmailImportDialog,
-            // 変更後
-            icon: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.email, size: 16),
-                SizedBox(width: 2),
-                Icon(Icons.workspace_premium, size: 14, color: Colors.amber),
-              ],
-            ),
-            // 変更後
-            label: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('メールから入力'),
-                const SizedBox(width: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.purple[700],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Pro',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              textStyle: const TextStyle(fontSize: 11),
-            ),
-          ),
-          ElevatedButton.icon(
-            onPressed: _saveItinerary,
-            icon: const Icon(Icons.save, size: 16),
-            label: const Text('修行ログに保存'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purple,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              textStyle: const TextStyle(fontSize: 11),
-            ),
+          // 免責表示
+          Text(
+            '時刻表、マイル、FOP/PPは参考情報です。最新情報は公式サイトでご確認ください。',
+            style: TextStyle(fontSize: 10, color: Colors.grey[600]),
           ),
         ],
       ),
