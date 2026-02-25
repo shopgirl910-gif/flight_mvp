@@ -6,6 +6,9 @@ import 'dart:convert';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'pro_service.dart';
+import 'dart:ui' as ui;
+import 'dart:js_util' as js_util;
+import 'package:flutter/rendering.dart';
 import 'pro_purchase_screen.dart';
 
 class FlightLogScreen extends StatefulWidget {
@@ -23,6 +26,9 @@ class FlightLogScreenState extends State<FlightLogScreen>
   bool isLoading = true;
   String? errorMessage;
   String? _expandedId;
+
+  // 空港コード→日本語名マップ（例: HND→羽田, OKA→那覇）
+  Map<String, String> _airportNameMap = {};
 
   // 累計統計（修行済みのみ）
 
@@ -66,7 +72,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
     _loadItineraries();
     Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (mounted) _loadItineraries();
@@ -80,6 +86,20 @@ class FlightLogScreenState extends State<FlightLogScreen>
   }
 
   void refresh() => _loadItineraries();
+
+  /// "HND-OKA-MMY-OKA-HND 8レグ" → "羽田-那覇-宮古-那覇-羽田 8レグ"
+  String _titleToJapanese(String title) {
+    if (_airportNameMap.isEmpty) return title;
+    // タイトル末尾の " Nレグ" 部分を分離
+    final legMatch = RegExp(r'(\s+\d+レグ)$').firstMatch(title);
+    final routePart = legMatch != null ? title.substring(0, legMatch.start) : title;
+    final legSuffix = legMatch != null ? legMatch.group(0)! : '';
+    // 各空港コードを日本語名に変換
+    final converted = routePart.split('-').map((code) {
+      return _airportNameMap[code] ?? code;
+    }).join('-');
+    return '$converted$legSuffix';
+  }
 
   void showPlannedTab({String? expandId}) {
     _loadItineraries().then((_) {
@@ -110,6 +130,26 @@ class FlightLogScreenState extends State<FlightLogScreen>
           .select()
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
+
+      // 空港名マップを取得（未取得の場合のみ）
+      if (_airportNameMap.isEmpty) {
+        try {
+          final airports = await Supabase.instance.client
+              .from('airports')
+              .select('code, name_ja');
+          for (final a in airports) {
+            final code = a['code'] as String? ?? '';
+            final nameJa = a['name_ja'] as String? ?? '';
+            if (code.isNotEmpty && nameJa.isNotEmpty) {
+              // "東京（羽田）" → "羽田", "大阪（関西）" → "関西" のように括弧内を使う
+              final match = RegExp(r'[（(](.+?)[）)]').firstMatch(nameJa);
+              _airportNameMap[code] = match != null ? match.group(1)! : nameJa;
+            }
+          }
+        } catch (_) {
+          // 取得失敗してもコード表示のままフォールバック
+        }
+      }
 
       final list = List<Map<String, dynamic>>.from(response);
 
@@ -348,7 +388,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
   void _shareToX(Map<String, dynamic> itinerary) {
     showDialog(
       context: context,
-      builder: (context) => _ShareDialog(itinerary: itinerary),
+      builder: (context) => _ShareDialog(itinerary: itinerary, airportNameMap: _airportNameMap),
     );
   }
 
@@ -902,7 +942,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
   }) {
     final l10n = AppLocalizations.of(context)!;
     final id = itinerary['id'] as String;
-    final title = itinerary['title'] as String? ?? l10n.untitled;
+    final title = _titleToJapanese(itinerary['title'] as String? ?? l10n.untitled);
     final totalFop = itinerary['total_fop'] as int? ?? 0;
     final totalPp = itinerary['total_pp'] as int? ?? 0;
     final totalMiles = itinerary['total_miles'] as int? ?? 0;
@@ -1346,7 +1386,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
   // 旅程全体の編集ダイアログ（全レグ一覧形式）
   Future<void> _showItineraryEditDialog(Map<String, dynamic> itinerary) async {
     final itineraryId = itinerary['id'];
-    final title = itinerary['title'] as String? ?? '';
+    final title = _titleToJapanese(itinerary['title'] as String? ?? '');
 
     // 編集用にレグをコピー
     List<Map<String, dynamic>> editableLegs = List<Map<String, dynamic>>.from(
@@ -2074,11 +2114,12 @@ class FlightLogScreenState extends State<FlightLogScreen>
   }
 }
 
-// シェアダイアログ
+// シェアダイアログ（画像シェア方式）
 class _ShareDialog extends StatefulWidget {
   final Map<String, dynamic> itinerary;
+  final Map<String, String> airportNameMap;
 
-  const _ShareDialog({required this.itinerary});
+  const _ShareDialog({required this.itinerary, required this.airportNameMap});
 
   @override
   State<_ShareDialog> createState() => _ShareDialogState();
@@ -2087,7 +2128,8 @@ class _ShareDialog extends StatefulWidget {
 class _ShareDialogState extends State<_ShareDialog> {
   final _themeController = TextEditingController();
   final _commentController = TextEditingController();
-  bool _showDetails = false;
+  final _cardKey = GlobalKey();
+  bool _isCapturing = false;
 
   @override
   void dispose() {
@@ -2104,12 +2146,70 @@ class _ShareDialogState extends State<_ShareDialog> {
     );
   }
 
-  List<String> _generateShareTexts() {
+  String _titleToJapanese(String title) {
+    final map = widget.airportNameMap;
+    if (map.isEmpty) return title;
+    final legMatch = RegExp(r'(\s+\d+レグ)$').firstMatch(title);
+    final routePart = legMatch != null ? title.substring(0, legMatch.start) : title;
+    final legSuffix = legMatch != null ? legMatch.group(0)! : '';
+    final converted = routePart.split('-').map((code) => map[code] ?? code).join('-');
+    return '$converted$legSuffix';
+  }
+
+  // ツイート用テキスト（概要のみ・常に280文字以内）
+  String _generateTweetText() {
     final itinerary = widget.itinerary;
     final theme = _themeController.text.trim();
     final comment = _commentController.text.trim();
+    final title = _titleToJapanese(itinerary['title'] as String? ?? '');
+    final fop = itinerary['total_fop'] as int? ?? 0;
+    final pp = itinerary['total_pp'] as int? ?? 0;
+    final miles = itinerary['total_miles'] as int? ?? 0;
+    final lsp = itinerary['total_lsp'] as int? ?? 0;
+    final legs = itinerary['legs'] as List<dynamic>? ?? [];
 
-    final title = itinerary['title'] as String? ?? '';
+    String dateStr = '';
+    if (legs.isNotEmpty) {
+      final firstLeg = legs.first as Map<String, dynamic>;
+      dateStr = firstLeg['date'] as String? ?? '';
+    }
+
+    final buf = StringBuffer();
+    if (theme.isNotEmpty) {
+      buf.writeln('✈️【$theme】');
+    } else {
+      buf.writeln('✈️【修行プラン】');
+    }
+    if (dateStr.isNotEmpty) buf.writeln('📅 $dateStr');
+    buf.writeln('🛫 $title');
+
+    if (fop > 0 && pp > 0) {
+      buf.writeln(
+        '📊 FOP: ${_formatNumber(fop)} / PP: ${_formatNumber(pp)} / マイル: ${_formatNumber(miles)}',
+      );
+    } else if (fop > 0) {
+      buf.write('📊 FOP: ${_formatNumber(fop)} / マイル: ${_formatNumber(miles)}');
+      if (lsp > 0) buf.write(' / ${lsp}LSP');
+      buf.writeln();
+    } else if (pp > 0) {
+      buf.writeln('📊 PP: ${_formatNumber(pp)} / マイル: ${_formatNumber(miles)}');
+    }
+
+    if (comment.isNotEmpty) buf.writeln('💬 $comment');
+    buf.writeln();
+    final airline = fop > 0 ? 'JAL' : 'ANA';
+    buf.writeln('#MRP修行プラン #${airline}修行');
+    buf.write('mrunplanner.com');
+
+    return buf.toString();
+  }
+
+  // シェアカード画像Widget
+  Widget _buildShareCard() {
+    final itinerary = widget.itinerary;
+    final theme = _themeController.text.trim();
+    final comment = _commentController.text.trim();
+    final title = _titleToJapanese(itinerary['title'] as String? ?? '');
     final fop = itinerary['total_fop'] as int? ?? 0;
     final pp = itinerary['total_pp'] as int? ?? 0;
     final miles = itinerary['total_miles'] as int? ?? 0;
@@ -2117,14 +2217,13 @@ class _ShareDialogState extends State<_ShareDialog> {
     final fare = itinerary['total_fare'] as int? ?? 0;
     final legs = itinerary['legs'] as List<dynamic>? ?? [];
 
-    // 日付取得
     String dateStr = '';
     if (legs.isNotEmpty) {
       final firstLeg = legs.first as Map<String, dynamic>;
       dateStr = firstLeg['date'] as String? ?? '';
     }
 
-    // 単価計算（運賃入力済みレグだけのポイントで計算）
+    // 単価計算
     String unitPrice = '';
     if (fare > 0 && (fop > 0 || pp > 0)) {
       int farePoints = 0;
@@ -2142,191 +2241,300 @@ class _ShareDialogState extends State<_ShareDialog> {
         unitPrice = '¥${(fare / farePoints).toStringAsFixed(1)}/$pointLabel';
       }
     }
+    final isJal = fop > 0 && pp == 0;
+    final isAna = pp > 0 && fop == 0;
+    final isMixed = fop > 0 && pp > 0;
+    final primaryColor = isMixed
+        ? const Color(0xFF9933CC)
+        : isJal
+        ? const Color(0xFFCC0000)
+        : const Color(0xFF00BFFF);
+    final bgColors = isMixed
+        ? [const Color(0xFF1A0019), const Color(0xFF2D002D)]
+        : isJal
+        ? [const Color(0xFF1A0000), const Color(0xFF2D0000)]
+        : [const Color(0xFF000D1A), const Color(0xFF001A33)];
 
-    // ヘッダー部分を生成
-    final header = StringBuffer();
-    if (theme.isNotEmpty) {
-      header.writeln('✈️【$theme】');
-    } else {
-      header.writeln('✈️【修行プラン】');
-    }
-    header.writeln('');
-    if (dateStr.isNotEmpty) {
-      header.writeln('📅 $dateStr');
-    }
-    header.writeln('🛫 $title');
-    header.writeln('');
+    return Container(
+      width: 360,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: bgColors,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── ヘッダー ──
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  theme.isNotEmpty ? theme : '修行プラン',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'MRP',
+                style: TextStyle(
+                  color: primaryColor,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
+          if (dateStr.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              '📅 $dateStr',
+              style: TextStyle(color: Colors.grey[400], fontSize: 13),
+            ),
+          ],
+          const SizedBox(height: 8),
+          // ルート
+          Text(
+            '🛫 $title',
+            style: TextStyle(
+              color: primaryColor,
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
 
-    // 統計部分
-    final stats = StringBuffer();
-    if (fop > 0 && pp > 0) {
-      stats.writeln(
-        '📊 FOP: ${_formatNumber(fop)} / PP: ${_formatNumber(pp)} / マイル: ${_formatNumber(miles)}',
-      );
-    } else if (fop > 0) {
-      stats.write(
-        '📊 FOP: ${_formatNumber(fop)} / マイル: ${_formatNumber(miles)}',
-      );
-      if (lsp > 0) stats.write(' / ${lsp}LSP');
-      stats.writeln('');
-    } else if (pp > 0) {
-      stats.writeln(
-        '📊 PP: ${_formatNumber(pp)} / マイル: ${_formatNumber(miles)}',
-      );
-    }
-    if (fare > 0) {
-      stats.write('💰 ¥${_formatNumber(fare)}');
-      if (unitPrice.isNotEmpty) {
-        stats.writeln('（$unitPrice）');
-      } else {
-        stats.writeln('');
-      }
-    }
+          const SizedBox(height: 12),
+          Container(height: 1, color: Colors.grey[800]),
+          const SizedBox(height: 12),
 
-    // フッター部分
-    final footer = StringBuffer();
-    if (comment.isNotEmpty) {
-      footer.writeln('');
-      footer.writeln('💬 $comment');
-    }
-    footer.writeln('');
-    final airline = fop > 0 ? 'JAL' : 'ANA';
-    footer.writeln('#MRP修行プラン #${airline}修行');
-    footer.writeln('mrunplanner.com');
+          // ── 統計バッジ ──
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              if (fop > 0) _statBadge('FOP', _formatNumber(fop), primaryColor),
+              if (pp > 0) _statBadge('PP', _formatNumber(pp), primaryColor),
+              _statBadge('マイル', _formatNumber(miles), Colors.grey[400]!),
+              if (lsp > 0) _statBadge('LSP', '$lsp', Colors.amber),
+            ],
+          ),
+          if (fare > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              '💰 ¥${_formatNumber(fare)}${unitPrice.isNotEmpty ? "（$unitPrice）" : ""}',
+              style: TextStyle(color: Colors.grey[300], fontSize: 13),
+            ),
+          ],
 
-    // 詳細なしの場合
-    if (!_showDetails) {
-      final text =
-          '${header.toString()}${stats.toString()}${footer.toString()}';
-      return [text];
-    }
+          const SizedBox(height: 12),
+          Container(height: 1, color: Colors.grey[800]),
+          const SizedBox(height: 8),
 
-    // 詳細ありの場合 - レグ情報を生成
-    final legLines = <String>[];
-    legLines.add('━━━━━━━━━━━━━━');
-    for (var leg in legs) {
-      final l = leg as Map<String, dynamic>;
-      final legAirline = l['airline'] as String? ?? '';
-      final flightNum = l['flight_number'] as String? ?? '';
-      final dep = l['departure_airport'] as String? ?? '';
-      final arr = l['arrival_airport'] as String? ?? '';
-      final depTime = l['departure_time'] as String? ?? '';
-      final arrTime = l['arrival_time'] as String? ?? '';
-      final legDate = l['date'] as String? ?? '';
+          // ── レグ詳細 ──
+          ...legs.asMap().entries.map((entry) {
+            final l = entry.value as Map<String, dynamic>;
+            final legAirline = l['airline'] as String? ?? '';
+            final flightNum = l['flight_number'] as String? ?? '';
+            final dep = l['departure_airport'] as String? ?? '';
+            final arr = l['arrival_airport'] as String? ?? '';
+            final legFop = l['fop'] as int? ?? 0;
+            final legPp = l['pp'] as int? ?? 0;
+            final points = legFop > 0 ? legFop : legPp;
+            final pointLabel = legFop > 0 ? 'FOP' : 'PP';
 
-      String line = '$legAirline $flightNum';
-      if (legDate.isNotEmpty && legs.length > 1) {
-        line += ' | $legDate';
-      }
-      if (depTime.isNotEmpty) {
-        line += ' $depTime';
-      }
-      line += ' $dep → $arr';
-      if (arrTime.isNotEmpty) {
-        line += ' $arrTime';
-      }
-      legLines.add(line);
-    }
-    legLines.add('━━━━━━━━━━━━━━');
+            // IATA コード化: JAL→JL, ANA→NH
+            final iataCode = legAirline == 'JAL' ? 'JL' : legAirline == 'ANA' ? 'NH' : legAirline;
+            final displayFlight = '$iataCode$flightNum';
 
-    // 280文字で分割
-    const maxLength = 270; // URLの余裕を持たせる
-    final texts = <String>[];
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      displayFlight,
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      '$dep → $arr',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$points $pointLabel',
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
 
-    // 最初のツイート
-    var current = StringBuffer();
-    current.write(header.toString());
-    current.write(stats.toString());
+          // ── コメント ──
+          if (comment.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(height: 1, color: Colors.grey[800]),
+            const SizedBox(height: 8),
+            Text(
+              '💬 $comment',
+              style: TextStyle(color: Colors.grey[300], fontSize: 12),
+            ),
+          ],
 
-    int legIndex = 0;
-    for (var legLine in legLines) {
-      if (current.length + legLine.length + 1 > maxLength &&
-          current.length > 0) {
-        texts.add(current.toString());
-        current = StringBuffer();
-      }
-      current.writeln(legLine);
-      legIndex++;
-    }
-
-    // 最後にフッターを追加
-    if (current.length + footer.length > maxLength && current.length > 0) {
-      texts.add(current.toString());
-      current = StringBuffer();
-    }
-    current.write(footer.toString());
-    texts.add(current.toString());
-
-    // 複数に分かれた場合、番号を付ける
-    if (texts.length > 1) {
-      final total = texts.length;
-      for (int i = 0; i < texts.length; i++) {
-        texts[i] = '[${i + 1}/$total]\n${texts[i]}';
-      }
-    }
-
-    return texts;
+          const SizedBox(height: 16),
+          // ── フッター ──
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '#MRP修行プラン',
+                style: TextStyle(color: Colors.grey[700], fontSize: 11),
+              ),
+              Text(
+                'mrunplanner.com',
+                style: TextStyle(color: Colors.grey[700], fontSize: 11),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
-  void _share() {
-    final texts = _generateShareTexts();
-    Navigator.pop(context);
-
-    // 最初のツイートを開く
-    final text = Uri.encodeComponent(texts[0]);
-    final url = 'https://twitter.com/intent/tweet?text=$text';
-    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-
-    // 複数ある場合は通知
-    if (texts.length > 1) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${texts.length}件に分割されました。続きは順番に投稿してください。'),
-              duration: const Duration(seconds: 5),
-              action: SnackBarAction(
-                label: '次へ',
-                onPressed: () => _shareNext(texts, 1),
-              ),
-            ),
-          );
-        }
-      });
-    }
+  Widget _statBadge(String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
   }
 
-  void _shareNext(List<String> texts, int index) {
-    if (index >= texts.length) return;
-
-    final text = Uri.encodeComponent(texts[index]);
-    final url = 'https://twitter.com/intent/tweet?text=$text';
-    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-
-    if (index + 1 < texts.length) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('[${index + 2}/${texts.length}] を投稿してください'),
-              duration: const Duration(seconds: 5),
-              action: SnackBarAction(
-                label: '次へ',
-                onPressed: () => _shareNext(texts, index + 1),
-              ),
+  Future<void> _share() async {
+    setState(() => _isCapturing = true);
+    try {
+      // Overlay で画面外にカードをレンダリング（ダイアログの高さ制約を回避）
+      final captureKey = GlobalKey();
+      final overlayEntry = OverlayEntry(
+        builder: (context) => Positioned(
+          left: -9999,
+          top: -9999,
+          child: Material(
+            color: Colors.transparent,
+            child: RepaintBoundary(
+              key: captureKey,
+              child: _buildShareCard(),
             ),
+          ),
+        ),
+      );
+      Overlay.of(context).insert(overlayEntry);
+      await Future.delayed(const Duration(milliseconds: 150));
+
+      final boundary =
+          captureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        overlayEntry.remove();
+        return;
+      }
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      overlayEntry.remove();
+
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+      final bytes = byteData.buffer.asUint8List();
+      final tweetText = _generateTweetText();
+
+      // Web Share API（モバイル対応）
+      if (js_util.hasProperty(html.window.navigator, 'share')) {
+        final file = html.File([bytes], 'mrp_share.png', {'type': 'image/png'});
+        final shareData = js_util.jsify({
+          'text': tweetText,
+          'files': [file],
+        });
+        final canShare = js_util.callMethod<bool>(
+          html.window.navigator,
+          'canShare',
+          [shareData],
+        );
+        if (canShare) {
+          if (mounted) Navigator.pop(context);
+          await js_util.promiseToFuture(
+            js_util.callMethod(html.window.navigator, 'share', [shareData]),
           );
+          return;
         }
-      });
+      }
+
+      // フォールバック（デスクトップ）: 画像DL + Twitter Intent
+      final blob = html.Blob([bytes], 'image/png');
+      final blobUrl = html.Url.createObjectUrlFromBlob(blob);
+      final cardTitle = (widget.itinerary['title'] as String? ?? 'share')
+          .replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+      final now = DateTime.now();
+      final filename =
+          'MRP_${cardTitle}_${now.year}${now.month.toString().padLeft(2, "0")}${now.day.toString().padLeft(2, "0")}.png';
+      html.AnchorElement(href: blobUrl)
+        ..setAttribute('download', filename)
+        ..click();
+      html.Url.revokeObjectUrl(blobUrl);
+
+      final encodedText = Uri.encodeComponent(tweetText);
+      final tweetUrl = 'https://twitter.com/intent/tweet?text=$encodedText';
+      if (mounted) Navigator.pop(context);
+      await launchUrl(
+        Uri.parse(tweetUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📎 画像をダウンロードしました。ツイートに添付してください'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCapturing = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final legs = widget.itinerary['legs'] as List<dynamic>? ?? [];
-    final shareTexts = _generateShareTexts();
-    final hasMultipleTweets = shareTexts.length > 1;
-
     return AlertDialog(
       title: const Row(
         children: [
@@ -2335,127 +2543,108 @@ class _ShareDialogState extends State<_ShareDialog> {
           Text('Xでシェア', style: TextStyle(fontSize: 18)),
         ],
       ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // テーマ入力
-            TextField(
-              controller: _themeController,
-              decoration: const InputDecoration(
-                labelText: 'テーマ（任意）',
-                hintText: '例: W毎追っかけ修行',
-                border: OutlineInputBorder(),
-                isDense: true,
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // テーマ入力
+              TextField(
+                controller: _themeController,
+                decoration: const InputDecoration(
+                  labelText: 'テーマ（任意）',
+                  hintText: '例: W毎追っかけ修行',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onChanged: (_) => setState(() {}),
               ),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            // コメント入力
-            TextField(
-              controller: _commentController,
-              decoration: const InputDecoration(
-                labelText: 'コメント（任意）',
-                hintText: '例: 初修行完了！',
-                border: OutlineInputBorder(),
-                isDense: true,
+              const SizedBox(height: 12),
+              // コメント入力
+              TextField(
+                controller: _commentController,
+                decoration: const InputDecoration(
+                  labelText: 'コメント（任意）',
+                  hintText: '例: 初修行完了！',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                maxLines: 2,
+                onChanged: (_) => setState(() {}),
               ),
-              maxLines: 2,
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            // 詳細表示チェック
-            CheckboxListTile(
-              value: _showDetails,
-              onChanged: (v) => setState(() => _showDetails = v ?? false),
-              title: const Text('フライト詳細を含める', style: TextStyle(fontSize: 14)),
-              subtitle: Text(
-                '${legs.length}レグの時刻表を表示',
-                style: const TextStyle(fontSize: 12),
+              const SizedBox(height: 16),
+
+              // ── 画像プレビュー ──
+              Text(
+                '📸 シェア画像プレビュー',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                ),
               ),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-            ),
-            const SizedBox(height: 16),
-            // プレビューセクション
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: RepaintBoundary(key: _cardKey, child: _buildShareCard()),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.preview, size: 16, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        'プレビュー${hasMultipleTweets ? "（${shareTexts.length}件に分割）" : ""}',
+
+              const SizedBox(height: 16),
+
+              // ── ツイートテキストプレビュー ──
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.text_fields,
+                          size: 14,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'ツイートテキスト',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _generateTweetText(),
+                      style: const TextStyle(fontSize: 11, height: 1.4),
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '${_generateTweetText().length}/280文字',
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[700],
+                          fontSize: 10,
+                          color: _generateTweetText().length > 280
+                              ? Colors.red
+                              : Colors.grey[500],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ...shareTexts.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final text = entry.value;
-                    return Container(
-                      margin: EdgeInsets.only(top: index > 0 ? 8 : 0),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.blue[200]!),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (hasMultipleTweets)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: Text(
-                                'ツイート ${index + 1}/${shareTexts.length}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue[700],
-                                ),
-                              ),
-                            ),
-                          Text(
-                            text,
-                            style: const TextStyle(fontSize: 11, height: 1.4),
-                          ),
-                          const SizedBox(height: 4),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              '${text.length}/280文字',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: text.length > 280
-                                    ? Colors.red
-                                    : Colors.grey[500],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       actions: [
@@ -2464,11 +2653,18 @@ class _ShareDialogState extends State<_ShareDialog> {
           child: const Text('キャンセル'),
         ),
         ElevatedButton.icon(
-          onPressed: _share,
-          icon: const Icon(Icons.send, size: 18),
-          label: Text(
-            hasMultipleTweets ? 'シェア (1/${shareTexts.length})' : 'シェア',
-          ),
+          onPressed: _isCapturing ? null : _share,
+          icon: _isCapturing
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.send, size: 18),
+          label: Text(_isCapturing ? '生成中...' : 'シェア'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue,
             foregroundColor: Colors.white,

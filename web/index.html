@@ -44,7 +44,8 @@
   <!--1.5.0　Stripe完了-->
   <!--1.6.0　BottomNavigationBar + SW自動更新修正-->
   <!--1.7.0　JGCプレミア追加-->
-  <meta name="app-version" content="1.7.0">
+  <!--1.8.0　シェア機能充実-->
+  <meta name="app-version" content="1.8.0">
 
   <title>MRP - Mileage Run Planner</title>
   <link rel="manifest" href="manifest.json">
@@ -347,7 +348,7 @@
     // ========================================
     // 修正: skipWaitingだけでなく、controllerchangeで
     // ページを自動リロードして新キャッシュを確実に適用
-    
+
     let refreshing = false;
 
     if ('serviceWorker' in navigator) {

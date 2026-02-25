@@ -209,9 +209,6 @@ class PlanOptimizer {
     final tourPlans = <List<_Flight>>[];
     _findTourPlans(homeAirport, tourPlans);
 
-    // 周遊プランも全体ランキング（FOP/PP最多・レグ最多）に参加させる
-    allPlans.addAll(tourPlans);
-
     if (allPlans.isEmpty) return [];
 
     // OptimizedFlightに変換してFOP計算

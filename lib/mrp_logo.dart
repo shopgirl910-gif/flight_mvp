@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'app_config.dart';
 
 /// MRPアプリ共通ロゴWidget
 /// X(@mrunplanner)のプロフィール画像を再現
@@ -109,7 +110,7 @@ class MrpLogoWithText extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             Text(
               'MRP',
               style: TextStyle(
@@ -125,6 +126,14 @@ class MrpLogoWithText extends StatelessWidget {
                 fontSize: 10,
                 fontWeight: FontWeight.normal,
                 color: Colors.white70,
+              ),
+            ),
+            Text(
+              'v${AppConfig.version}',
+              style: TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.normal,
+                color: Colors.white38,
               ),
             ),
           ],

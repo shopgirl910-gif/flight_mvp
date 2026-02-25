@@ -27,6 +27,9 @@ class FlightLogScreenState extends State<FlightLogScreen>
   String? errorMessage;
   String? _expandedId;
 
+  // 空港コード→日本語名マップ（例: HND→羽田, OKA→那覇）
+  Map<String, String> _airportNameMap = {};
+
   // 累計統計（修行済みのみ）
 
   // 運賃種別・座席クラス定義
@@ -69,7 +72,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
     _loadItineraries();
     Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (mounted) _loadItineraries();
@@ -83,6 +86,20 @@ class FlightLogScreenState extends State<FlightLogScreen>
   }
 
   void refresh() => _loadItineraries();
+
+  /// "HND-OKA-MMY-OKA-HND 8レグ" → "羽田-那覇-宮古-那覇-羽田 8レグ"
+  String _titleToJapanese(String title) {
+    if (_airportNameMap.isEmpty) return title;
+    // タイトル末尾の " Nレグ" 部分を分離
+    final legMatch = RegExp(r'(\s+\d+レグ)$').firstMatch(title);
+    final routePart = legMatch != null ? title.substring(0, legMatch.start) : title;
+    final legSuffix = legMatch != null ? legMatch.group(0)! : '';
+    // 各空港コードを日本語名に変換
+    final converted = routePart.split('-').map((code) {
+      return _airportNameMap[code] ?? code;
+    }).join('-');
+    return '$converted$legSuffix';
+  }
 
   void showPlannedTab({String? expandId}) {
     _loadItineraries().then((_) {
@@ -113,6 +130,26 @@ class FlightLogScreenState extends State<FlightLogScreen>
           .select()
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
+
+      // 空港名マップを取得（未取得の場合のみ）
+      if (_airportNameMap.isEmpty) {
+        try {
+          final airports = await Supabase.instance.client
+              .from('airports')
+              .select('code, name_ja');
+          for (final a in airports) {
+            final code = a['code'] as String? ?? '';
+            final nameJa = a['name_ja'] as String? ?? '';
+            if (code.isNotEmpty && nameJa.isNotEmpty) {
+              // "東京（羽田）" → "羽田", "大阪（関西）" → "関西" のように括弧内を使う
+              final match = RegExp(r'[（(](.+?)[）)]').firstMatch(nameJa);
+              _airportNameMap[code] = match != null ? match.group(1)! : nameJa;
+            }
+          }
+        } catch (_) {
+          // 取得失敗してもコード表示のままフォールバック
+        }
+      }
 
       final list = List<Map<String, dynamic>>.from(response);
 
@@ -351,7 +388,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
   void _shareToX(Map<String, dynamic> itinerary) {
     showDialog(
       context: context,
-      builder: (context) => _ShareDialog(itinerary: itinerary),
+      builder: (context) => _ShareDialog(itinerary: itinerary, airportNameMap: _airportNameMap),
     );
   }
 
@@ -905,7 +942,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
   }) {
     final l10n = AppLocalizations.of(context)!;
     final id = itinerary['id'] as String;
-    final title = itinerary['title'] as String? ?? l10n.untitled;
+    final title = _titleToJapanese(itinerary['title'] as String? ?? l10n.untitled);
     final totalFop = itinerary['total_fop'] as int? ?? 0;
     final totalPp = itinerary['total_pp'] as int? ?? 0;
     final totalMiles = itinerary['total_miles'] as int? ?? 0;
@@ -1349,7 +1386,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
   // 旅程全体の編集ダイアログ（全レグ一覧形式）
   Future<void> _showItineraryEditDialog(Map<String, dynamic> itinerary) async {
     final itineraryId = itinerary['id'];
-    final title = itinerary['title'] as String? ?? '';
+    final title = _titleToJapanese(itinerary['title'] as String? ?? '');
 
     // 編集用にレグをコピー
     List<Map<String, dynamic>> editableLegs = List<Map<String, dynamic>>.from(
@@ -1997,7 +2034,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
       fareRate = int.parse(rateMatch.group(1)!) / 100.0;
     }
 
-    final flightMiles = (baseMiles * fareRate).round();
+    final flightMiles = (baseMiles * fareRate).toInt();
 
     // カードボーナス率
     double cardBonusRate = 0.0;
@@ -2050,8 +2087,9 @@ class FlightLogScreenState extends State<FlightLogScreen>
         ? statusBonusRate + 0.05
         : (cardBonusRate > statusBonusRate ? cardBonusRate : statusBonusRate);
 
-    // 合計マイル = フライトマイル × (1 + 適用ボーナス率)
-    final totalMiles = (baseMiles * fareRate * (1 + appliedRate)).toInt();
+    // ANA公式準拠: マイルは2段階切り捨て、PPは1式切り捨て
+    final bonusMiles = (flightMiles * appliedRate).toInt();
+    final totalMiles = flightMiles + bonusMiles;
 
     // PP = 区間マイル × 運賃率 × 2 + 搭乗ポイント
     final fareNumber = fareType.split(' ').first;
@@ -2080,8 +2118,9 @@ class FlightLogScreenState extends State<FlightLogScreen>
 // シェアダイアログ（画像シェア方式）
 class _ShareDialog extends StatefulWidget {
   final Map<String, dynamic> itinerary;
+  final Map<String, String> airportNameMap;
 
-  const _ShareDialog({required this.itinerary});
+  const _ShareDialog({required this.itinerary, required this.airportNameMap});
 
   @override
   State<_ShareDialog> createState() => _ShareDialogState();
@@ -2108,12 +2147,22 @@ class _ShareDialogState extends State<_ShareDialog> {
     );
   }
 
+  String _titleToJapanese(String title) {
+    final map = widget.airportNameMap;
+    if (map.isEmpty) return title;
+    final legMatch = RegExp(r'(\s+\d+レグ)$').firstMatch(title);
+    final routePart = legMatch != null ? title.substring(0, legMatch.start) : title;
+    final legSuffix = legMatch != null ? legMatch.group(0)! : '';
+    final converted = routePart.split('-').map((code) => map[code] ?? code).join('-');
+    return '$converted$legSuffix';
+  }
+
   // ツイート用テキスト（概要のみ・常に280文字以内）
   String _generateTweetText() {
     final itinerary = widget.itinerary;
     final theme = _themeController.text.trim();
     final comment = _commentController.text.trim();
-    final title = itinerary['title'] as String? ?? '';
+    final title = _titleToJapanese(itinerary['title'] as String? ?? '');
     final fop = itinerary['total_fop'] as int? ?? 0;
     final pp = itinerary['total_pp'] as int? ?? 0;
     final miles = itinerary['total_miles'] as int? ?? 0;
@@ -2161,7 +2210,7 @@ class _ShareDialogState extends State<_ShareDialog> {
     final itinerary = widget.itinerary;
     final theme = _themeController.text.trim();
     final comment = _commentController.text.trim();
-    final title = itinerary['title'] as String? ?? '';
+    final title = _titleToJapanese(itinerary['title'] as String? ?? '');
     final fop = itinerary['total_fop'] as int? ?? 0;
     final pp = itinerary['total_pp'] as int? ?? 0;
     final miles = itinerary['total_miles'] as int? ?? 0;
@@ -2200,7 +2249,7 @@ class _ShareDialogState extends State<_ShareDialog> {
         ? const Color(0xFF9933CC)
         : isJal
         ? const Color(0xFFCC0000)
-        : const Color(0xFF0066CC);
+        : const Color(0xFF00BFFF);
     final bgColors = isMixed
         ? [const Color(0xFF1A0019), const Color(0xFF2D002D)]
         : isJal
@@ -2301,33 +2350,28 @@ class _ShareDialogState extends State<_ShareDialog> {
             final flightNum = l['flight_number'] as String? ?? '';
             final dep = l['departure_airport'] as String? ?? '';
             final arr = l['arrival_airport'] as String? ?? '';
-            final depTime = l['departure_time'] as String? ?? '';
-            final arrTime = l['arrival_time'] as String? ?? '';
             final legFop = l['fop'] as int? ?? 0;
             final legPp = l['pp'] as int? ?? 0;
             final points = legFop > 0 ? legFop : legPp;
             final pointLabel = legFop > 0 ? 'FOP' : 'PP';
+
+            // IATA コード化: JAL→JL, ANA→NH
+            final iataCode = legAirline == 'JAL' ? 'JL' : legAirline == 'ANA' ? 'NH' : legAirline;
+            final displayFlight = '$iataCode$flightNum';
 
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 70,
+                    width: 60,
                     child: Text(
-                      '$legAirline $flightNum',
+                      displayFlight,
                       style: TextStyle(
                         color: Colors.grey[500],
                         fontSize: 10,
                         fontFamily: 'monospace',
                       ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 36,
-                    child: Text(
-                      depTime,
-                      style: const TextStyle(color: Colors.white, fontSize: 10),
                     ),
                   ),
                   Expanded(
@@ -2404,10 +2448,33 @@ class _ShareDialogState extends State<_ShareDialog> {
   Future<void> _share() async {
     setState(() => _isCapturing = true);
     try {
+      // Overlay で画面外にカードをレンダリング（ダイアログの高さ制約を回避）
+      final captureKey = GlobalKey();
+      final overlayEntry = OverlayEntry(
+        builder: (context) => Positioned(
+          left: -9999,
+          top: -9999,
+          child: Material(
+            color: Colors.transparent,
+            child: RepaintBoundary(
+              key: captureKey,
+              child: _buildShareCard(),
+            ),
+          ),
+        ),
+      );
+      Overlay.of(context).insert(overlayEntry);
+      await Future.delayed(const Duration(milliseconds: 150));
+
       final boundary =
-          _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) return;
+          captureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        overlayEntry.remove();
+        return;
+      }
       final image = await boundary.toImage(pixelRatio: 3.0);
+      overlayEntry.remove();
+
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
       final bytes = byteData.buffer.asUint8List();

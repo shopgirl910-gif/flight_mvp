@@ -356,7 +356,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   late final List<Widget> _screens = [
-    const SimulationScreen(),
+    SimulationScreen(
+      onNavigateToFlightLog: (itineraryId) {
+        setState(() => _selectedIndex = 1);
+        _flightLogKey.currentState?.showPlannedTab(expandId: itineraryId);
+      },
+    ),
     FlightLogScreen(key: _flightLogKey),
     const QuizScreen(),
     const CheckinScreen(),

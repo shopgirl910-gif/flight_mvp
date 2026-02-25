@@ -3331,10 +3331,6 @@ class SimulationScreenState extends State<SimulationScreen>
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const Tooltip(
-            message: '初期値はプロフィール設定から引き継ぎます。\nカードやステータスを変更すると、マイル・FOP/PPが即時再計算されます。',
-            child: Icon(Icons.info_outline, size: 14, color: Colors.grey),
-          ),
           SizedBox(
             width: 150,
             child: Column(
@@ -3744,37 +3740,6 @@ class SimulationScreenState extends State<SimulationScreen>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Builder(
-                  builder: (context) {
-                    final expanded = ValueNotifier<bool>(false);
-                    return ValueListenableBuilder<bool>(
-                      valueListenable: expanded,
-                      builder: (context, isExpanded, _) => GestureDetector(
-                        onTap: () => expanded.value = !expanded.value,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: isExpanded
-                              ? const Text(
-                                  '💡 初期値はプロフィール設定から引き継ぎます。カードやステータスを変更すると、マイル・FOP/PPが即時再計算されます。',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey, height: 1.4),
-                                )
-                              : const Row(
-                                  children: [
-                                    Text('💡', style: TextStyle(fontSize: 14)),
-                                    SizedBox(width: 6),
-                                    Text('この設定について', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                  ],
-                                ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
                 // === JAL設定 ===
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -3832,8 +3797,9 @@ class SimulationScreenState extends State<SimulationScreen>
                               )
                               .toList(),
                           onChanged: (v) {
-                            _onJALCardChanged(v);
-                            setDialogState(() {});
+                            setDialogState(() => selectedJALCard = v);
+                            setState(() => selectedJALCard = v);
+                            _recalculateAllLegs();
                           },
                         ),
                       ),
@@ -3877,8 +3843,9 @@ class SimulationScreenState extends State<SimulationScreen>
                               )
                               .toList(),
                           onChanged: (v) {
-                            _onJALStatusChanged(v);
-                            setDialogState(() {});
+                            setDialogState(() => selectedJALStatus = v);
+                            setState(() => selectedJALStatus = v);
+                            _recalculateAllLegs();
                           },
                         ),
                       ),
@@ -3898,8 +3865,13 @@ class SimulationScreenState extends State<SimulationScreen>
                                   onChanged: isJGCOverseas
                                       ? null
                                       : (v) {
-                                          _onJALTourPremiumChanged(v);
-                                          setDialogState(() {});
+                                          setDialogState(
+                                            () => jalTourPremium = v ?? false,
+                                          );
+                                          setState(
+                                            () => jalTourPremium = v ?? false,
+                                          );
+                                          _recalculateAllLegs();
                                         },
                                   activeColor: Colors.red,
                                   materialTapTargetSize:
@@ -3981,8 +3953,9 @@ class SimulationScreenState extends State<SimulationScreen>
                               )
                               .toList(),
                           onChanged: (v) {
-                            _onANACardChanged(v);
-                            setDialogState(() {});
+                            setDialogState(() => selectedANACard = v);
+                            setState(() => selectedANACard = v);
+                            _recalculateAllLegs();
                           },
                         ),
                       ),
@@ -4024,8 +3997,9 @@ class SimulationScreenState extends State<SimulationScreen>
                               )
                               .toList(),
                           onChanged: (v) {
-                            _onANAStatusChanged(v);
-                            setDialogState(() {});
+                            setDialogState(() => selectedANAStatus = v);
+                            setState(() => selectedANAStatus = v);
+                            _recalculateAllLegs();
                           },
                         ),
                       ),
