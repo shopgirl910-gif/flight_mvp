@@ -542,10 +542,11 @@ class FlightLogScreenState extends State<FlightLogScreen>
         );
       },
     );
+    final emailText = controller.text;
     controller.dispose();
 
     if (result != null && result.isNotEmpty) {
-      await _saveEmailImportResult(result);
+      await _saveEmailImportResult(result, emailText: emailText);
     } else if (result != null && result.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -625,10 +626,25 @@ class FlightLogScreenState extends State<FlightLogScreen>
     }
   }
 
-  Future<void> _saveEmailImportResult(List<Map<String, dynamic>> legs) async {
+  Future<void> _saveEmailImportResult(List<Map<String, dynamic>> legs, {String emailText = ''}) async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
+
+      // ── 運賃按分処理 ──
+      // AIが「往復26,220円」を各レグに26,220として返すケースを補正
+      // 条件: メールに「往復」を含み、全レグが同一運賃 → レグ数で割る
+      if (legs.length >= 2 && emailText.contains('往復')) {
+        final fares = legs.map((l) => l['fare'] as int? ?? 0).toList();
+        final allSame = fares.every((f) => f == fares.first) && fares.first > 0;
+        if (allSame) {
+          final perLeg = (fares.first / legs.length).round();
+          debugPrint('💰 往復運賃按分: ${fares.first}円 ÷ ${legs.length}レグ = $perLeg円/レグ');
+          for (final leg in legs) {
+            leg['fare'] = perLeg;
+          }
+        }
+      }
 
       // ユーザープロファイルを取得
       final profileRes = await Supabase.instance.client
@@ -875,9 +891,10 @@ class FlightLogScreenState extends State<FlightLogScreen>
         checkins.add({
           'user_id': userId,
           'airport_code': code,
-          'checked_in_at': dateIso.isNotEmpty
+          'checkin_at': dateIso.isNotEmpty
               ? '${dateIso}T12:00:00+09:00'
               : DateTime.now().toIso8601String(),
+          'checkin_date': dateIso.isNotEmpty ? dateIso : null,
           'latitude': airport?['latitude'] ?? 0.0,
           'longitude': airport?['longitude'] ?? 0.0,
         });

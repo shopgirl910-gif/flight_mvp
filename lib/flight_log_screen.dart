@@ -632,8 +632,49 @@ class FlightLogScreenState extends State<FlightLogScreen>
       if (user == null) return;
 
       // ── 運賃按分処理 ──
-      // AIが「往復26,220円」を各レグに26,220として返すケースを補正
-      // 条件: メールに「往復」を含み、全レグが同一運賃 → レグ数で割る
+
+      // 1. 人数検出（厳密なパターンのみ）
+      int passengerCount = 1;
+
+      // パターン1: 「大人：3名」「小人：1名」等の明示的な人数表記
+      final adultMatch = RegExp(r'大人[：:]\s*(\d+)名').firstMatch(emailText);
+      final childMatch = RegExp(r'小[人児][：:]\s*(\d+)名').firstMatch(emailText);
+      if (adultMatch != null || childMatch != null) {
+        passengerCount = (adultMatch != null ? int.parse(adultMatch.group(1)!) : 0)
+            + (childMatch != null ? int.parse(childMatch.group(1)!) : 0);
+      }
+
+      // パターン2: 「＜お客様氏名＞」セクション内の「様」カウント
+      if (passengerCount <= 1) {
+        final nameSection = RegExp(r'お客様氏名[＞>）\)]?([\s\S]*?)(?:＜|<|予約番号|フライト詳細)')
+            .firstMatch(emailText);
+        if (nameSection != null) {
+          final section = nameSection.group(1) ?? '';
+          final samaCount = RegExp(r'様').allMatches(section).length;
+          if (samaCount >= 2) {
+            passengerCount = samaCount;
+          }
+        }
+      }
+
+      debugPrint('👥 検出搭乗者数: $passengerCount名');
+
+      // 2. 人数按分（「N名×金額」は1人分なので割らない、それ以外は全員分→割る）
+      final hasPerPersonFormat = RegExp(r'\d+名[×x]').hasMatch(emailText);
+      if (passengerCount >= 2 && !hasPerPersonFormat) {
+        for (final leg in legs) {
+          final fare = leg['fare'] as int? ?? 0;
+          if (fare > 0) {
+            final perPerson = (fare / passengerCount).round();
+            leg['fare'] = perPerson;
+          }
+        }
+        debugPrint('👥 合計表記 → 運賃を$passengerCount名で按分');
+      } else if (passengerCount >= 2) {
+        debugPrint('👥 N名×金額表記 → 按分なし');
+      }
+
+      // 3. 往復按分: 全レグ同一運賃 + メールに「往復」→ レグ数で割る
       if (legs.length >= 2 && emailText.contains('往復')) {
         final fares = legs.map((l) => l['fare'] as int? ?? 0).toList();
         final allSame = fares.every((f) => f == fares.first) && fares.first > 0;
