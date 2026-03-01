@@ -5,6 +5,7 @@ import 'dart:math';
 import 'auth_screen.dart';
 import 'japan_map_widget.dart';
 import 'l10n/app_localizations.dart';
+import 'main.dart' show paintItBlackUpdateNotifier;
 
 class CheckinScreen extends StatefulWidget {
   const CheckinScreen({super.key});
@@ -160,7 +161,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
   void initState() {
     super.initState();
     _loadData();
-    // ãƒ­ã‚°ã‚¤ãƒ³çŠ¶æ…‹ã®å¤‰åŒ–ã‚’ç›£è¦–
+    // ログイン状態の変化を監視
     Supabase.instance.client.auth.onAuthStateChange.listen((event) {
       if (event.event == AuthChangeEvent.signedIn && mounted) {
         _loadCheckins().then((_) {
@@ -168,7 +169,24 @@ class _CheckinScreenState extends State<CheckinScreen> {
         });
       }
     });
+    // 修行ログからのPaint it Black更新通知をリッスン
+    paintItBlackUpdateNotifier.addListener(_onPaintItBlackUpdate);
   }
+
+  @override
+  void dispose() {
+    paintItBlackUpdateNotifier.removeListener(_onPaintItBlackUpdate);
+    super.dispose();
+  }
+
+  void _onPaintItBlackUpdate() {
+    if (mounted) {
+      _loadCheckins().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
 
   Future<void> _loadData() async {
     setState(() => isLoading = true);

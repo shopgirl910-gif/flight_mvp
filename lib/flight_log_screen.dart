@@ -12,6 +12,8 @@ import 'package:flutter/rendering.dart';
 import 'pro_purchase_screen.dart';
 import 'pro_purchase_dialog.dart';
 import 'auth_screen.dart';
+import 'email_parse_dialog.dart';
+import 'main.dart' show paintItBlackUpdateNotifier;
 
 class FlightLogScreen extends StatefulWidget {
   const FlightLogScreen({super.key});
@@ -31,6 +33,77 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
   // 空港コード→日本語名マップ（例: HND→羽田, OKA→那覇）
   Map<String, String> _airportNameMap = {};
+
+  /// 空港名/コードを3レターコードに正規化
+  String _normalizeAirportCode(String input) {
+    if (input.isEmpty) return input;
+    // 既に3レターコードならそのまま
+    if (RegExp(r'^[A-Z]{3}$').hasMatch(input)) return input;
+
+    const nameToCode = {
+      '羽田': 'HND', '成田': 'NRT', '関西': 'KIX', '伊丹': 'ITM',
+      '新千歳': 'CTS', '千歳': 'CTS', '福岡': 'FUK', '那覇': 'OKA',
+      '中部': 'NGO', '名古屋': 'NGO', '小牧': 'NKM', '県営名古屋': 'NKM',
+      '小松': 'KMQ', '鹿児島': 'KOJ', '宮崎': 'KMI', '大分': 'OIT',
+      '熊本': 'KMJ', '長崎': 'NGS', '松山': 'MYJ', '高松': 'TAK',
+      '高知': 'KCZ', '広島': 'HIJ', '岡山': 'OKJ', '出雲': 'IZO',
+      '鳥取': 'TTJ', '秋田': 'AXT', '山形': 'GAJ', '青森': 'AOJ',
+      '花巻': 'HNA', '仙台': 'SDJ', '新潟': 'KIJ', '富山': 'TOY',
+      '能登': 'NTQ', '石垣': 'ISG', '宮古': 'MMY', '奄美': 'ASJ',
+      '徳島': 'TKS', '北九州': 'KKJ', '佐賀': 'HSG', '対馬': 'TSJ',
+      '壱岐': 'IKI', '五島': 'FUJ', '種子島': 'TNE', '屋久島': 'KUM',
+      '久米島': 'UEO', '女満別': 'MMB', '旭川': 'AKJ', '釧路': 'KUH',
+      '帯広': 'OBO', '函館': 'HKD', '稚内': 'WKJ', '利尻': 'RIS',
+      '紋別': 'MBE', '中標津': 'SHB', '神戸': 'UKB', '南紀白浜': 'SHM',
+      '但馬': 'TJH', '下地島': 'SHI', '多良間': 'TRA',
+      '東京(羽田)': 'HND', '東京（羽田）': 'HND',
+      '大阪(関西)': 'KIX', '大阪（関西）': 'KIX',
+      '大阪(伊丹)': 'ITM', '大阪（伊丹）': 'ITM',
+      '札幌(新千歳)': 'CTS', '札幌（新千歳）': 'CTS',
+      '名古屋(中部)': 'NGO', '名古屋（中部）': 'NGO',
+    };
+
+    if (nameToCode.containsKey(input)) return nameToCode[input]!;
+    final cleaned = input.replaceAll(' ', '');
+    if (nameToCode.containsKey(cleaned)) return nameToCode[cleaned]!;
+
+    // 括弧内抽出（「東京(羽田)」→「羽田」→HND）
+    final match = RegExp(r'[（(](.+?)[）)]').firstMatch(input);
+    if (match != null) {
+      final inner = match.group(1)!;
+      if (nameToCode.containsKey(inner)) return nameToCode[inner]!;
+    }
+
+    // _airportNameMapの逆引き
+    for (final entry in _airportNameMap.entries) {
+      if (entry.value == input || entry.value == cleaned) return entry.key;
+    }
+
+    return input;
+  }
+
+  /// 距離を取得（双方向検索）
+  Future<int> _getRouteDistance(String departure, String arrival) async {
+    if (departure.isEmpty || arrival.isEmpty) return 0;
+    // 正方向
+    final res = await Supabase.instance.client
+        .from('routes')
+        .select('distance_miles')
+        .eq('departure_code', departure)
+        .eq('arrival_code', arrival)
+        .maybeSingle();
+    if (res != null && (res['distance_miles'] as int? ?? 0) > 0) {
+      return res['distance_miles'] as int;
+    }
+    // 逆方向フォールバック
+    final rev = await Supabase.instance.client
+        .from('routes')
+        .select('distance_miles')
+        .eq('departure_code', arrival)
+        .eq('arrival_code', departure)
+        .maybeSingle();
+    return rev?['distance_miles'] as int? ?? 0;
+  }
 
   // 累計統計（修行済みのみ）
 
@@ -110,6 +183,15 @@ class FlightLogScreenState extends State<FlightLogScreen>
       }
     });
     _tabController.animateTo(1);
+  }
+
+  void showCompletedTab({String? expandId}) {
+    _loadItineraries().then((_) {
+      if (expandId != null) {
+        setState(() => _expandedId = expandId);
+      }
+    });
+    _tabController.animateTo(0);
   }
 
   Future<void> _loadItineraries() async {
@@ -266,15 +348,81 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
     if (confirm == true) {
       try {
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user == null) return;
+
+        // 削除対象の旅程を取得
+        final itinerary = await Supabase.instance.client
+            .from('saved_itineraries')
+            .select('legs, is_completed')
+            .eq('id', id)
+            .single();
+
+        final isCompleted = itinerary['is_completed'] as bool? ?? false;
+        final legs = itinerary['legs'] as List<dynamic>? ?? [];
+
+        // 修行済みの場合、Paint it Black連携を確認
+        Set<String> airportsToRemove = {};
+        if (isCompleted && legs.isNotEmpty) {
+          // 削除対象の旅程に含まれる空港コードを取得
+          final airportsInThisItinerary = <String>{};
+          for (final leg in legs) {
+            final dep = leg['departure_airport'] as String? ?? '';
+            final arr = leg['arrival_airport'] as String? ?? '';
+            if (dep.isNotEmpty) airportsInThisItinerary.add(dep);
+            if (arr.isNotEmpty) airportsInThisItinerary.add(arr);
+          }
+
+          // 他の修行済み旅程で使われている空港を取得
+          final otherItineraries = await Supabase.instance.client
+              .from('saved_itineraries')
+              .select('legs')
+              .eq('user_id', user.id)
+              .eq('is_completed', true)
+              .neq('id', id);
+
+          final airportsInOtherItineraries = <String>{};
+          for (final other in otherItineraries) {
+            final otherLegs = other['legs'] as List<dynamic>? ?? [];
+            for (final leg in otherLegs) {
+              final dep = leg['departure_airport'] as String? ?? '';
+              final arr = leg['arrival_airport'] as String? ?? '';
+              if (dep.isNotEmpty) airportsInOtherItineraries.add(dep);
+              if (arr.isNotEmpty) airportsInOtherItineraries.add(arr);
+            }
+          }
+
+          // 他の旅程に含まれていない空港を削除対象に
+          airportsToRemove = airportsInThisItinerary.difference(airportsInOtherItineraries);
+        }
+
+        // 旅程を削除
         await Supabase.instance.client
             .from('saved_itineraries')
             .delete()
             .eq('id', id);
+
+        // Paint it Blackから空港を削除
+        if (airportsToRemove.isNotEmpty) {
+          await Supabase.instance.client
+              .from('airport_checkins')
+              .delete()
+              .eq('user_id', user.id)
+              .inFilter('airport_code', airportsToRemove.toList());
+          
+          debugPrint('🗑️ Paint it Blackから削除: ${airportsToRemove.join(', ')}');
+          // Paint it Black画面に更新を通知
+          paintItBlackUpdateNotifier.value++;
+        }
+
         _loadItineraries();
         if (mounted) {
+          final message = airportsToRemove.isNotEmpty
+              ? '${l10n.deleted}（Paint it Black: ${airportsToRemove.length}空港削除）'
+              : l10n.deleted;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(l10n.deleted),
+              content: Text(message),
               backgroundColor: Colors.green,
             ),
           );
@@ -321,11 +469,10 @@ class FlightLogScreenState extends State<FlightLogScreen>
       }
       return;
     }
-
     _showEmailImportDialogInternal();
-  }
+  } 
 
-  Future<void> _showEmailImportDialogInternal() async {
+    Future<void> _showEmailImportDialogInternal() async {
     final isPro = await ProService().isPro();
     
     if (!isPro) {
@@ -335,175 +482,259 @@ class FlightLogScreenState extends State<FlightLogScreen>
       return;
     }
 
-    final controller = TextEditingController();
     if (!mounted) return;
     
-    final result = await showDialog<List<Map<String, dynamic>>>(
-      context: context,
-      builder: (dialogContext) {
-        bool isLoading = false;
-        String? errorMsg;
-        return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: Row(
-              children: [
-                const Icon(Icons.email, color: Colors.purple),
-                const SizedBox(width: 8),
-                const Text('メールから入力', style: TextStyle(fontSize: 16)),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.purple[700],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'AI',
-                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'JAL/ANAの予約確認メールを貼り付けてください（AI解析）',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: controller,
-                    maxLines: 10,
-                    decoration: const InputDecoration(
-                      hintText: 'メール本文をここに貼り付け...',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.all(8),
-                    ),
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                  if (errorMsg != null) ...[
-                    const SizedBox(height: 8),
-                    Text(errorMsg!, style: const TextStyle(color: Colors.red, fontSize: 12)),
-                  ],
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
-                child: const Text('キャンセル'),
-              ),
-              ElevatedButton(
-                onPressed: isLoading
-                    ? null
-                    : () async {
-                        if (controller.text.trim().isEmpty) {
-                          setDialogState(() => errorMsg = 'メール本文を貼り付けてください');
-                          return;
-                        }
-                        setDialogState(() {
-                          isLoading = true;
-                          errorMsg = null;
-                        });
-                        try {
-                          final response = await Supabase.instance.client.functions.invoke(
-                            'swift-endpoint',
-                            body: {'emailText': controller.text},
-                          );
-                          if (response.status != 200) {
-                            throw Exception(response.data['error'] ?? '解析に失敗しました');
-                          }
-                          final data = response.data as Map<String, dynamic>;
-                          final parsedLegs = (data['legs'] as List<dynamic>)
-                              .map((e) => Map<String, dynamic>.from(e as Map))
-                              .map((l) {
-                                final airline = l['airline'] as String? ?? 'JAL';
-                                var flightNum = (l['flight_number'] ?? '').toString();
-                                if (flightNum.isNotEmpty && RegExp(r'^\d+$').hasMatch(flightNum)) {
-                                  flightNum = '$airline$flightNum';
-                                }
-                                return {
-                                  'airline': airline,
-                                  'date': l['date'],
-                                  'flightNumber': flightNum,
-                                  'departure': l['departure'],
-                                  'arrival': l['arrival'],
-                                  'departureTime': l['departure_time'] ?? '',
-                                  'arrivalTime': l['arrival_time'] ?? '',
-                                  'seatClass': (l['seat_class'] == 'ファースト') ? 'ファーストクラス' : (l['seat_class'] ?? '普通席'),
-                                  'fareType': _mapFareType(airline, l['fare_type'] as String? ?? ''),
-                                  'fare': l['fare'] ?? 0,
-                                };
-                              })
-                              .toList();
-                          if (dialogContext.mounted) Navigator.pop(dialogContext, parsedLegs);
-                        } catch (e) {
-                          setDialogState(() {
-                            isLoading = false;
-                            errorMsg = 'AI解析エラー: $e';
-                          });
-                        }
-                      },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-                child: isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text('AI解析', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    controller.dispose();
-
-    if (result != null && result.isNotEmpty) {
-      await _saveEmailImportResult(result);
-    } else if (result != null && result.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('フライト情報が見つかりませんでした'), backgroundColor: Colors.orange),
-        );
+    // email_parse_dialogを表示して解析結果を受け取る
+    final result = await showEmailParseDialog(context);
+    
+    if (result != null) {
+      final legs = (result['legs'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+      final emailText = result['emailText'] as String? ?? '';
+      
+      if (legs.isNotEmpty) {
+        // 既存の保存処理を使用（FOP/マイル計算含む）
+        await _saveEmailImportResult(legs, emailText: emailText);
+        _loadItineraries();
       }
     }
   }
 
+ 
+  // ============================================================
+// flight_log_screen.dart の _mapFareType メソッドを差し替え
+// 差し替え範囲: 行 559〜582
+// ============================================================
+
   String _mapFareType(String airline, String rawFareType) {
+    final raw = rawFareType.trim();
+    if (raw.isEmpty) {
+      return airline == 'JAL'
+          ? fareTypesByAirline['JAL']![3]  // デフォルト: スペシャルセイバー
+          : fareTypesByAirline['ANA']![6]; // デフォルト: ANA SUPER VALUE
+    }
+
     if (airline == 'JAL') {
       final fareTypes = fareTypesByAirline['JAL']!;
+
+      // 1. 完全一致チェック（運賃番号含む）
       for (final ft in fareTypes) {
-        if (ft.contains(rawFareType) || rawFareType.contains(ft.split(' ').last)) {
-          return ft;
-        }
+        if (ft == raw) return ft;
       }
-      if (rawFareType.contains('セイバー') || rawFareType.contains('saver')) return fareTypes[3];
-      if (rawFareType.contains('株主')) return fareTypes[1];
+
+      // 2. キーワードマッチ（長い名前から先にチェック＝スペシャルセイバー→セイバーの順）
+      if (raw.contains('スペシャルセイバー') || raw.contains('special_saver') || raw.contains('スペシャル')) {
+        return fareTypes[3]; // 運賃4: スペシャルセイバー
+      }
+      if (raw.contains('フレックス') || raw.contains('flex') || raw.contains('普通運賃') || raw.contains('大人普通')) {
+        return fareTypes[0]; // 運賃1: フレックス等
+      }
+      if (raw.contains('株主')) {
+        return fareTypes[1]; // 運賃2: 株主割引
+      }
+      if (raw.contains('セイバー') || raw.contains('saver')) {
+        return fareTypes[2]; // 運賃3: セイバー（スペシャルセイバーは上で処理済み）
+      }
+      if (raw.contains('包括') || raw.contains('パッケージ') || raw.contains('ツアー') || raw.contains('DP')) {
+        return fareTypes[4]; // 運賃5: 包括旅行運賃
+      }
+      if (raw.contains('スカイメイト') || raw.contains('障がい') || raw.contains('介護') || raw.contains('離島')) {
+        return fareTypes[5]; // 運賃6: スカイメイト等
+      }
+
       return fareTypes[3]; // デフォルト: スペシャルセイバー
     } else {
       final fareTypes = fareTypesByAirline['ANA']!;
+
+      // 1. 完全一致チェック
       for (final ft in fareTypes) {
-        if (ft.contains(rawFareType) || rawFareType.contains(ft.split(' ').last)) {
-          return ft;
-        }
+        if (ft == raw) return ft;
       }
-      if (rawFareType.contains('SUPER VALUE') || rawFareType.contains('いっしょにマイル')) return fareTypes[6];
-      if (rawFareType.contains('VALUE')) return fareTypes[4];
-      if (rawFareType.contains('株主')) return fareTypes[4];
+
+      // 2. 国際航空券（先にチェック）
+      if (raw.contains('国際') || raw.contains('international')) {
+        if (raw.contains('F') || raw.contains('A') || raw.contains('PC') || raw.contains('ファースト') || raw.contains('ビジネス')) {
+          // F/Aクラスかどうかを判定
+          if (RegExp(r'[FA]').hasMatch(raw) && (raw.contains('PC') || raw.contains('ファースト'))) {
+            return fareTypes[8]; // 運賃9: 国際航空券(PC) F/A
+          }
+        }
+        if (raw.contains('Y') || raw.contains('B') || raw.contains('M') || raw.contains('普通')) {
+          return fareTypes[9]; // 運賃10
+        }
+        if (raw.contains('U') || raw.contains('H') || raw.contains('Q')) {
+          return fareTypes[10]; // 運賃11
+        }
+        if (raw.contains('V') || raw.contains('W') || raw.contains('S')) {
+          return fareTypes[11]; // 運賃12
+        }
+        if (raw.contains('L') || raw.contains('K')) {
+          return fareTypes[12]; // 運賃13
+        }
+        return fareTypes[9]; // 国際デフォルト: 運賃10
+      }
+
+      // 3. 国内線キーワードマッチ
+      if (raw.contains('プレミアム') && !raw.contains('SFC')) {
+        if (raw.contains('株主') || raw.contains('VALUE PREMIUM')) {
+          return fareTypes[1]; // 運賃2: プレミアム株主優待
+        }
+        return fareTypes[0]; // 運賃1: プレミアム運賃
+      }
+      if (raw.contains('FLEX') || raw.contains('フレックス') || raw.contains('Biz') || raw.contains('ビジネスきっぷ')) {
+        return fareTypes[2]; // 運賃3: ANA FLEX
+      }
+      if (raw.contains('アイきっぷ')) {
+        return fareTypes[3]; // 運賃4
+      }
+      if (raw.contains('SUPER VALUE') || raw.contains('いっしょにマイル') || raw.contains('スーパーバリュー')) {
+        return fareTypes[6]; // 運賃7: ANA SUPER VALUE
+      }
+      if (raw.contains('TRANSIT') || raw.contains('トランジット')) {
+        return fareTypes[5]; // 運賃6: VALUE TRANSIT
+      }
+      if (raw.contains('VALUE') || raw.contains('バリュー') || raw.contains('特割') || raw.contains('株主')) {
+        return fareTypes[4]; // 運賃5: ANA VALUE
+      }
+      if (raw.contains('個人包括') || raw.contains('スマート') || raw.contains('U25') || raw.contains('シニア') || raw.contains('SALE')) {
+        return fareTypes[7]; // 運賃8
+      }
+
       return fareTypes[6]; // デフォルト: ANA SUPER VALUE
     }
   }
+  /// レグの日付が過去かどうか判定（複数フォーマット対応）
+  bool _isLegDatePast(Map<String, dynamic> leg) {
+    final dateStr = leg['date'] as String? ?? '';
+    if (dateStr.isEmpty) return false;
+    final parsed = _parseDateFlexible(dateStr);
+    if (parsed == null) return false;
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    return parsed.isBefore(todayOnly);
+  }
 
-  Future<void> _saveEmailImportResult(List<Map<String, dynamic>> legs) async {
+  /// 複数の日付フォーマットに対応するパーサー
+  DateTime? _parseDateFlexible(String dateStr) {
+    if (dateStr.isEmpty) return null;
+    final s = dateStr.trim();
+    try {
+      // 1) "2024年11月7日" / "2024年11月07日（木）" 形式
+      final jaMatch = RegExp(r'(\d{4})年(\d{1,2})月(\d{1,2})日').firstMatch(s);
+      if (jaMatch != null) {
+        return DateTime(
+          int.parse(jaMatch.group(1)!),
+          int.parse(jaMatch.group(2)!),
+          int.parse(jaMatch.group(3)!),
+        );
+      }
+
+      // 2) "2024/11/07" or "2024-11-07" 形式
+      final normalized = s.replaceAll('-', '/');
+      final parts = normalized.split('/');
+      if (parts.length == 3) {
+        final y = int.parse(parts[0]);
+        final m = int.parse(parts[1]);
+        final d = int.parse(parts[2]);
+        if (y > 1900 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+          return DateTime(y, m, d);
+        }
+      }
+
+      // 3) ISO 8601 フォールバック
+      return DateTime.parse(s);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _saveEmailImportResult(List<Map<String, dynamic>> legs, {String emailText = ''}) async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
+
+      // ── 運賃按分処理 ──
+
+      // 1. 人数検出（厳密なパターンのみ）
+      int passengerCount = 1;
+
+      // パターン1: 「大人：3名」「小人：1名」等の明示的な人数表記
+      final adultMatch = RegExp(r'大人[：:]\s*(\d+)名').firstMatch(emailText);
+      final childMatch = RegExp(r'小[人児][：:]\s*(\d+)名').firstMatch(emailText);
+      if (adultMatch != null || childMatch != null) {
+        passengerCount = (adultMatch != null ? int.parse(adultMatch.group(1)!) : 0)
+            + (childMatch != null ? int.parse(childMatch.group(1)!) : 0);
+      }
+
+      // パターン2: 「＜お客様氏名＞」セクション内の「様」カウント
+      if (passengerCount <= 1) {
+        final nameSection = RegExp(r'お客様氏名[＞>）\)]?([\s\S]*?)(?:＜|<|予約番号|フライト詳細)')
+            .firstMatch(emailText);
+        if (nameSection != null) {
+          final section = nameSection.group(1) ?? '';
+          final samaCount = RegExp(r'様').allMatches(section).length;
+          if (samaCount >= 2) {
+            passengerCount = samaCount;
+          }
+        }
+      }
+
+      debugPrint('👥 検出搭乗者数: $passengerCount名');
+
+      // 2. 人数按分（「N名×金額」は1人分なので割らない、それ以外は全員分→割る）
+      final hasPerPersonFormat = RegExp(r'\d+名[×x]').hasMatch(emailText);
+      if (passengerCount >= 2 && !hasPerPersonFormat) {
+        for (final leg in legs) {
+          final fare = leg['fare'] as int? ?? 0;
+          if (fare > 0) {
+            final perPerson = (fare / passengerCount).round();
+            leg['fare'] = perPerson;
+          }
+        }
+        debugPrint('👥 合計表記 → 運賃を$passengerCount名で按分');
+      } else if (passengerCount >= 2) {
+        debugPrint('👥 N名×金額表記 → 按分なし');
+      }
+
+      // 3. 往復按分: 全レグ同一運賃 + メールに「往復」→ レグ数で割る
+      if (legs.length >= 2 && emailText.contains('往復')) {
+        final fares = legs.map((l) => l['fare'] as int? ?? 0).toList();
+        final allSame = fares.every((f) => f == fares.first) && fares.first > 0;
+        if (allSame) {
+          final perLeg = (fares.first / legs.length).round();
+          debugPrint('💰 往復運賃按分: ${fares.first}円 ÷ ${legs.length}レグ = $perLeg円/レグ');
+          for (final leg in legs) {
+            leg['fare'] = perLeg;
+          }
+        }
+      }
+
+      // 4. メール本文から「合計」金額を取得して適用
+      // ただし、各レグに既に異なる運賃が設定されている場合はスキップ
+      if (emailText.isNotEmpty) {
+        // 各レグの運賃を確認
+        final legFares = legs.map((l) => l['fare'] as int? ?? 0).toList();
+        final hasIndividualFares = legFares.any((f) => f > 0) && 
+            (legFares.toSet().length > 1 || legs.length == 1);
+        
+        if (!hasIndividualFares) {
+          // 「合計XX,XXX円」または「合計XX円」を検出
+          final totalMatch = RegExp(r'合計[：:\s]*([0-9,]+)\s*円').firstMatch(emailText);
+          if (totalMatch != null) {
+            final totalStr = totalMatch.group(1)!.replaceAll(',', '');
+            final totalFare = int.tryParse(totalStr) ?? 0;
+            if (totalFare > 0) {
+              // 合計をレグ数で按分
+              final perLeg = (totalFare / legs.length).round();
+              debugPrint('💰 合計金額検出: $totalFare円 ÷ ${legs.length}レグ = $perLeg円/レグ');
+              for (final leg in legs) {
+                leg['fare'] = perLeg;
+              }
+            }
+          }
+        } else {
+          debugPrint('💰 各レグに個別運賃あり → 合計按分スキップ');
+        }
+      }
 
       // ユーザープロファイルを取得
       final profileRes = await Supabase.instance.client
@@ -514,35 +745,72 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
       final profile = profileRes ?? {};
       final jalStatus = profile['jal_status'] as String? ?? '-';
-      final jalCardType = profile['jal_card_type'] as String? ?? '-';
+      final jalCardType = profile['jal_card'] as String? ?? '-';
       final jalTourPremium = profile['jal_tour_premium'] as bool? ?? false;
       final anaStatus = profile['ana_status'] as String? ?? '-';
-      final anaCardType = profile['ana_card_type'] as String? ?? '-';
+      final anaCardType = profile['ana_card'] as String? ?? '-';
+
+      // ── 重複チェック ──
+      final existingItineraries = await Supabase.instance.client
+          .from('saved_itineraries')
+          .select('legs')
+          .eq('user_id', user.id);
+
+      // 既存のフライトを集める（日付 + 便名）
+      final existingFlights = <String>{};
+      for (final itinerary in existingItineraries) {
+        final existingLegs = itinerary['legs'] as List<dynamic>? ?? [];
+        for (final leg in existingLegs) {
+          final date = (leg['date'] ?? leg['flightDate'] ?? '').toString();
+          final flightNumber = (leg['flight_number'] ?? leg['flightNumber'] ?? '').toString();
+          if (date.isNotEmpty && flightNumber.isNotEmpty) {
+            existingFlights.add('$date|$flightNumber');
+          }
+        }
+      }
+
+      // 新規レグの重複をチェック
+      final duplicates = <String>[];
+      for (final leg in legs) {
+        final date = (leg['date'] ?? '').toString().replaceAll('/', '-');
+        final flightNumber = (leg['flightNumber'] ?? '').toString();
+        final key = '$date|$flightNumber';
+        // 日付フォーマットの違いを考慮（YYYY/MM/DD と YYYY-MM-DD）
+        final altKey = '${date.replaceAll('-', '/')}|$flightNumber';
+        if (existingFlights.contains(key) || existingFlights.contains(altKey)) {
+          duplicates.add('$date $flightNumber');
+        }
+      }
+
+      if (duplicates.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('⚠️ 重複: ${duplicates.join(', ')} は既に登録済みです'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        return; // 保存しない
+      }
 
       // 各レグのFOP/PP/マイルを計算
-      int totalFop = 0;
-      int totalPp = 0;
-      int totalMiles = 0;
-      int totalLsp = 0;
-      int totalFare = 0;
-
       final processedLegs = <Map<String, dynamic>>[];
       for (final leg in legs) {
         final airline = leg['airline'] as String;
-        final departure = leg['departure'] as String? ?? '';
-        final arrival = leg['arrival'] as String? ?? '';
-        final fareType = leg['fareType'] as String? ?? '';
+        final departure = _normalizeAirportCode(leg['departure'] as String? ?? '');
+        final arrival = _normalizeAirportCode(leg['arrival'] as String? ?? '');
+        final rawFareType = leg['fareType'] as String? ?? '';
+        final fareType = _mapFareType(airline, rawFareType);
+        debugPrint('  🎫 rawFareType="$rawFareType" → fareType="$fareType"');
         final seatClass = leg['seatClass'] as String? ?? '普通席';
         final fare = leg['fare'] as int? ?? 0;
 
-        // 距離を取得
-        final routeRes = await Supabase.instance.client
-            .from('routes')
-            .select('distance_miles')
-            .eq('departure_code', departure)
-            .eq('arrival_code', arrival)
-            .maybeSingle();
-        final distance = routeRes?['distance_miles'] as int? ?? 0;
+        // 距離を取得（双方向検索）
+        final distance = await _getRouteDistance(departure, arrival);
+
+        debugPrint('  📏 $departure→$arrival distance=$distance');
 
         final calculated = _calculateLeg(
           airline: airline,
@@ -558,28 +826,28 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
         final fop = calculated['fop'] ?? 0;
         final miles = calculated['miles'] ?? 0;
-        final lsp = calculated['lsp'] ?? 0;
+        int lsp = calculated['lsp'] ?? 0;
 
-        if (airline == 'JAL') {
-          totalFop += fop;
-        } else {
-          totalPp += fop; // ANAの場合、fopにPP値が入っている
+        // LSPは2024年1月1日以降のみ（JAL Life Status プログラム開始日）
+        if (airline == 'JAL' && lsp > 0) {
+          final dateStr = (leg['date'] ?? '').toString().replaceAll('/', '-');
+          final flightDate = DateTime.tryParse(dateStr);
+          if (flightDate != null && flightDate.isBefore(DateTime(2024, 1, 1))) {
+            lsp = 0;
+          }
         }
-        totalMiles += miles;
-        totalLsp += lsp;
-        totalFare += fare;
 
         processedLegs.add({
           'airline': airline,
-          'departure': departure,
-          'arrival': arrival,
-          'flightNumber': leg['flightNumber'] ?? '',
+          'departure_airport': departure,
+          'arrival_airport': arrival,
+          'flight_number': leg['flightNumber'] ?? '',
           'date': leg['date'] ?? '',
-          'departureTime': leg['departureTime'] ?? '',
-          'arrivalTime': leg['arrivalTime'] ?? '',
-          'fareType': fareType,
-          'seatClass': seatClass,
-          'fare': fare,
+          'departure_time': leg['departureTime'] ?? '',
+          'arrival_time': leg['arrivalTime'] ?? '',
+          'fare_type': fareType,
+          'seat_class': seatClass,
+          'fare_amount': fare,
           'fop': fop,
           'miles': miles,
           'lsp': lsp,
@@ -587,33 +855,71 @@ class FlightLogScreenState extends State<FlightLogScreen>
         });
       }
 
-      // タイトル生成
-      final routeCodes = processedLegs.map((l) => l['departure']).toList();
-      if (processedLegs.isNotEmpty) routeCodes.add(processedLegs.last['arrival']);
-      final title = '${routeCodes.join('-')} ${processedLegs.length}レグ';
+      // 過去日付と未来日付でレグを分離
+      final pastLegs = processedLegs.where((l) => _isLegDatePast(l)).toList();
+      final futureLegs = processedLegs.where((l) => !_isLegDatePast(l)).toList();
 
-      // 保存
-      final response = await Supabase.instance.client.from('saved_itineraries').insert({
-        'user_id': user.id,
-        'title': title,
-        'legs': processedLegs,
-        'total_fop': totalFop,
-        'total_pp': totalPp,
-        'total_miles': totalMiles,
-        'total_lsp': totalLsp,
-        'total_fare': totalFare,
-        'is_completed': false,
-      }).select().single();
+      debugPrint('📧 メール解析結果: 全${processedLegs.length}レグ → 過去${pastLegs.length} / 未来${futureLegs.length}');
+      for (final l in processedLegs) {
+        debugPrint('  ${l['departure_airport']}→${l['arrival_airport']} date="${l['date']}" isPast=${_isLegDatePast(l)}');
+      }
+
+      int savedCount = 0;
+      int completedCount = 0;
+      int plannedCount = 0;
+      String? lastSavedId;
+      String? completedId;
+      String? plannedId;
+
+      // --- 過去日付レグ → 修行済みとして保存 ---
+      if (pastLegs.isNotEmpty) {
+        completedId = await _saveItineraryGroup(user.id, pastLegs, isCompleted: true);
+        completedCount = pastLegs.length;
+        savedCount += completedCount;
+
+        // Paint it Black連携: 空港チェックイン自動登録
+        await _registerAirportCheckins(user.id, pastLegs);
+      }
+
+      // --- 未来日付レグ → 予定として保存 ---
+      if (futureLegs.isNotEmpty) {
+        plannedId = await _saveItineraryGroup(user.id, futureLegs, isCompleted: false);
+        plannedCount = futureLegs.length;
+        savedCount += plannedCount;
+      }
+
+      // タブ遷移ロジック:
+      //   過去のみ → 修行済みタブ
+      //   未来のみ → 予定タブ
+      //   混在     → 予定タブ
+      final int targetTab;
+      if (futureLegs.isNotEmpty) {
+        targetTab = 1; // 予定タブ
+        lastSavedId = plannedId;
+      } else {
+        targetTab = 0; // 修行済みタブ
+        lastSavedId = completedId;
+      }
 
       if (mounted) {
+        // フィードバックメッセージ
+        final messages = <String>[];
+        if (completedCount > 0) messages.add('$completedCountレグを修行済みに登録');
+        if (plannedCount > 0) messages.add('$plannedCountレグを予定に登録');
+        final msg = messages.join('、');
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${processedLegs.length}件のフライトを予定に追加しました'),
+            content: Text('✅ $msg しました${completedCount > 0 ? '（🗾 Paint it Black反映）' : ''}'),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
         );
         _loadItineraries();
-        setState(() => _expandedId = response['id']);
+        _tabController.animateTo(targetTab);
+        if (lastSavedId != null) {
+          setState(() => _expandedId = lastSavedId);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -621,6 +927,139 @@ class FlightLogScreenState extends State<FlightLogScreen>
           SnackBar(content: Text('保存に失敗しました: $e'), backgroundColor: Colors.red),
         );
       }
+    }
+  }
+
+  /// レグ群を1つの旅程として保存
+  Future<String> _saveItineraryGroup(
+    String userId,
+    List<Map<String, dynamic>> legs, {
+    required bool isCompleted,
+  }) async {
+    int totalFop = 0;
+    int totalPp = 0;
+    int totalMiles = 0;
+    int totalLsp = 0;
+    int totalFare = 0;
+
+    for (final l in legs) {
+      final airline = l['airline'] as String? ?? '';
+      final fop = l['fop'] as int? ?? 0;
+      final miles = l['miles'] as int? ?? 0;
+      final lsp = l['lsp'] as int? ?? 0;
+      final fare = l['fare_amount'] as int? ?? 0;
+
+      if (airline == 'JAL') {
+        totalFop += fop;
+      } else {
+        totalPp += fop;
+      }
+      totalMiles += miles;
+      totalLsp += lsp;
+      totalFare += fare;
+    }
+
+    // タイトル生成
+    final routeCodes = legs.map((l) => l['departure_airport']).toList();
+    if (legs.isNotEmpty) routeCodes.add(legs.last['arrival_airport']);
+    final title = '${routeCodes.join('-')} ${legs.length}レグ';
+
+    final response = await Supabase.instance.client.from('saved_itineraries').insert({
+      'user_id': userId,
+      'title': title,
+      'legs': legs,
+      'total_fop': totalFop,
+      'total_pp': totalPp,
+      'total_miles': totalMiles,
+      'total_lsp': totalLsp,
+      'total_fare': totalFare,
+      'is_completed': isCompleted,
+    }).select().single();
+
+    return response['id'] as String;
+  }
+
+  /// Paint it Black連携: 修行済みフライトの空港をチェックイン登録
+  Future<void> _registerAirportCheckins(
+    String userId,
+    List<Map<String, dynamic>> completedLegs,
+  ) async {
+    try {
+      debugPrint('🎫 _registerAirportCheckins called with ${completedLegs.length} legs');
+      
+      // 全レグの出発地・到着地を収集（重複排除）
+      final airportCodes = <String>{};
+      for (final l in completedLegs) {
+        final dep = l['departure_airport'] as String? ?? '';
+        final arr = l['arrival_airport'] as String? ?? '';
+        debugPrint('  leg: dep=$dep, arr=$arr');
+        if (dep.isNotEmpty) airportCodes.add(dep);
+        if (arr.isNotEmpty) airportCodes.add(arr);
+      }
+      debugPrint('🎫 Collected airports: $airportCodes');
+      if (airportCodes.isEmpty) return;
+
+      // 既にチェックイン済みの空港を取得
+      final existing = await Supabase.instance.client
+          .from('airport_checkins')
+          .select('airport_code')
+          .eq('user_id', userId);
+
+      final existingCodes =
+          (existing as List).map((e) => e['airport_code'] as String).toSet();
+
+      // 未チェックインの空港のみ対象
+      final newAirports = airportCodes.difference(existingCodes);
+      if (newAirports.isEmpty) return;
+
+      // 空港の緯度経度を取得
+      final airports = await Supabase.instance.client
+          .from('airports')
+          .select('code, latitude, longitude')
+          .inFilter('code', newAirports.toList());
+
+      final airportMap = <String, Map<String, dynamic>>{};
+      for (final a in (airports as List)) {
+        airportMap[a['code'] as String] = Map<String, dynamic>.from(a);
+      }
+
+      // バッチINSERT
+      final checkins = <Map<String, dynamic>>[];
+      for (final code in newAirports) {
+        final airport = airportMap[code];
+        // フライト日付を取得（該当空港を含む最初のレグ）
+        final relatedLeg = completedLegs.firstWhere(
+          (l) => l['departure_airport'] == code || l['arrival_airport'] == code,
+          orElse: () => completedLegs.first,
+        );
+        final rawDate = relatedLeg['date'] as String? ?? '';
+        final parsedDate = _parseDateFlexible(rawDate);
+        final dateIso = parsedDate != null
+            ? '${parsedDate.year}-${parsedDate.month.toString().padLeft(2, '0')}-${parsedDate.day.toString().padLeft(2, '0')}'
+            : '';
+
+        checkins.add({
+          'user_id': userId,
+          'airport_code': code,
+          'checkin_at': dateIso.isNotEmpty
+              ? '${dateIso}T12:00:00+09:00'
+              : DateTime.now().toIso8601String(),
+          'checkin_date': dateIso.isNotEmpty ? dateIso : null,
+          'latitude': airport?['latitude'] ?? 0.0,
+          'longitude': airport?['longitude'] ?? 0.0,
+        });
+      }
+
+      if (checkins.isNotEmpty) {
+        debugPrint('🎫 Inserting ${checkins.length} checkins: ${checkins.map((c) => c['airport_code']).toList()}');
+        await Supabase.instance.client.from('airport_checkins').insert(checkins);
+        debugPrint('🎫 Checkins inserted successfully');
+        // Paint it Black画面に更新を通知
+        paintItBlackUpdateNotifier.value++;
+      }
+    } catch (e) {
+      // チェックイン登録失敗は旅程保存に影響させない
+      debugPrint('Paint it Black チェックイン登録エラー: $e');
     }
   }
 
@@ -767,19 +1206,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
     final firstLeg = legs.first as Map<String, dynamic>;
     final dateStr = firstLeg['date'] as String?;
     if (dateStr == null || dateStr.isEmpty) return null;
-    try {
-      final parts = dateStr.split('/');
-      if (parts.length == 3) {
-        return DateTime(
-          int.parse(parts[0]),
-          int.parse(parts[1]),
-          int.parse(parts[2]),
-        );
-      }
-      return DateTime.parse(dateStr);
-    } catch (e) {
-      return null;
-    }
+    return _parseDateFlexible(dateStr);
   }
 
   bool _isPastDate(Map<String, dynamic> itinerary) {
@@ -871,7 +1298,15 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
   Widget _buildCompletedTab(AppLocalizations l10n) {
     if (completedItineraries.isEmpty) {
-      return _buildEmptyTabView('修行済みの旅程はありません', Icons.flight_land);
+      return Column(
+        children: [
+          // メールから入力ボタン（修行済みタブ）
+          _buildEmailImportButton(),
+          Expanded(
+            child: _buildEmptyTabView('修行済みの旅程はありません', Icons.flight_land),
+          ),
+        ],
+      );
     }
 
     return RefreshIndicator(
@@ -881,9 +1316,11 @@ class FlightLogScreenState extends State<FlightLogScreen>
           final isMobile = constraints.maxWidth < 600;
           return CustomScrollView(
             slivers: [
+              // メールから入力ボタン（修行済みタブ）
+              SliverToBoxAdapter(child: _buildEmailImportButton()),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.all(isMobile ? 12 : 16),
+                  padding: EdgeInsets.fromLTRB(isMobile ? 12 : 16, 0, isMobile ? 12 : 16, 0),
                   child: _buildSummaryCard(l10n, isMobile),
                 ),
               ),
@@ -913,36 +1350,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
       return Column(
         children: [
           // メールから入力ボタン
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _showEmailImportDialog,
-                icon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.email, size: 18),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-                label: const Text('予約メールから入力'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          ),
+          _buildEmailImportButton(),
           Expanded(
             child: _buildEmptyTabView(
               '予定の旅程はありません\nシミュレーションから追加してください',
@@ -961,35 +1369,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
           return CustomScrollView(
             slivers: [
               // メールから入力ボタン
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(isMobile ? 12 : 16, isMobile ? 12 : 16, isMobile ? 12 : 16, 8),
-                  child: ElevatedButton.icon(
-                    onPressed: _showEmailImportDialog,
-                    icon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.email, size: 18),
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                    label: const Text('予約メールから入力'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ),
+              SliverToBoxAdapter(child: _buildEmailImportButton()),
               SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16),
                 sliver: SliverList(
@@ -1007,6 +1387,40 @@ class FlightLogScreenState extends State<FlightLogScreen>
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// 「予約メールから入力」共通ボタン（修行済み・予定タブ両方で使用）
+  Widget _buildEmailImportButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: _showEmailImportDialog,
+          icon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.email, size: 18),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          label: const Text('予約メールから入力'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+        ),
       ),
     );
   }
@@ -1828,6 +2242,13 @@ class FlightLogScreenState extends State<FlightLogScreen>
     // 削除予定のインデックスを追跡
     Set<int> deletedIndices = {};
 
+    // ステータス/カード編集用変数
+    String editJalStatus = itinerary['jal_status'] as String? ?? '-';
+    String editJalCard = itinerary['jal_card'] as String? ?? '-';
+    String editAnaStatus = itinerary['ana_status'] as String? ?? '-';
+    String editAnaCard = itinerary['ana_card'] as String? ?? '-';
+    bool editJalTourPremium = itinerary['jal_tour_premium'] as bool? ?? false;
+
     // 旅程総額の初期値を判定
     // レグに運賃が入っている → レグ入力モード
     // total_fareがあるがレグ運賃が全て0 → 旅程総額モード
@@ -1846,6 +2267,20 @@ class FlightLogScreenState extends State<FlightLogScreen>
     final legFareControllers = List.generate(editableLegs.length, (i) {
       final fare = editableLegs[i]['fare_amount'] as int? ?? 0;
       return TextEditingController(text: fare > 0 ? '$fare' : '');
+    });
+
+    // FOP/マイル/LSP手動入力用のcontroller
+    final legFopControllers = List.generate(editableLegs.length, (i) {
+      final fop = editableLegs[i]['manual_fop'] as int?;
+      return TextEditingController(text: fop != null ? '$fop' : '');
+    });
+    final legMilesControllers = List.generate(editableLegs.length, (i) {
+      final miles = editableLegs[i]['manual_miles'] as int?;
+      return TextEditingController(text: miles != null ? '$miles' : '');
+    });
+    final legLspControllers = List.generate(editableLegs.length, (i) {
+      final lsp = editableLegs[i]['manual_lsp'] as int?;
+      return TextEditingController(text: lsp != null ? '$lsp' : '');
     });
 
     final result = await showDialog<bool>(
@@ -2000,6 +2435,163 @@ class FlightLogScreenState extends State<FlightLogScreen>
                               style: TextStyle(fontSize: 10, color: itineraryFareNoteColor),
                             ),
                           ],
+                        ],
+                      ),
+                    ),
+                    // ── ステータス/カード選択 ──
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber[200]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '搭乗時のステータス/カード',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 8),
+                          // JAL
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text('JAL', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: editJalCard,
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    labelText: 'カード',
+                                    labelStyle: TextStyle(fontSize: 10),
+                                  ),
+                                  style: const TextStyle(fontSize: 11, color: Colors.black87),
+                                  items: const [
+                                    DropdownMenuItem(value: '-', child: Text('なし')),
+                                    DropdownMenuItem(value: 'jmb', child: Text('JMB会員')),
+                                    DropdownMenuItem(value: 'jal_regular', child: Text('JAL普通')),
+                                    DropdownMenuItem(value: 'jal_club_a', child: Text('CLUB-A')),
+                                    DropdownMenuItem(value: 'jal_club_a_gold', child: Text('CLUB-Aゴールド')),
+                                    DropdownMenuItem(value: 'jal_platinum', child: Text('プラチナ')),
+                                    DropdownMenuItem(value: 'jgc_japan', child: Text('JGC(日本)')),
+                                    DropdownMenuItem(value: 'jgc_overseas', child: Text('JGC(海外)')),
+                                  ],
+                                  onChanged: (v) => setDialogState(() => editJalCard = v ?? '-'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: editJalStatus,
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    labelText: 'ステータス',
+                                    labelStyle: TextStyle(fontSize: 10),
+                                  ),
+                                  style: const TextStyle(fontSize: 11, color: Colors.black87),
+                                  items: [
+                                    const DropdownMenuItem(value: '-', child: Text('なし')),
+                                    const DropdownMenuItem(value: 'diamond', child: Text('ダイヤモンド')),
+                                    if (editJalCard == 'jgc_japan' || editJalCard == 'jgc_overseas')
+                                      const DropdownMenuItem(value: 'jgc_premier', child: Text('JGCプレミア')),
+                                    const DropdownMenuItem(value: 'sapphire', child: Text('サファイア')),
+                                    const DropdownMenuItem(value: 'crystal', child: Text('クリスタル')),
+                                  ],
+                                  onChanged: (v) => setDialogState(() => editJalStatus = v ?? '-'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          // ツアープレミアム
+                          Row(
+                            children: [
+                              const SizedBox(width: 40), // JALラベル分のスペース
+                              Checkbox(
+                                value: editJalTourPremium,
+                                onChanged: (v) => setDialogState(() => editJalTourPremium = v ?? false),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              const Text(
+                                'JALカード ツアープレミアム',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // ANA
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text('ANA', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: editAnaCard,
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    labelText: 'カード',
+                                    labelStyle: TextStyle(fontSize: 10),
+                                  ),
+                                  style: const TextStyle(fontSize: 11, color: Colors.black87),
+                                  items: const [
+                                    DropdownMenuItem(value: '-', child: Text('なし')),
+                                    DropdownMenuItem(value: 'amc', child: Text('AMC')),
+                                    DropdownMenuItem(value: 'ana_regular', child: Text('ANA一般')),
+                                    DropdownMenuItem(value: 'ana_wide', child: Text('ANAワイド')),
+                                    DropdownMenuItem(value: 'ana_gold', child: Text('ANAゴールド')),
+                                    DropdownMenuItem(value: 'ana_premium', child: Text('ANAプレミアム')),
+                                    DropdownMenuItem(value: 'sfc_regular', child: Text('SFC一般')),
+                                    DropdownMenuItem(value: 'sfc_gold', child: Text('SFCゴールド')),
+                                    DropdownMenuItem(value: 'sfc_premium', child: Text('SFCプレミアム')),
+                                  ],
+                                  onChanged: (v) => setDialogState(() => editAnaCard = v ?? '-'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: editAnaStatus,
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    labelText: 'ステータス',
+                                    labelStyle: TextStyle(fontSize: 10),
+                                  ),
+                                  style: const TextStyle(fontSize: 11, color: Colors.black87),
+                                  items: const [
+                                    DropdownMenuItem(value: '-', child: Text('なし')),
+                                    DropdownMenuItem(value: 'diamond_1', child: Text('ダイヤ(1年目)')),
+                                    DropdownMenuItem(value: 'diamond_2', child: Text('ダイヤ(継続)')),
+                                    DropdownMenuItem(value: 'platinum_1', child: Text('プラチナ(1年目)')),
+                                    DropdownMenuItem(value: 'platinum_2', child: Text('プラチナ(継続)')),
+                                    DropdownMenuItem(value: 'bronze_1', child: Text('ブロンズ(1年目)')),
+                                    DropdownMenuItem(value: 'bronze_2', child: Text('ブロンズ(継続)')),
+                                  ],
+                                  onChanged: (v) => setDialogState(() => editAnaStatus = v ?? '-'),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -2288,6 +2880,106 @@ class FlightLogScreenState extends State<FlightLogScreen>
                                 ],
                               ],
                             ),
+                            const SizedBox(height: 8),
+                            // ── 手動入力（FOP/マイル/LSP）──
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.purple[50],
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.purple[200]!),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '手動入力（空欄=自動計算）',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.purple[700],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      // FOP/PP
+                                      Expanded(
+                                        child: TextField(
+                                          controller: legFopControllers[originalIndex],
+                                          keyboardType: TextInputType.number,
+                                          style: const TextStyle(fontSize: 11),
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                                            labelText: airline == 'ANA' ? 'PP' : 'FOP',
+                                            labelStyle: const TextStyle(fontSize: 10),
+                                            hintText: '自動',
+                                            hintStyle: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                                          ),
+                                          onChanged: (v) {
+                                            setDialogState(() {
+                                              final val = int.tryParse(v);
+                                              editableLegs[originalIndex]['manual_fop'] = val;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      // マイル
+                                      Expanded(
+                                        child: TextField(
+                                          controller: legMilesControllers[originalIndex],
+                                          keyboardType: TextInputType.number,
+                                          style: const TextStyle(fontSize: 11),
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                                            labelText: 'マイル',
+                                            labelStyle: const TextStyle(fontSize: 10),
+                                            hintText: '自動',
+                                            hintStyle: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                                          ),
+                                          onChanged: (v) {
+                                            setDialogState(() {
+                                              final val = int.tryParse(v);
+                                              editableLegs[originalIndex]['manual_miles'] = val;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      // LSP（JALのみ）
+                                      if (airline == 'JAL')
+                                        Expanded(
+                                          child: TextField(
+                                            controller: legLspControllers[originalIndex],
+                                            keyboardType: TextInputType.number,
+                                            style: const TextStyle(fontSize: 11),
+                                            decoration: InputDecoration(
+                                              isDense: true,
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                                              labelText: 'LSP',
+                                              labelStyle: const TextStyle(fontSize: 10),
+                                              hintText: '自動',
+                                              hintStyle: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                                            ),
+                                            onChanged: (v) {
+                                              setDialogState(() {
+                                                final val = int.tryParse(v);
+                                                editableLegs[originalIndex]['manual_lsp'] = val;
+                                              });
+                                            },
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       );
@@ -2334,10 +3026,24 @@ class FlightLogScreenState extends State<FlightLogScreen>
         deletedIndices,
         itinerary,
         itineraryFareAmount: itineraryFareAmount,
+        jalStatus: editJalStatus,
+        jalCard: editJalCard,
+        anaStatus: editAnaStatus,
+        anaCard: editAnaCard,
+        jalTourPremium: editJalTourPremium,
       );
     }
     itineraryFareController.dispose();
     for (final c in legFareControllers) {
+      c.dispose();
+    }
+    for (final c in legFopControllers) {
+      c.dispose();
+    }
+    for (final c in legMilesControllers) {
+      c.dispose();
+    }
+    for (final c in legLspControllers) {
       c.dispose();
     }
   }
@@ -2349,6 +3055,11 @@ class FlightLogScreenState extends State<FlightLogScreen>
     Set<int> deletedIndices,
     Map<String, dynamic> itinerary, {
     int itineraryFareAmount = 0,
+    String? jalStatus,
+    String? jalCard,
+    String? anaStatus,
+    String? anaCard,
+    bool jalTourPremium = false,
   }) async {
     // 削除されていないレグのみ残す
     final remainingLegs = <Map<String, dynamic>>[];
@@ -2386,19 +3097,43 @@ class FlightLogScreenState extends State<FlightLogScreen>
         baseMiles: baseMiles,
         fareType: fareType,
         seatClass: seatClass,
-        jalCard: itinerary['jal_card'] as String?,
-        anaCard: itinerary['ana_card'] as String?,
-        jalStatus: itinerary['jal_status'] as String?,
-        anaStatus: itinerary['ana_status'] as String?,
-        jalTourPremium: itinerary['jal_tour_premium'] as bool? ?? false,
+        jalCard: jalCard,
+        anaCard: anaCard,
+        jalStatus: jalStatus,
+        anaStatus: anaStatus,
+        jalTourPremium: jalTourPremium,
       );
+
+      // 手動入力があれば優先、なければ自動計算値
+      final manualFop = leg['manual_fop'] as int?;
+      final manualMiles = leg['manual_miles'] as int?;
+      final manualLsp = leg['manual_lsp'] as int?;
+
+      int fop = manualFop ?? (calculated['fop'] ?? 0);
+      int miles = manualMiles ?? (calculated['miles'] ?? 0);
+      int lsp = manualLsp ?? (calculated['lsp'] ?? 0);
+
+      // LSPは2024年1月1日以降のみ（JAL Life Status プログラム開始日）
+      // ただし手動入力の場合はそのまま使用
+      if (airline == 'JAL' && lsp > 0 && manualLsp == null) {
+        final dateStr = (leg['date'] ?? leg['flightDate'] ?? '').toString().replaceAll('/', '-');
+        final flightDate = DateTime.tryParse(dateStr);
+        if (flightDate != null && flightDate.isBefore(DateTime(2024, 1, 1))) {
+          lsp = 0;
+        }
+      }
 
       remainingLegs[i] = {
         ...leg,
-        'fop': calculated['fop'],
-        'miles': calculated['miles'],
-        'lsp': calculated['lsp'],
+        'fop': fop,
+        'miles': miles,
+        'lsp': lsp,
+        // 手動入力値はDBに保存しない（毎回計算 or 入力）
       };
+      // manual_*キーを削除（DBに保存しない）
+      remainingLegs[i].remove('manual_fop');
+      remainingLegs[i].remove('manual_miles');
+      remainingLegs[i].remove('manual_lsp');
     }
 
     // 合計を再計算（JALはFOP、ANAはPPに分離）
@@ -2434,7 +3169,12 @@ class FlightLogScreenState extends State<FlightLogScreen>
             'total_miles': totalMiles,
             'total_lsp': totalLsp,
             'total_fare': totalFare,
-          })
+            'jal_status': jalStatus,
+            'jal_card': jalCard,
+            'ana_status': anaStatus,
+            'ana_card': anaCard,
+            'jal_tour_premium': jalTourPremium,
+            })
           .eq('id', itineraryId);
 
       if (mounted) {
@@ -2533,7 +3273,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
     bool tourPremium = false,
   }) {
     // JGCカード(海外)の場合のみ、ツアープレミアムは無効
-    final isJGCOverseas = cardType == 'JALグローバルクラブ会員(海外)';
+    final isJGCOverseas = cardType == 'jgc_overseas';
     final effectiveTourPremium = isJGCOverseas ? false : tourPremium;
 
     double fareRate = 1.0;
@@ -2564,17 +3304,17 @@ class FlightLogScreenState extends State<FlightLogScreen>
     double cardBonusRate = 0.0;
     if (cardType != null) {
       const cardRates = {
-        'JALカード普通会員': 0.10,
-        'JALカードCLUB-A会員': 0.25,
-        'JALカードCLUB-Aゴールド会員': 0.25,
-        'JALカードプラチナ会員': 0.25,
-        'JALグローバルクラブ会員(日本)': 0.35,
-        'JALグローバルクラブ会員(海外)': 0.0,
-        'JALカードNAVI会員': 0.10,
-        'JAL CLUB EST 普通会員': 0.10,
-        'JAL CLUB EST CLUB-A会員': 0.25,
-        'JAL CLUB EST CLUB-A GOLD会員': 0.25,
-        'JAL CLUB EST プラチナ会員': 0.25,
+        'jal_regular': 0.10,
+        'jal_club_a': 0.25,
+        'jal_club_a_gold': 0.25,
+        'jal_platinum': 0.25,
+        'jgc_japan': 0.35,
+        'jgc_overseas': 0.0,
+        'jal_navi': 0.10,
+        'club_est_regular': 0.10,
+        'club_est_club_a': 0.25,
+        'club_est_gold': 0.25,
+        'club_est_platinum': 0.25,
       };
       cardBonusRate = cardRates[cardType] ?? 0.0;
     }
@@ -2583,10 +3323,10 @@ class FlightLogScreenState extends State<FlightLogScreen>
     double statusBonusRate = 0.0;
     if (status != null) {
       const statusRates = {
-        'JMBダイヤモンド': 1.30,
-        'JGCプレミア': 1.05,
-        'JMBサファイア': 1.05,
-        'JMBクリスタル': 0.55,
+        'diamond': 1.30,
+        'jgc_premier': 1.05,
+        'sapphire': 1.05,
+        'crystal': 0.55,
       };
       statusBonusRate = statusRates[status] ?? 0.0;
     }
@@ -2639,15 +3379,15 @@ class FlightLogScreenState extends State<FlightLogScreen>
     double cardBonusRate = 0.0;
     if (cardType != null) {
       const cardRates = {
-        'AMCカード(提携カード含む)': 0.0,
-        'ANAカード 一般': 0.10,
-        'ANAカード 学生用': 0.10,
-        'ANAカード ワイド': 0.25,
-        'ANAカード ゴールド': 0.25,
-        'ANAカード プレミアム': 0.50,
-        'SFC 一般': 0.35,
-        'SFC ゴールド': 0.40,
-        'SFC プレミアム': 0.50,
+        'amc_card': 0.0,
+        'ana_regular': 0.10,
+        'ana_student': 0.10,
+        'ana_wide': 0.25,
+        'ana_gold': 0.25,
+        'ana_premium': 0.50,
+        'sfc_regular': 0.35,
+        'sfc_gold': 0.40,
+        'sfc_premium': 0.50,
       };
       cardBonusRate = cardRates[cardType] ?? 0.0;
     }
@@ -2656,12 +3396,12 @@ class FlightLogScreenState extends State<FlightLogScreen>
     double statusBonusRate = 0.0;
     if (status != null) {
       const statusRates = {
-        'ダイヤモンド(1年目)': 1.15,
-        'ダイヤモンド(継続2年以上)': 1.25,
-        'プラチナ(1年目)': 0.90,
-        'プラチナ(継続2年以上)': 1.00,
-        'ブロンズ(1年目)': 0.40,
-        'ブロンズ(継続2年以上)': 0.50,
+        'diamond_1': 1.15,
+        'diamond_2': 1.25,
+        'platinum_1': 0.90,
+        'platinum_2': 1.00,
+        'bronze_1': 0.40,
+        'bronze_2': 0.50,
       };
       statusBonusRate = statusRates[status] ?? 0.0;
     }
@@ -2669,16 +3409,17 @@ class FlightLogScreenState extends State<FlightLogScreen>
     // ゴールド/プレミアムカード + ステータスの場合 +5%
     final anaCardTypes = [
       '-',
-      'AMCカード(提携カード含む)',
-      'ANAカード 一般',
-      'ANAカード 学生用',
-      'ANAカード ワイド',
-      'ANAカード ゴールド',
-      'ANAカード プレミアム',
-      'SFC 一般',
-      'SFC ゴールド',
-      'SFC プレミアム',
+      'amc_card',
+      'ana_regular',
+      'ana_student',
+      'ana_wide',
+      'ana_gold',
+      'ana_premium',
+      'sfc_regular',
+      'sfc_gold',
+      'sfc_premium',
     ];
+
     final cardIdx = anaCardTypes.indexOf(cardType ?? '-');
     final isGoldPremium =
         cardIdx == 5 || cardIdx == 6 || cardIdx == 8 || cardIdx == 9;
@@ -2712,7 +3453,10 @@ class FlightLogScreenState extends State<FlightLogScreen>
 
     return {'fop': totalPP, 'miles': totalMiles, 'lsp': 0};
   }
-}
+}// ============================================================
+// flight_log_screen.dart の _ShareDialog クラス全体を以下に差し替え
+// 差し替え範囲: 行 3018〜ファイル末尾
+// ============================================================
 
 // シェアダイアログ（画像シェア方式）
 class _ShareDialog extends StatefulWidget {
@@ -2730,6 +3474,44 @@ class _ShareDialogState extends State<_ShareDialog> {
   final _commentController = TextEditingController();
   final _cardKey = GlobalKey();
   bool _isCapturing = false;
+
+  // 搭乗日（任意）
+  DateTime? _selectedDate;
+
+  // 公開内容チェックボックス
+  bool _showFopPp = true;
+  bool _showMiles = true;
+  bool _showStatus = true;
+
+  // ユーザーステータス情報
+  String _jalStatus = '';
+  String _anaStatus = '';
+  String _jalCard = '';
+  String _anaCard = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    final profile = await Supabase.instance.client
+        .from('user_profiles')
+        .select('jal_status, ana_status, jal_card, ana_card')
+        .eq('id', user.id)
+        .maybeSingle();
+    if (profile != null && mounted) {
+      setState(() {
+        _jalStatus = profile['jal_status'] as String? ?? '';
+        _anaStatus = profile['ana_status'] as String? ?? '';
+        _jalCard = profile['jal_card'] as String? ?? '';
+        _anaCard = profile['ana_card'] as String? ?? '';
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -2756,23 +3538,56 @@ class _ShareDialogState extends State<_ShareDialog> {
     return '$converted$legSuffix';
   }
 
-  // ツイート用テキスト（概要のみ・常に280文字以内）
+  String _statusToJapanese(String value) {
+    const map = {
+      // ステータス
+      'diamond_1': 'ダイヤモンド(1年目)',
+      'diamond_2': 'ダイヤモンド(継続)',
+      'platinum_1': 'プラチナ(1年目)',
+      'platinum_2': 'プラチナ(継続)',
+      'bronze_1': 'ブロンズ(1年目)',
+      'bronze_2': 'ブロンズ(継続)',
+      'crystal': 'クリスタル',
+      'sapphire': 'サファイア',
+      'jgc_premier': 'JGCプレミア',
+      // ANAカード
+      'amc_card': 'AMCカード',
+      'ana_regular': 'ANAカード一般',
+      'ana_wide': 'ANAカードワイド',
+      'ana_gold': 'ANAゴールド',
+      'ana_premium': 'ANAプレミアム',
+      'ana_student': 'ANAカード学生',
+      'sfc_regular': 'SFC一般',
+      'sfc_gold': 'SFCゴールド',
+      'sfc_premium': 'SFCプレミアム',
+      // JALカード
+      'jmb': 'JMB会員',
+      'jal_regular': 'JALカード普通',
+      'jal_club_a': 'CLUB-A',
+      'jal_club_a_gold': 'CLUB-Aゴールド',
+      'jal_platinum': 'JALプラチナ',
+      'jgc_japan': 'JGC(日本)',
+      'jgc_overseas': 'JGC(海外)',
+      'jal_navi': 'JAL NAVI',
+      'club_est_regular': 'CLUB EST普通',
+      'club_est_club_a': 'CLUB EST CLUB-A',
+      'club_est_gold': 'CLUB EST GOLD',
+      'club_est_platinum': 'CLUB ESTプラチナ',
+      // 空値
+      'なし': '',
+      'NULL': '',
+      '-': '',
+    };
+    return map[value] ?? value;
+  }
+
+  // ツイート用テキスト（簡略化: テーマ+日付+ルート+コメント+ハッシュタグ+URL）
   String _generateTweetText() {
     final itinerary = widget.itinerary;
     final theme = _themeController.text.trim();
     final comment = _commentController.text.trim();
     final title = _titleToJapanese(itinerary['title'] as String? ?? '');
     final fop = itinerary['total_fop'] as int? ?? 0;
-    final pp = itinerary['total_pp'] as int? ?? 0;
-    final miles = itinerary['total_miles'] as int? ?? 0;
-    final lsp = itinerary['total_lsp'] as int? ?? 0;
-    final legs = itinerary['legs'] as List<dynamic>? ?? [];
-
-    String dateStr = '';
-    if (legs.isNotEmpty) {
-      final firstLeg = legs.first as Map<String, dynamic>;
-      dateStr = firstLeg['date'] as String? ?? '';
-    }
 
     final buf = StringBuffer();
     if (theme.isNotEmpty) {
@@ -2780,20 +3595,11 @@ class _ShareDialogState extends State<_ShareDialog> {
     } else {
       buf.writeln('✈️【修行プラン】');
     }
-    if (dateStr.isNotEmpty) buf.writeln('📅 $dateStr');
-    buf.writeln('🛫 $title');
-
-    if (fop > 0 && pp > 0) {
-      buf.writeln(
-        '📊 FOP: ${_formatNumber(fop)} / PP: ${_formatNumber(pp)} / マイル: ${_formatNumber(miles)}',
-      );
-    } else if (fop > 0) {
-      buf.write('📊 FOP: ${_formatNumber(fop)} / マイル: ${_formatNumber(miles)}');
-      if (lsp > 0) buf.write(' / ${lsp}LSP');
-      buf.writeln();
-    } else if (pp > 0) {
-      buf.writeln('📊 PP: ${_formatNumber(pp)} / マイル: ${_formatNumber(miles)}');
+    if (_selectedDate != null) {
+      final d = _selectedDate!;
+      buf.writeln('📅 ${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}');
     }
+    buf.writeln('🛫 $title');
 
     if (comment.isNotEmpty) buf.writeln('💬 $comment');
     buf.writeln();
@@ -2809,19 +3615,12 @@ class _ShareDialogState extends State<_ShareDialog> {
     final itinerary = widget.itinerary;
     final theme = _themeController.text.trim();
     final comment = _commentController.text.trim();
-    final title = _titleToJapanese(itinerary['title'] as String? ?? '');
     final fop = itinerary['total_fop'] as int? ?? 0;
     final pp = itinerary['total_pp'] as int? ?? 0;
     final miles = itinerary['total_miles'] as int? ?? 0;
     final lsp = itinerary['total_lsp'] as int? ?? 0;
     final fare = itinerary['total_fare'] as int? ?? 0;
     final legs = itinerary['legs'] as List<dynamic>? ?? [];
-
-    String dateStr = '';
-    if (legs.isNotEmpty) {
-      final firstLeg = legs.first as Map<String, dynamic>;
-      dateStr = firstLeg['date'] as String? ?? '';
-    }
 
     // 単価計算
     String unitPrice = '';
@@ -2841,6 +3640,7 @@ class _ShareDialogState extends State<_ShareDialog> {
         unitPrice = '¥${(fare / farePoints).toStringAsFixed(1)}/$pointLabel';
       }
     }
+
     final isJal = fop > 0 && pp == 0;
     final isAna = pp > 0 && fop == 0;
     final isMixed = fop > 0 && pp > 0;
@@ -2856,7 +3656,7 @@ class _ShareDialogState extends State<_ShareDialog> {
         : [const Color(0xFF000D1A), const Color(0xFF001A33)];
 
     return Container(
-      width: 360,
+      width: 400,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -2870,67 +3670,64 @@ class _ShareDialogState extends State<_ShareDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── ヘッダー ──
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  theme.isNotEmpty ? theme : '修行プラン',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'MRP',
-                style: TextStyle(
-                  color: primaryColor,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-            ],
-          ),
-          if (dateStr.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              '📅 $dateStr',
-              style: TextStyle(color: Colors.grey[400], fontSize: 13),
-            ),
-          ],
-          const SizedBox(height: 8),
-          // ルート
+          // ── ヘッダー: 左上に #MRP + テーマ ──
           Text(
-            '🛫 $title',
+            '#MRP',
             style: TextStyle(
               color: primaryColor,
-              fontSize: 15,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            theme.isNotEmpty ? theme : '修行プラン',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
 
           const SizedBox(height: 12),
           Container(height: 1, color: Colors.grey[800]),
           const SizedBox(height: 12),
 
-          // ── 統計バッジ ──
+          // ── 統計バッジ（チェックON時のみ表示） ──
           Wrap(
             spacing: 16,
             runSpacing: 8,
             children: [
-              if (fop > 0) _statBadge('FOP', _formatNumber(fop), primaryColor),
-              if (pp > 0) _statBadge('PP', _formatNumber(pp), primaryColor),
-              _statBadge('マイル', _formatNumber(miles), Colors.grey[400]!),
-              if (lsp > 0) _statBadge('LSP', '$lsp', Colors.amber),
+              if (_showFopPp && fop > 0) _statBadge('FOP', _formatNumber(fop), primaryColor),
+              if (_showFopPp && pp > 0) _statBadge('PP', _formatNumber(pp), primaryColor),
+              if (_showMiles) _statBadge('マイル', _formatNumber(miles), Colors.grey[400]!),
+              if (_showFopPp && lsp > 0) _statBadge('LSP', '$lsp', Colors.amber),
             ],
           ),
-          if (fare > 0) ...[
+
+          // ステータス表示（チェックON時のみ）
+          if (_showStatus) ...[
+            const SizedBox(height: 8),
+            if (isJal || isMixed) ...[
+              if (_jalStatus.isNotEmpty && _jalStatus != '-' && _jalStatus != 'なし')
+                Text(
+                  '🏅 JAL ${_statusToJapanese(_jalStatus)}${_jalCard.isNotEmpty && _jalCard != '-' && _jalCard != 'なし' && _jalCard != 'NULL' ? ' / ${_statusToJapanese(_jalCard)}' : ''}',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                ),
+            ],
+            if (isAna || isMixed) ...[
+              if (_anaStatus.isNotEmpty && _anaStatus != '-' && _anaStatus != 'なし')
+                Text(
+                  '🏅 ANA ${_statusToJapanese(_anaStatus)}${_anaCard.isNotEmpty && _anaCard != '-' && _anaCard != 'なし' && _anaCard != 'NULL' ? ' / ${_statusToJapanese(_anaCard)}' : ''}',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                ),
+            ],
+          ],
+
+          if (fare > 0 && _showFopPp) ...[
             const SizedBox(height: 8),
             Text(
               '💰 ¥${_formatNumber(fare)}${unitPrice.isNotEmpty ? "（$unitPrice）" : ""}',
@@ -2942,28 +3739,69 @@ class _ShareDialogState extends State<_ShareDialog> {
           Container(height: 1, color: Colors.grey[800]),
           const SizedBox(height: 8),
 
-          // ── レグ詳細 ──
+          // ── レグ詳細（時刻+マイル列追加） ──
+          // ヘッダー行
+          Row(
+            children: [
+              SizedBox(
+                width: 50,
+                child: Text('便名', style: TextStyle(color: Colors.grey[600], fontSize: 9)),
+              ),
+              SizedBox(
+                width: 70,
+                child: Text('区間', style: TextStyle(color: Colors.grey[600], fontSize: 9)),
+              ),
+              SizedBox(
+                width: 80,
+                child: Text('出発-到着', style: TextStyle(color: Colors.grey[600], fontSize: 9)),
+              ),
+              if (_showMiles)
+                SizedBox(
+                  width: 40,
+                  child: Text('マイル', style: TextStyle(color: Colors.grey[600], fontSize: 9), textAlign: TextAlign.right),
+                ),
+              if (_showFopPp)
+                Expanded(
+                  child: Text(
+                    fop > 0 ? 'FOP' : 'PP',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 9),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
           ...legs.asMap().entries.map((entry) {
             final l = entry.value as Map<String, dynamic>;
             final legAirline = l['airline'] as String? ?? '';
             final flightNum = l['flight_number'] as String? ?? '';
             final dep = l['departure_airport'] as String? ?? '';
             final arr = l['arrival_airport'] as String? ?? '';
+            final depTime = l['departure_time'] as String? ?? '';
+            final arrTime = l['arrival_time'] as String? ?? '';
             final legFop = l['fop'] as int? ?? 0;
             final legPp = l['pp'] as int? ?? 0;
+            final legMiles = l['miles'] as int? ?? 0;
             final points = legFop > 0 ? legFop : legPp;
             final pointLabel = legFop > 0 ? 'FOP' : 'PP';
 
-            // IATA コード化: JAL→JL, ANA→NH
             final iataCode = legAirline == 'JAL' ? 'JL' : legAirline == 'ANA' ? 'NH' : legAirline;
             final displayFlight = '$iataCode$flightNum';
+
+            // 時刻フォーマット（HH:MM-HH:MM）
+            String timeStr = '';
+            if (depTime.isNotEmpty && arrTime.isNotEmpty) {
+              final dShort = depTime.length >= 5 ? depTime.substring(0, 5) : depTime;
+              final aShort = arrTime.length >= 5 ? arrTime.substring(0, 5) : arrTime;
+              timeStr = '$dShort-$aShort';
+            }
 
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 60,
+                    width: 50,
                     child: Text(
                       displayFlight,
                       style: TextStyle(
@@ -2973,24 +3811,52 @@ class _ShareDialogState extends State<_ShareDialog> {
                       ),
                     ),
                   ),
-                  Expanded(
+                  SizedBox(
+                    width: 70,
                     child: Text(
-                      '$dep → $arr',
+                      '$dep→$arr',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                  Text(
-                    '$points $pointLabel',
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                  SizedBox(
+                    width: 80,
+                    child: Text(
+                      timeStr,
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 9,
+                        fontFamily: 'monospace',
+                      ),
                     ),
                   ),
+                  if (_showMiles)
+                    SizedBox(
+                      width: 40,
+                      child: Text(
+                        '$legMiles',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  if (_showFopPp)
+                    Expanded(
+                      child: Text(
+                        '$points $pointLabel',
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
                 ],
               ),
             );
@@ -3047,7 +3913,6 @@ class _ShareDialogState extends State<_ShareDialog> {
   Future<void> _share() async {
     setState(() => _isCapturing = true);
     try {
-      // Overlay で画面外にカードをレンダリング（ダイアログの高さ制約を回避）
       final captureKey = GlobalKey();
       final overlayEntry = OverlayEntry(
         builder: (context) => Positioned(
@@ -3133,6 +3998,19 @@ class _ShareDialogState extends State<_ShareDialog> {
     }
   }
 
+  // 日付ピッカー
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -3155,7 +4033,7 @@ class _ShareDialogState extends State<_ShareDialog> {
                 controller: _themeController,
                 decoration: const InputDecoration(
                   labelText: 'テーマ（任意）',
-                  hintText: '例: W毎追っかけ修行',
+                  hintText: '例: W杯追っかけ修行',
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
@@ -3173,6 +4051,61 @@ class _ShareDialogState extends State<_ShareDialog> {
                 ),
                 maxLines: 2,
                 onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+
+              // 搭乗日カレンダー（任意）
+              InkWell(
+                onTap: _pickDate,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: '搭乗日（任意）',
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_selectedDate != null)
+                          IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () => setState(() => _selectedDate = null),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        const Icon(Icons.calendar_today, size: 18),
+                        const SizedBox(width: 8),
+                      ],
+                    ),
+                  ),
+                  child: Text(
+                    _selectedDate != null
+                        ? '${_selectedDate!.year}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.day.toString().padLeft(2, '0')}'
+                        : '',
+                    style: TextStyle(
+                      color: _selectedDate != null ? Colors.black : Colors.grey,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 公開内容チェックボックス
+              Text(
+                '📋 画像に表示する内容',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 0,
+                children: [
+                  _buildCheckbox('FOP/PP', _showFopPp, (v) => setState(() => _showFopPp = v ?? true)),
+                  _buildCheckbox('マイル数', _showMiles, (v) => setState(() => _showMiles = v ?? true)),
+                  _buildCheckbox('ステータス', _showStatus, (v) => setState(() => _showStatus = v ?? true)),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -3273,4 +4206,28 @@ class _ShareDialogState extends State<_ShareDialog> {
       ],
     );
   }
+
+  Widget _buildCheckbox(String label, bool value, ValueChanged<bool?> onChanged) {
+    return SizedBox(
+      width: 130,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: value,
+              onChanged: onChanged,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(fontSize: 13)),
+        ],
+      ),
+    );
+  }
 }
+
+

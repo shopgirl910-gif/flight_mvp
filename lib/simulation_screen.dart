@@ -45,7 +45,7 @@ class SimulationScreenState extends State<SimulationScreen>
   Map<int, TextEditingController> arrivalAirportControllers = {};
   Map<int, FocusNode> departureAirportFocusNodes = {};
   Map<int, FocusNode> arrivalAirportFocusNodes = {};
-
+  final ScrollController _freeDesignScrollController = ScrollController();
   Map<int, List<Map<String, dynamic>>> availableFlights = {};
   Map<int, List<String>> availableDestinations = {};
   Map<int, String?> legWarnings = {};
@@ -527,6 +527,7 @@ class SimulationScreenState extends State<SimulationScreen>
     for (var c in arrivalAirportControllers.values) c.dispose();
     for (var f in departureAirportFocusNodes.values) f.dispose();
     for (var f in arrivalAirportFocusNodes.values) f.dispose();
+    _freeDesignScrollController.dispose();
     super.dispose();
   }
 
@@ -594,13 +595,19 @@ class SimulationScreenState extends State<SimulationScreen>
     arrivalAirportControllers[legId]?.text = arrivalAirport;
 
     setState(() {
+      // デフォルト運賃種別と座席クラスを設定
+      final defaultFareType = airline == 'JAL' 
+          ? '運賃4 (75%) スペシャルセイバー' 
+          : '運賃7 (75%) ANA SUPER VALUE/いっしょにマイル割';
+      const defaultSeatClass = '普通席';
+      
       legs.add({
         'id': legId,
         'airline': airline,
         'departureAirport': departureAirport,
         'arrivalAirport': arrivalAirport,
-        'fareType': '',
-        'seatClass': '',
+        'fareType': defaultFareType,
+        'seatClass': defaultSeatClass,
         'calculatedFOP': null,
         'calculatedMiles': null,
         'calculatedLSP': null,
@@ -609,6 +616,17 @@ class SimulationScreenState extends State<SimulationScreen>
     });
 
     if (departureAirport.isNotEmpty) _fetchAvailableFlights(legs.length - 1);
+      // Web版: 最下段にスクロール
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_freeDesignScrollController.hasClients) {
+        _freeDesignScrollController.animateTo(
+          _freeDesignScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+
   }
 
   void _removeLeg(int index) {
@@ -1899,7 +1917,8 @@ class SimulationScreenState extends State<SimulationScreen>
                               );
                             }
                             final data = response.data as Map<String, dynamic>;
-                            final parsedLegs = (data['legs'] as List<dynamic>)
+                            print('DEBUG: Edge Function response legs = ${data['legs']}');
+                            var parsedLegs = (data['legs'] as List<dynamic>)
                                 .map((e) => Map<String, dynamic>.from(e as Map))
                                 .map((l) {
                                   // Edge Functionのキー名をアプリ内のキー名に変換
@@ -1933,6 +1952,58 @@ class SimulationScreenState extends State<SimulationScreen>
                                   };
                                 })
                                 .toList();
+                            
+                            // メール本文に年が含まれているかチェック
+                            final emailText = controller.text;
+                            final yearMatch = RegExp(r'202\d年|202\d/|/202\d|202\d-|-202\d').firstMatch(emailText);
+                            final hasYearInEmail = yearMatch != null;
+                            print('DEBUG: hasYearInEmail = $hasYearInEmail');
+                            if (yearMatch != null) {
+                              print('DEBUG: matched year text = "${yearMatch.group(0)}"');
+                              print('DEBUG: context = "${emailText.substring((yearMatch.start - 20).clamp(0, emailText.length), (yearMatch.end + 20).clamp(0, emailText.length))}"');
+                            }
+                            
+                            if (!hasYearInEmail && dialogContext.mounted) {
+                              setDialogState(() => isLoading = false);
+                              // 年を確認するダイアログを表示
+                              final selectedYear = await showDialog<int>(
+                                context: dialogContext,
+                                barrierDismissible: false,
+                                builder: (ctx) {
+                                  final currentYear = DateTime.now().year;
+                                  return AlertDialog(
+                                    title: const Text('搭乗年を選択'),
+                                    content: const Text('メールに年の記載がありませんでした。\n搭乗年を選択してください。'),
+                                    actions: [
+                                      for (var y = currentYear - 1; y <= currentYear + 1; y++)
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx, y),
+                                          child: Text('$y年', style: TextStyle(
+                                            fontWeight: y == currentYear ? FontWeight.bold : FontWeight.normal,
+                                            fontSize: 16,
+                                          )),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              );
+                              
+                              if (selectedYear == null) {
+                                return; // キャンセル
+                              }
+                              
+                              // 選択された年で日付を上書き
+                              parsedLegs = parsedLegs.map((leg) {
+                                final date = leg['date'] as String? ?? '';
+                                if (date.isNotEmpty) {
+                                  // 既存の年を削除してから新しい年を追加
+                                  final dateWithoutYear = date.replaceAll(RegExp(r'^\d{4}[/-]'), '');
+                                  leg['date'] = '$selectedYear/$dateWithoutYear';
+                                }
+                                return leg;
+                              }).toList();
+                            }
+                            
                             if (dialogContext.mounted)
                               Navigator.pop(dialogContext, parsedLegs);
                           } catch (e) {
@@ -2023,37 +2094,43 @@ class SimulationScreenState extends State<SimulationScreen>
   }
 
   @override
+  // ダークネイビー背景色
+  static const Color _darkNavy = Color(0xFF1A1A2E);
+
   Widget build(BuildContext context) {
     super.build(context);
     if (isLoading) return const Center(child: CircularProgressIndicator());
-    return Column(
-      children: [
-        Container(
-          color: Colors.grey[100],
-          child: TabBar(
-            controller: _tabController,
-            labelColor: Colors.black87,
-            unselectedLabelColor: Colors.grey[500],
-            indicatorColor: Colors.black87,
-            indicatorWeight: 2.5,
-            labelStyle: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
+    return Container(
+      color: _darkNavy,
+      child: Column(
+        children: [
+          Container(
+            color: _darkNavy,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white60,
+              indicatorColor: Colors.white,
+              indicatorWeight: 2.5,
+              labelStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+              unselectedLabelStyle: const TextStyle(fontSize: 13),
+              tabs: const [
+                Tab(text: '✈ 自由設計'),
+                Tab(text: '🎯 おまかせ最適化'),
+              ],
             ),
-            unselectedLabelStyle: const TextStyle(fontSize: 13),
-            tabs: const [
-              Tab(text: '✈ 自由設計'),
-              Tab(text: '🎯 おまかせ最適化'),
-            ],
           ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [_buildFreeDesignTab(), _buildOptimizerTab()],
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [_buildFreeDesignTab(), _buildOptimizerTab()],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -2062,50 +2139,49 @@ class SimulationScreenState extends State<SimulationScreen>
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 600;
 
-        // 表示順序を計算: 最新レグを最上段、それ以外は時系列順
+        // 表示順序を計算
         List<MapEntry<int, Map<String, dynamic>>> displayOrder = [];
 
         if (legs.isNotEmpty) {
-          // 最新のレグ（最後に追加されたもの）
-          final latestIndex = legs.length - 1;
-          final latestEntry = MapEntry(latestIndex, legs[latestIndex]);
+          if (isMobile) {
+            // モバイル: 最新レグを最上段、それ以外は時系列順（現状維持）
+            final latestIndex = legs.length - 1;
+            final latestEntry = MapEntry(latestIndex, legs[latestIndex]);
 
-          // それ以外のレグを時系列順にソート
-          final oldLegs = legs
-              .asMap()
-              .entries
-              .where((e) => e.key != latestIndex)
-              .toList();
-          oldLegs.sort((a, b) {
-            final aId = a.value['id'] as int;
-            final bId = b.value['id'] as int;
-            final aDate = dateControllers[aId]?.text ?? '';
-            final bDate = dateControllers[bId]?.text ?? '';
-            final aTime = departureTimeControllers[aId]?.text ?? '';
-            final bTime = departureTimeControllers[bId]?.text ?? '';
+            final oldLegs = legs
+                .asMap()
+                .entries
+                .where((e) => e.key != latestIndex)
+                .toList();
+            oldLegs.sort((a, b) {
+              final aId = a.value['id'] as int;
+              final bId = b.value['id'] as int;
+              final aDate = dateControllers[aId]?.text ?? '';
+              final bDate = dateControllers[bId]?.text ?? '';
+              final aTime = departureTimeControllers[aId]?.text ?? '';
+              final bTime = departureTimeControllers[bId]?.text ?? '';
 
-            // 日付で比較
-            if (aDate.isNotEmpty && bDate.isNotEmpty) {
-              final dateCompare = aDate
-                  .replaceAll('/', '')
-                  .compareTo(bDate.replaceAll('/', ''));
-              if (dateCompare != 0) return dateCompare;
-            }
+              if (aDate.isNotEmpty && bDate.isNotEmpty) {
+                final dateCompare = aDate
+                    .replaceAll('/', '')
+                    .compareTo(bDate.replaceAll('/', ''));
+                if (dateCompare != 0) return dateCompare;
+              }
+              if (aTime.isNotEmpty && bTime.isNotEmpty) {
+                return aTime.compareTo(bTime);
+              }
+              return aId.compareTo(bId);
+            });
 
-            // 同じ日付なら時刻で比較
-            if (aTime.isNotEmpty && bTime.isNotEmpty) {
-              return aTime.compareTo(bTime);
-            }
-
-            // それ以外はIDで比較
-            return aId.compareTo(bId);
-          });
-
-          // 表示順序: 最新レグ → 時系列順のレグ
-          displayOrder = [latestEntry, ...oldLegs];
+            displayOrder = [latestEntry, ...oldLegs];
+          } else {
+            // Web: 追加順そのまま（上から下に並ぶ）
+            displayOrder = legs.asMap().entries.toList();
+          }
         }
 
         return SingleChildScrollView(
+          controller: isMobile ? null : _freeDesignScrollController,
           padding: EdgeInsets.all(isMobile ? 8 : 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2114,7 +2190,6 @@ class SimulationScreenState extends State<SimulationScreen>
               // 既存レグを表示
               if (displayOrder.isNotEmpty)
                 ...displayOrder.map((e) {
-                  // 最新レグ（最後に追加されたもの）かどうかを判定
                   final isLatest = legs.isNotEmpty && e.key == legs.length - 1;
                   return _buildLegCard(
                     context,
@@ -2138,8 +2213,6 @@ class SimulationScreenState extends State<SimulationScreen>
       },
     );
   }
-
-  // ========== おまかせ最適化タブ ==========
 
   // ========== おまかせ最適化タブ ==========
 
@@ -2587,11 +2660,17 @@ class SimulationScreenState extends State<SimulationScreen>
                     ),
                   ),
                 // 免責表示
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F0F0),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Text(
                     '時刻表、マイル、FOP/PPは参考情報です。最新情報は公式サイトでご確認ください。',
-                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 10, color: Colors.grey[700]),
                   ),
                 ),
               ],
@@ -3273,11 +3352,17 @@ class SimulationScreenState extends State<SimulationScreen>
       return Column(
         children: [
           // 免責表示
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Text(
               '時刻表、マイル、FOP/PPは参考情報です。最新情報は公式サイトでご確認ください。',
-              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 10, color: Colors.grey[700]),
             ),
           ),
           if (hasJAL) _buildMobileSummaryCard('JAL', Colors.red),
@@ -3551,9 +3636,18 @@ class SimulationScreenState extends State<SimulationScreen>
           ),
           Container(width: 1, height: 36, color: Colors.grey[300]),
           // 免責表示
-          Text(
-            '時刻表、マイル、FOP/PPは参考情報です。最新情報は公式サイトでご確認ください。',
-            style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '時刻表、マイル、FOP/PPは参考情報です。最新情報は公式サイトでご確認ください。',
+              style: TextStyle(fontSize: 10, color: Colors.grey[700]),
+            ),
           ),
         ],
       ),
@@ -4121,15 +4215,15 @@ class SimulationScreenState extends State<SimulationScreen>
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           color: isLatest ? Colors.yellow[50] : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isExpanded ? airlineColor : airlineColor.withOpacity(0.3),
             width: isExpanded ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 4,
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
@@ -4139,7 +4233,7 @@ class SimulationScreenState extends State<SimulationScreen>
             InkWell(
               onTap: () =>
                   setState(() => expandedLegId = isExpanded ? null : legId),
-              borderRadius: BorderRadius.circular(isExpanded ? 0 : 12),
+              borderRadius: BorderRadius.circular(isExpanded ? 0 : 16),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -4150,10 +4244,10 @@ class SimulationScreenState extends State<SimulationScreen>
                       ? airlineColor.withOpacity(0.1)
                       : Colors.transparent,
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(11),
-                    topRight: const Radius.circular(11),
-                    bottomLeft: Radius.circular(isExpanded ? 0 : 11),
-                    bottomRight: Radius.circular(isExpanded ? 0 : 11),
+                    topLeft: const Radius.circular(15),
+                    topRight: const Radius.circular(15),
+                    bottomLeft: Radius.circular(isExpanded ? 0 : 15),
+                    bottomRight: Radius.circular(isExpanded ? 0 : 15),
                   ),
                 ),
                 child: Row(
@@ -4325,10 +4419,14 @@ class SimulationScreenState extends State<SimulationScreen>
                   (v) {
                     if (v != null && v != leg['airline']) {
                       _clearFlightInfo(index, legId);
+                      // デフォルト運賃種別を設定
+                      final defaultFareType = v == 'JAL' 
+                          ? '運賃4 (75%) スペシャルセイバー' 
+                          : '運賃7 (75%) ANA SUPER VALUE/いっしょにマイル割';
                       setState(() {
                         legs[index]['airline'] = v;
-                        legs[index]['fareType'] = '';
-                        legs[index]['seatClass'] = '';
+                        legs[index]['fareType'] = defaultFareType;
+                        legs[index]['seatClass'] = '普通席';
                       });
                     }
                   },
@@ -4336,10 +4434,10 @@ class SimulationScreenState extends State<SimulationScreen>
                 ),
               ),
               const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
+              SizedBox(
+                width: 110,
                 child: _buildMobileDatePicker(
-                  '日付',
+                  '日付（任意）',
                   dateControllers[legId]!,
                   context,
                   index,
@@ -4347,9 +4445,9 @@ class SimulationScreenState extends State<SimulationScreen>
               ),
               const SizedBox(width: 8),
               SizedBox(
-                width: 60,
+                width: 80,
                 child: _buildMobileTextField(
-                  '便名',
+                  '便名（任意）',
                   flightNumberControllers[legId]!,
                   '',
                   onSubmit: (_) => _autoFillFromFlightNumber(index),
@@ -4407,7 +4505,7 @@ class SimulationScreenState extends State<SimulationScreen>
           ),
           const SizedBox(height: 6),
           _buildMobileDropdown(
-            '運賃種別',
+            '運賃種別（変更可）',
             leg['fareType'] as String,
             fareTypesByAirline[airline] ?? [],
             (v) {
@@ -4426,7 +4524,7 @@ class SimulationScreenState extends State<SimulationScreen>
             children: [
               Expanded(
                 child: _buildMobileDropdown(
-                  '座席クラス',
+                  '座席クラス（変更可）',
                   leg['seatClass'] as String,
                   seatClassesByAirline[airline] ?? [],
                   (v) {
@@ -4440,9 +4538,9 @@ class SimulationScreenState extends State<SimulationScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: _buildMobileTextField(
-                  '運賃(円)',
+                  '運賃（任意）',
                   fareAmountControllers[legId]!,
-                  '15000',
+                  '',
                   onChanged: (_) => setState(() {}),
                 ),
               ),
@@ -4454,38 +4552,56 @@ class SimulationScreenState extends State<SimulationScreen>
             children: [
               Row(
                 children: [
-                  TextButton(
+                  // クリアボタン（グレー背景）
+                  ElevatedButton(
                     onPressed: () => _clearLeg(index, legId),
-                    child: Text(
-                      'クリア',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[600],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
+                    child: const Text('クリア', style: TextStyle(fontSize: 12)),
                   ),
+                  const SizedBox(width: 8),
+                  // 削除ボタン（ゴミ箱アイコン）
                   if (legs.length > 1)
-                    TextButton(
+                    IconButton(
                       onPressed: () => _removeLeg(index),
-                      child: const Text(
-                        '削除',
-                        style: TextStyle(color: Colors.red, fontSize: 12),
-                      ),
+                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 22),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: '削除',
                     ),
                 ],
               ),
               Row(
                 children: [
-                  TextButton(
+                  // 追加ボタン（緑背景）
+                  ElevatedButton(
                     onPressed: _addLeg,
-                    child: Text(
-                      '+ 追加',
-                      style: TextStyle(color: Colors.green[700], fontSize: 12),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green[600],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
+                    child: const Text('+ 追加', style: TextStyle(fontSize: 12)),
                   ),
-                  TextButton(
+                  const SizedBox(width: 8),
+                  // 修行ログに保存ボタン（紫背景）
+                  ElevatedButton(
                     onPressed: _saveItinerary,
-                    child: Text(
-                      '修行ログに保存',
-                      style: TextStyle(color: Colors.purple[700], fontSize: 12),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple[600],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
+                    child: const Text('修行ログに保存', style: TextStyle(fontSize: 12)),
                   ),
                 ],
               ),
@@ -4636,11 +4752,9 @@ class SimulationScreenState extends State<SimulationScreen>
     final destinations = _getSortedAirportList(
       rawDestinations,
     ).where((e) => e != airportDivider).toList();
-    final currentValue = leg['arrivalAirport'] as String,
-        displayValue =
-            currentValue.isEmpty || !destinations.contains(currentValue)
-            ? null
-            : currentValue;
+    final currentCode = (leg['arrivalAirport'] as String).toUpperCase();
+    final jaName = airportNames[currentCode];
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4653,91 +4767,17 @@ class SimulationScreenState extends State<SimulationScreen>
           ),
         ),
         const SizedBox(height: 2),
-        Container(
-          height: 36,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: DropdownButton<String>(
-            value: displayValue,
-            isExpanded: true,
-            underline: const SizedBox(),
-            icon: Icon(
-              Icons.arrow_drop_down,
-              size: 20,
-              color: Colors.grey[600],
-            ),
-            menuMaxHeight: 250,
-            hint: Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: Text(
-                '選択',
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-              ),
-            ),
-            selectedItemBuilder: (c) => destinations
-                .map(
-                  (code) => Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '$code ${airportNames[code] ?? ''}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-            items: destinations
-                .map(
-                  (code) => DropdownMenuItem(
-                    value: code,
-                    child: Text(
-                      '$code ${airportNames[code] ?? ''}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: (v) {
-              if (v != null) {
-                arrivalAirportControllers[legId]?.text = v;
-                setState(() => legs[index]['arrivalAirport'] = v);
-                _fetchAvailableFlights(index);
-                _calculateSingleLeg(index);
-              }
+        GestureDetector(
+          onTap: () => _showAirportBottomSheet(
+            airportList: destinations,
+            onSelected: (code) {
+              arrivalAirportControllers[legId]?.text = code;
+              setState(() => legs[index]['arrivalAirport'] = code);
+              _fetchAvailableFlights(index);
+              _calculateSingleLeg(index);
             },
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMobileAirportAutocomplete({
-    required TextEditingController controller,
-    required FocusNode focusNode,
-    required List<String> airportList,
-    required void Function(String) onSelected,
-  }) {
-    return RawAutocomplete<String>(
-      textEditingController: controller,
-      focusNode: focusNode,
-      optionsBuilder: (textEditingValue) {
-        final input = textEditingValue.text.toUpperCase();
-        if (input.isEmpty)
-          return _getSortedAirportList(
-            airportList,
-          ).where((e) => e != airportDivider);
-        return airportList.where((code) {
-          final name = airportNames[code] ?? '';
-          return code.contains(input) || name.contains(input);
-        });
-      },
-      displayStringForOption: (code) => code,
-      fieldViewBuilder:
-          (context, textController, focusNode, onFieldSubmitted) => Container(
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey[300]!),
@@ -4750,30 +4790,17 @@ class SimulationScreenState extends State<SimulationScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextFormField(
-                        controller: textController,
-                        focusNode: focusNode,
-                        style: const TextStyle(
+                      Text(
+                        currentCode.isNotEmpty ? currentCode : '選択',
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
+                          color: currentCode.isNotEmpty ? Colors.black : Colors.grey,
                         ),
-                        textCapitalization: TextCapitalization.characters,
-                        decoration: const InputDecoration(
-                          hintText: '選択',
-                          isDense: true,
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onFieldSubmitted: (value) {
-                          final code = value.toUpperCase();
-                          if (airportNames.containsKey(code)) onSelected(code);
-                        },
                       ),
-                      if (textController.text.isNotEmpty &&
-                          airportNames[textController.text.toUpperCase()] !=
-                              null)
+                      if (jaName != null)
                         Text(
-                          airportNames[textController.text.toUpperCase()]!,
+                          jaName,
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.grey[600],
@@ -4786,67 +4813,201 @@ class SimulationScreenState extends State<SimulationScreen>
               ],
             ),
           ),
-      optionsViewBuilder: (context, onAutoSelected, options) {
-        final sortedOptions = _getSortedAirportList(options.toList());
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 250, maxWidth: 200),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: sortedOptions.length,
-                itemBuilder: (context, i) {
-                  final code = sortedOptions[i];
-                  if (code == airportDivider)
-                    return Container(
-                      height: 1,
-                      color: Colors.grey[300],
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 6,
-                        horizontal: 8,
-                      ),
-                    );
-                  return InkWell(
-                    onTap: () => onAutoSelected(code),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      child: Row(
-                        children: [
-                          Text(
-                            code,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            airportNames[code] ?? '',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        );
-      },
-      onSelected: onSelected,
+        ),
+      ],
     );
   }
 
+ // ============================================================
+// simulation_screen.dart の _buildMobileAirportAutocomplete メソッドを
+// 以下の2つのメソッドに差し替え
+// 差し替え範囲: 行 4718〜4848
+// ============================================================
+
+  Widget _buildMobileAirportAutocomplete({
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required List<String> airportList,
+    required void Function(String) onSelected,
+  }) {
+    final currentCode = controller.text.toUpperCase();
+    final jaName = airportNames[currentCode];
+    return GestureDetector(
+      onTap: () => _showAirportBottomSheet(
+        airportList: airportList,
+        onSelected: (code) {
+          controller.text = code;
+          onSelected(code);
+        },
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(6),
+          color: Colors.grey[50],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    currentCode.isNotEmpty ? currentCode : '選択',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: currentCode.isNotEmpty ? Colors.black : Colors.grey,
+                    ),
+                  ),
+                  if (jaName != null)
+                    Text(
+                      jaName,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_drop_down, size: 20, color: Colors.grey[600]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAirportBottomSheet({
+    required List<String> airportList,
+    required void Function(String) onSelected,
+  }) {
+    final searchController = TextEditingController();
+    final effectiveList = airportList.where((e) => e != airportDivider).toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final query = searchController.text.toUpperCase();
+            final filtered = query.isEmpty
+                ? _getSortedAirportList(effectiveList).where((e) => e != airportDivider).toList()
+                : effectiveList.where((code) {
+                    final name = airportNames[code] ?? '';
+                    return code.contains(query) || name.contains(query);
+                  }).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.6,
+              minChildSize: 0.3,
+              maxChildSize: 0.85,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    // ドラッグハンドル
+                    Container(
+                      margin: const EdgeInsets.only(top: 8, bottom: 4),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    // 検索バー
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: TextField(
+                        controller: searchController,
+                        autofocus: true,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(
+                          hintText: '空港コードまたは名前で検索',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    searchController.clear();
+                                    setSheetState(() {});
+                                  },
+                                )
+                              : null,
+                          isDense: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                        ),
+                        onChanged: (_) => setSheetState(() {}),
+                      ),
+                    ),
+                    // 空港リスト
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: filtered.length,
+                        itemBuilder: (context, i) {
+                          final code = filtered[i];
+                          if (code == airportDivider) {
+                            return Container(
+                              height: 1,
+                              color: Colors.grey[300],
+                              margin: const EdgeInsets.symmetric(
+                                vertical: 6,
+                                horizontal: 16,
+                              ),
+                            );
+                          }
+                          return ListTile(
+                            dense: true,
+                            visualDensity: const VisualDensity(vertical: -2),
+                            title: Row(
+                              children: [
+                                Text(
+                                  code,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  airportNames[code] ?? '',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              onSelected(code);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
   Widget _buildMobileFlightTimeDropdown(
     Map<String, dynamic> leg,
     int legId,
@@ -5327,10 +5488,14 @@ class SimulationScreenState extends State<SimulationScreen>
               onChanged: (v) {
                 if (v != null && v != airline) {
                   _clearFlightInfo(index, legId);
+                  // デフォルト運賃種別を設定
+                  final defaultFareType = v == 'JAL' 
+                      ? '運賃4 (75%) スペシャルセイバー' 
+                      : '運賃7 (75%) ANA SUPER VALUE/いっしょにマイル割';
                   setState(() {
                     legs[index]['airline'] = v;
-                    legs[index]['fareType'] = '';
-                    legs[index]['seatClass'] = '';
+                    legs[index]['fareType'] = defaultFareType;
+                    legs[index]['seatClass'] = '普通席';
                   });
                 }
               },

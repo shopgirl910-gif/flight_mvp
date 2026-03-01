@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.3.0+1
+version: 1.0.0+1
 
 environment:
   sdk: ^3.10.1
@@ -43,6 +43,7 @@ dependencies:
   geolocator: ^14.0.2
   url_launcher: ^6.3.2
   flutter_dotenv: ^6.0.0
+  google_fonts: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -60,7 +61,7 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-  generate: true     # ← この行を追加
+  generate: true     # ← この行を追加s
   assets:
     - .env
 
@@ -85,11 +86,16 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
+  
+  fonts:
+    - family: NotoSansJP
+      fonts:
+        - asset: fonts/NotoSansJP-Regular.ttf
+          weight: 400
+        - asset: fonts/NotoSansJP-Bold.ttf
+          weight: 700
+    
+
   #         style: italic
   #   - family: Trajan Pro
   #     fonts:

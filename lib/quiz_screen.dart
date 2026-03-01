@@ -33,8 +33,19 @@ class _QuizScreenState extends State<QuizScreen> {
     // ログイン状態の変化を監視
     Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (data.session != null) {
+        // ログイン時
         _fetchUserProgress();
         setState(() {});
+      } else {
+        // ログアウト時 - 状態をリセット
+        setState(() {
+          selectedAnswer = null;
+          isCorrect = null;
+          hasAnswered = false;
+          totalCorrect = 0;
+          lastCorrectDate = null;
+          alreadyAnsweredToday = false;
+        });
       }
     });
   }

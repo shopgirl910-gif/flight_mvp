@@ -12,7 +12,11 @@ import 'pro_purchase_dialog.dart';
 import 'pro_service.dart';
 import 'mrp_logo.dart';
 import 'badge_widget.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'dart:html' as html;
+
+// グローバルな更新通知（Paint it Black用）
+final paintItBlackUpdateNotifier = ValueNotifier<int>(0);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,7 +53,13 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MRP - Mileage Run Planner',
-      theme: ThemeData(primarySwatch: Colors.purple),
+      theme: ThemeData(
+        primarySwatch: Colors.purple,
+        textTheme: GoogleFonts.notoSansJpTextTheme(
+          ThemeData.light().textTheme,
+        ),
+      ),
+      home: const MainScreen(),
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
@@ -58,7 +68,6 @@ class _MyAppState extends State<MyApp> {
       ],
       supportedLocales: const [Locale('ja'), Locale('en')],
       locale: _locale,
-      home: const MainScreen(),
     );
   }
 }
