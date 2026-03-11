@@ -13,6 +13,7 @@ import 'pro_service.dart';
 import 'mrp_logo.dart';
 import 'badge_widget.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:html' as html;
 
 // グローバルな更新通知（Paint it Black用）
@@ -20,11 +21,11 @@ final paintItBlackUpdateNotifier = ValueNotifier<int>(0);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
 
   await Supabase.initialize(
-    url: 'https://ipxlsygkxgmramrjazhj.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlweGxzeWdreGdtcmFtcmphemhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0Njk4MDgsImV4cCI6MjA4MDA0NTgwOH0.ZFr2MgXRA2Lx1xaDWqAPOSxf6N4kVtTq2IRbdlJrnjw',
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
   runApp(const MyApp());
@@ -143,7 +144,7 @@ class _MainScreenState extends State<MainScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Badge data load error: $e');
+      // Badge data load error
     }
   }
 

@@ -100,9 +100,7 @@ class CheckinService {
   }) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
-      print('userId: $userId'); // デバッグ用
       if (userId == null) {
-        print('userID: $userId');
         return false;
       }
       await _supabase.from('checkins').insert({
@@ -114,7 +112,7 @@ class CheckinService {
       });
       return true;
     } catch (e) {
-      print('Checkin error: $e'); // エラー詳細を表示
+      // Checkin error: $e
       return false;
     }
   }

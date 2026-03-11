@@ -367,9 +367,7 @@ class SimulationScreenState extends State<SimulationScreen>
   }
 
   Future<void> _loadUserProfile() async {
-    print('DEBUG: _loadUserProfile called');
     final user = Supabase.instance.client.auth.currentUser;
-    print('DEBUG: user = $user');
     if (user == null) return;
     try {
       final res = await Supabase.instance.client
@@ -385,10 +383,6 @@ class SimulationScreenState extends State<SimulationScreen>
       final jalStatus = res['jal_status'] as String?;
       final anaStatus = res['ana_status'] as String?;
       final tourPremium = res['jal_tour_premium'] as bool? ?? false;
-      print(
-        'DEBUG: jalCard=$jalCard, anaCard=$anaCard, jalStatus=$jalStatus, anaStatus=$anaStatus',
-      );
-
       // データベース値(キー形式)→ドロップダウン値(表示名)のマッピング
       final jalCardMap = {
         '-': '-',
@@ -482,7 +476,7 @@ class SimulationScreenState extends State<SimulationScreen>
         });
       }
     } catch (e) {
-      print('DEBUG: error = $e');
+      // error loading profile
     }
   }
 
@@ -771,7 +765,9 @@ class SimulationScreenState extends State<SimulationScreen>
   ) {
     final flightsByRoute = <String, List<Map<String, dynamic>>>{};
     for (var flight in flights) {
-      final key = '${flight['flight_number']}_${flight['arrival_code']}';
+      String depTime = flight['departure_time'] ?? '';
+      if (depTime.length > 5) depTime = depTime.substring(0, 5);
+      final key = '${depTime}_${flight['arrival_code']}';
       flightsByRoute.putIfAbsent(key, () => []);
       flightsByRoute[key]!.add(flight);
     }
@@ -1917,7 +1913,7 @@ class SimulationScreenState extends State<SimulationScreen>
                               );
                             }
                             final data = response.data as Map<String, dynamic>;
-                            final parsedLegs = (data['legs'] as List<dynamic>)
+                            var parsedLegs = (data['legs'] as List<dynamic>)
                                 .map((e) => Map<String, dynamic>.from(e as Map))
                                 .map((l) {
                                   // Edge Functionのキー名をアプリ内のキー名に変換
@@ -1951,6 +1947,53 @@ class SimulationScreenState extends State<SimulationScreen>
                                   };
                                 })
                                 .toList();
+                            
+                            // メール本文に年が含まれているかチェック
+                            final emailText = controller.text;
+                            final yearMatch = RegExp(r'202\d年|202\d/|/202\d|202\d-|-202\d').firstMatch(emailText);
+                            final hasYearInEmail = yearMatch != null;
+
+                            if (!hasYearInEmail && dialogContext.mounted) {
+                              setDialogState(() => isLoading = false);
+                              // 年を確認するダイアログを表示
+                              final selectedYear = await showDialog<int>(
+                                context: dialogContext,
+                                barrierDismissible: false,
+                                builder: (ctx) {
+                                  final currentYear = DateTime.now().year;
+                                  return AlertDialog(
+                                    title: const Text('搭乗年を選択'),
+                                    content: const Text('メールに年の記載がありませんでした。\n搭乗年を選択してください。'),
+                                    actions: [
+                                      for (var y = currentYear - 1; y <= currentYear + 1; y++)
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx, y),
+                                          child: Text('$y年', style: TextStyle(
+                                            fontWeight: y == currentYear ? FontWeight.bold : FontWeight.normal,
+                                            fontSize: 16,
+                                          )),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              );
+                              
+                              if (selectedYear == null) {
+                                return; // キャンセル
+                              }
+                              
+                              // 選択された年で日付を上書き
+                              parsedLegs = parsedLegs.map((leg) {
+                                final date = leg['date'] as String? ?? '';
+                                if (date.isNotEmpty) {
+                                  // 既存の年を削除してから新しい年を追加
+                                  final dateWithoutYear = date.replaceAll(RegExp(r'^\d{4}[/-]'), '');
+                                  leg['date'] = '$selectedYear/$dateWithoutYear';
+                                }
+                                return leg;
+                              }).toList();
+                            }
+                            
                             if (dialogContext.mounted)
                               Navigator.pop(dialogContext, parsedLegs);
                           } catch (e) {
@@ -4359,7 +4402,7 @@ class SimulationScreenState extends State<SimulationScreen>
           Row(
             children: [
               SizedBox(
-                width: 70,
+                width: 80,
                 child: _buildMobileDropdown(
                   '航空会社',
                   leg['airline'] as String,
@@ -4381,9 +4424,7 @@ class SimulationScreenState extends State<SimulationScreen>
                   color: airlineColor,
                 ),
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 140,
+              Expanded(
                 child: _buildMobileDatePicker(
                   '日付（任意）',
                   dateControllers[legId]!,
@@ -4700,11 +4741,9 @@ class SimulationScreenState extends State<SimulationScreen>
     final destinations = _getSortedAirportList(
       rawDestinations,
     ).where((e) => e != airportDivider).toList();
-    final currentValue = leg['arrivalAirport'] as String,
-        displayValue =
-            currentValue.isEmpty || !destinations.contains(currentValue)
-            ? null
-            : currentValue;
+    final currentCode = (leg['arrivalAirport'] as String).toUpperCase();
+    final jaName = airportNames[currentCode];
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4717,62 +4756,51 @@ class SimulationScreenState extends State<SimulationScreen>
           ),
         ),
         const SizedBox(height: 2),
-        Container(
-          height: 36,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: DropdownButton<String>(
-            value: displayValue,
-            isExpanded: true,
-            underline: const SizedBox(),
-            icon: Icon(
-              Icons.arrow_drop_down,
-              size: 20,
-              color: Colors.grey[600],
-            ),
-            menuMaxHeight: 250,
-            hint: Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: Text(
-                '選択',
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-              ),
-            ),
-            selectedItemBuilder: (c) => destinations
-                .map(
-                  (code) => Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '$code ${airportNames[code] ?? ''}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-            items: destinations
-                .map(
-                  (code) => DropdownMenuItem(
-                    value: code,
-                    child: Text(
-                      '$code ${airportNames[code] ?? ''}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: (v) {
-              if (v != null) {
-                arrivalAirportControllers[legId]?.text = v;
-                setState(() => legs[index]['arrivalAirport'] = v);
-                _fetchAvailableFlights(index);
-                _calculateSingleLeg(index);
-              }
+        GestureDetector(
+          onTap: () => _showAirportBottomSheet(
+            airportList: destinations,
+            onSelected: (code) {
+              arrivalAirportControllers[legId]?.text = code;
+              setState(() => legs[index]['arrivalAirport'] = code);
+              _fetchAvailableFlights(index);
+              _calculateSingleLeg(index);
             },
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(6),
+              color: Colors.grey[50],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        currentCode.isNotEmpty ? currentCode : '選択',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: currentCode.isNotEmpty ? Colors.black : Colors.grey,
+                        ),
+                      ),
+                      if (jaName != null)
+                        Text(
+                          jaName,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.arrow_drop_down, size: 20, color: Colors.grey[600]),
+              ],
+            ),
           ),
         ),
       ],

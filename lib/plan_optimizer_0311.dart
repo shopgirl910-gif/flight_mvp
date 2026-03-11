@@ -451,7 +451,7 @@ class PlanOptimizer {
     required int currentTime,
     required List<_Flight> path,
     required Set<String> visitedAirports,
-    required Map<String, int> usedRoutes,
+    required Set<String> usedRoutes,
     required List<List<_Flight>> results,
   }) {
     // 深さ制限（パフォーマンス保護）
@@ -461,21 +461,19 @@ class PlanOptimizer {
 
     for (var f in available) {
       final routeKey = _routePairKey(f.depCode, f.arrCode);
-      final useCount = usedRoutes[routeKey] ?? 0;
 
-      // 同一路線は最大2回まで
-      if (useCount >= 2) continue;
+      // 同一路線使用済みならスキップ
+      if (usedRoutes.contains(routeKey)) continue;
 
       if (f.arrCode == home) {
         // 帰着: 3レグ以上で有効（2レグは三角ルートと重複）
         if (path.length >= 3) {
           results.add([...path, f]);
         }
-      } else {
-        // 同一路線2回未満なら訪問済み空港でも許可
-        final wasVisited = visitedAirports.contains(f.arrCode);
-        usedRoutes[routeKey] = useCount + 1;
+      } else if (!visitedAirports.contains(f.arrCode)) {
+        // 未訪問空港へ
         visitedAirports.add(f.arrCode);
+        usedRoutes.add(routeKey);
         path.add(f);
 
         _tourDFS(
@@ -489,9 +487,8 @@ class PlanOptimizer {
         );
 
         path.removeLast();
-        if (!wasVisited) visitedAirports.remove(f.arrCode);
-        usedRoutes[routeKey] = useCount;
-        if (useCount == 0) usedRoutes.remove(routeKey);
+        usedRoutes.remove(routeKey);
+        visitedAirports.remove(f.arrCode);
       }
     }
   }

@@ -409,7 +409,6 @@ class FlightLogScreenState extends State<FlightLogScreen>
               .eq('user_id', user.id)
               .inFilter('airport_code', airportsToRemove.toList());
           
-          debugPrint('🗑️ Paint it Blackから削除: ${airportsToRemove.join(', ')}');
         }
 
         _loadItineraries();
@@ -675,8 +674,6 @@ class FlightLogScreenState extends State<FlightLogScreen>
         }
       }
 
-      debugPrint('👥 検出搭乗者数: $passengerCount名');
-
       // 2. 人数按分（「N名×金額」は1人分なので割らない、それ以外は全員分→割る）
       final hasPerPersonFormat = RegExp(r'\d+名[×x]').hasMatch(emailText);
       if (passengerCount >= 2 && !hasPerPersonFormat) {
@@ -687,9 +684,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
             leg['fare'] = perPerson;
           }
         }
-        debugPrint('👥 合計表記 → 運賃を$passengerCount名で按分');
       } else if (passengerCount >= 2) {
-        debugPrint('👥 N名×金額表記 → 按分なし');
       }
 
       // 3. 往復按分: 全レグ同一運賃 + メールに「往復」→ レグ数で割る
@@ -698,7 +693,6 @@ class FlightLogScreenState extends State<FlightLogScreen>
         final allSame = fares.every((f) => f == fares.first) && fares.first > 0;
         if (allSame) {
           final perLeg = (fares.first / legs.length).round();
-          debugPrint('💰 往復運賃按分: ${fares.first}円 ÷ ${legs.length}レグ = $perLeg円/レグ');
           for (final leg in legs) {
             leg['fare'] = perLeg;
           }
@@ -715,7 +709,6 @@ class FlightLogScreenState extends State<FlightLogScreen>
           if (totalFare > 0) {
             // 合計をレグ数で按分
             final perLeg = (totalFare / legs.length).round();
-            debugPrint('💰 合計金額検出: $totalFare円 ÷ ${legs.length}レグ = $perLeg円/レグ');
             for (final leg in legs) {
               leg['fare'] = perLeg;
             }
@@ -790,14 +783,11 @@ class FlightLogScreenState extends State<FlightLogScreen>
         final arrival = _normalizeAirportCode(leg['arrival'] as String? ?? '');
         final rawFareType = leg['fareType'] as String? ?? '';
         final fareType = _mapFareType(airline, rawFareType);
-        debugPrint('  🎫 rawFareType="$rawFareType" → fareType="$fareType"');
         final seatClass = leg['seatClass'] as String? ?? '普通席';
         final fare = leg['fare'] as int? ?? 0;
 
         // 距離を取得（双方向検索）
         final distance = await _getRouteDistance(departure, arrival);
-
-        debugPrint('  📏 $departure→$arrival distance=$distance');
 
         final calculated = _calculateLeg(
           airline: airline,
@@ -845,11 +835,6 @@ class FlightLogScreenState extends State<FlightLogScreen>
       // 過去日付と未来日付でレグを分離
       final pastLegs = processedLegs.where((l) => _isLegDatePast(l)).toList();
       final futureLegs = processedLegs.where((l) => !_isLegDatePast(l)).toList();
-
-      debugPrint('📧 メール解析結果: 全${processedLegs.length}レグ → 過去${pastLegs.length} / 未来${futureLegs.length}');
-      for (final l in processedLegs) {
-        debugPrint('  ${l['departure_airport']}→${l['arrival_airport']} date="${l['date']}" isPast=${_isLegDatePast(l)}');
-      }
 
       int savedCount = 0;
       int completedCount = 0;
@@ -972,18 +957,14 @@ class FlightLogScreenState extends State<FlightLogScreen>
     List<Map<String, dynamic>> completedLegs,
   ) async {
     try {
-      debugPrint('🎫 _registerAirportCheckins called with ${completedLegs.length} legs');
-      
       // 全レグの出発地・到着地を収集（重複排除）
       final airportCodes = <String>{};
       for (final l in completedLegs) {
         final dep = l['departure_airport'] as String? ?? '';
         final arr = l['arrival_airport'] as String? ?? '';
-        debugPrint('  leg: dep=$dep, arr=$arr');
         if (dep.isNotEmpty) airportCodes.add(dep);
         if (arr.isNotEmpty) airportCodes.add(arr);
       }
-      debugPrint('🎫 Collected airports: $airportCodes');
       if (airportCodes.isEmpty) return;
 
       // 既にチェックイン済みの空港を取得
@@ -1038,13 +1019,11 @@ class FlightLogScreenState extends State<FlightLogScreen>
       }
 
       if (checkins.isNotEmpty) {
-        debugPrint('🎫 Inserting ${checkins.length} checkins: ${checkins.map((c) => c['airport_code']).toList()}');
         await Supabase.instance.client.from('airport_checkins').insert(checkins);
-        debugPrint('🎫 Checkins inserted successfully');
       }
     } catch (e) {
       // チェックイン登録失敗は旅程保存に影響させない
-      debugPrint('Paint it Black チェックイン登録エラー: $e');
+      // チェックイン登録エラー
     }
   }
 
@@ -3213,7 +3192,7 @@ class FlightLogScreenState extends State<FlightLogScreen>
         return reverse['distance_miles'] as int? ?? 0;
       }
     } catch (e) {
-      print('Error fetching miles: $e');
+      // error fetching miles
     }
     return 0;
   }

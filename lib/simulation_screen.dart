@@ -179,6 +179,11 @@ class SimulationScreenState extends State<SimulationScreen>
     'MMY',
     'ISG',
     'OGN',
+    'UEO',  // 久米島
+    'KTD',  // 北大東
+    'MMD',  // 南大東
+    'TRA',  // 多良間
+    'YON',  // 与那国
   ];
   List<String> get airports => [
     ...majorAirports,
@@ -261,6 +266,7 @@ class SimulationScreenState extends State<SimulationScreen>
     'MMD': '南大東',
     'UEO': '久米島',
     'TRA': '多良間',
+    'YON': '与那国',  // 追加
     'SHI': '下地島',
     'OKE': '沖永良部',
   };
@@ -367,9 +373,7 @@ class SimulationScreenState extends State<SimulationScreen>
   }
 
   Future<void> _loadUserProfile() async {
-    print('DEBUG: _loadUserProfile called');
     final user = Supabase.instance.client.auth.currentUser;
-    print('DEBUG: user = $user');
     if (user == null) return;
     try {
       final res = await Supabase.instance.client
@@ -385,10 +389,6 @@ class SimulationScreenState extends State<SimulationScreen>
       final jalStatus = res['jal_status'] as String?;
       final anaStatus = res['ana_status'] as String?;
       final tourPremium = res['jal_tour_premium'] as bool? ?? false;
-      print(
-        'DEBUG: jalCard=$jalCard, anaCard=$anaCard, jalStatus=$jalStatus, anaStatus=$anaStatus',
-      );
-
       // データベース値(キー形式)→ドロップダウン値(表示名)のマッピング
       final jalCardMap = {
         '-': '-',
@@ -482,7 +482,7 @@ class SimulationScreenState extends State<SimulationScreen>
         });
       }
     } catch (e) {
-      print('DEBUG: error = $e');
+      // error loading profile
     }
   }
 
@@ -492,29 +492,27 @@ class SimulationScreenState extends State<SimulationScreen>
   }
 
   Future<List<String>> _fetchAirlineAirports(String airline) async {
-    if (airlineAirports.containsKey(airline)) return airlineAirports[airline]!;
+    //if (airlineAirports.containsKey(airline)) return airlineAirports[airline]!;
     try {
       final airlineCodes = (airline == 'JAL')
-          ? ['JAL', 'JTA', 'RAC', 'JAC']
+          ? ['JAL', 'JTA', 'RAC', 'JAC', 'HAC']
           : [airline];
       final response = await Supabase.instance.client
-          .from('schedules')
-          .select('departure_code')
-          .inFilter('airline_code', airlineCodes)
-          .eq('is_active', true);
-      final codes =
-          (response as List)
-              .map((r) => r['departure_code'] as String)
-              .toSet()
-              .toList()
-            ..sort();
+          .rpc('get_airline_departure_codes', params: {
+            'airline_codes': airlineCodes,
+          });  
+      final rawList = (response as List);
+      final codes = rawList
+          .map((r) => r['departure_code'] as String)
+          .toSet()
+          .toList()
+        ..sort();
       setState(() => airlineAirports[airline] = codes);
       return codes;
     } catch (e) {
       return airports;
     }
   }
-
   @override
   void dispose() {
     _tabController.dispose();
@@ -771,7 +769,7 @@ class SimulationScreenState extends State<SimulationScreen>
   ) {
     final flightsByRoute = <String, List<Map<String, dynamic>>>{};
     for (var flight in flights) {
-      final key = '${flight['flight_number']}_${flight['arrival_code']}';
+      final key = '${flight['arrival_code']}_${flight['flight_number']}' as String;
       flightsByRoute.putIfAbsent(key, () => []);
       flightsByRoute[key]!.add(flight);
     }
@@ -820,37 +818,31 @@ class SimulationScreenState extends State<SimulationScreen>
     String targetDate,
   ) {
     if (schedules.isEmpty) return null;
-    var selected = schedules
-        .where(
-          (s) =>
-              (s['period_start'] as String).compareTo(targetDate) <= 0 &&
-              (s['period_end'] as String).compareTo(targetDate) >= 0,
-        )
-        .toList();
+    var selected = schedules.where((s) =>
+      s['period_start'].toString().compareTo(targetDate) <= 0 &&
+      s['period_end'].toString().compareTo(targetDate) >= 0,
+    ).toList();
     if (selected.isNotEmpty) return selected.first;
-    selected = schedules
-        .where((s) => (s['period_start'] as String).compareTo(targetDate) > 0)
-        .toList();
+    selected = schedules.where((s) =>
+      s['period_start'].toString().compareTo(targetDate) > 0,
+    ).toList();
     if (selected.isNotEmpty) {
-      selected.sort(
-        (a, b) => (a['period_start'] as String).compareTo(
-          b['period_start'] as String,
-        ),
+      selected.sort((a, b) =>
+        a['period_start'].toString().compareTo(b['period_start'].toString()),
       );
       return selected.first;
     }
-    selected = schedules
-        .where((s) => (s['period_end'] as String).compareTo(targetDate) < 0)
-        .toList();
+    selected = schedules.where((s) =>
+      s['period_end'].toString().compareTo(targetDate) < 0,
+    ).toList();
     if (selected.isNotEmpty) {
-      selected.sort(
-        (a, b) =>
-            (b['period_end'] as String).compareTo(a['period_end'] as String),
+      selected.sort((a, b) =>
+        b['period_end'].toString().compareTo(a['period_end'].toString()),
       );
       return selected.first;
     }
     return null;
-  }
+}
 
   // JALグループ（JTA/RAC/JAC）も含めて便名検索
   Future<List<Map<String, dynamic>>> _fetchSchedulesByFlightNumber(
@@ -864,16 +856,19 @@ class SimulationScreenState extends State<SimulationScreen>
           : date.replaceAll('/', '-');
       final List<String> airlineCodes;
       if (airline == 'JAL') {
-        airlineCodes = ['JAL', 'JTA', 'RAC', 'JAC'];
+        airlineCodes = ['JAL', 'JTA', 'RAC', 'JAC', 'HAC'];
       } else {
         airlineCodes = [airline];
       }
+
       final response = await Supabase.instance.client
-          .from('schedules')
-          .select()
-          .inFilter('airline_code', airlineCodes)
-          .eq('flight_number', flightNumber)
-          .eq('is_active', true);
+        .from('schedules')
+        .select()
+        .or('airline_code.eq.JAL,airline_code.eq.JTA,airline_code.eq.RAC,airline_code.eq.JAC,airline_code.eq.HAC')
+        .eq('flight_number', flightNumber)
+        //.lte('period_start', targetDate)
+        //.gte('period_end', targetDate)
+        .eq('is_active', true);
       final allSchedules = (response as List).cast<Map<String, dynamic>>();
       final Map<String, List<Map<String, dynamic>>> byRoute = {};
       for (var s in allSchedules) {
@@ -888,11 +883,13 @@ class SimulationScreenState extends State<SimulationScreen>
       }
       return results;
     } catch (e) {
+      // fetch error
       return [];
     }
   }
 
   Future<Map<String, dynamic>?> _fetchScheduleByFlightNumber(
+    
     String airline,
     String flightNumber,
     String date,
@@ -1042,15 +1039,20 @@ class SimulationScreenState extends State<SimulationScreen>
         : dateText.replaceAll('/', '-');
     try {
       final airlineCodes = (airline == 'JAL')
-          ? ['JAL', 'JTA', 'RAC', 'JAC']
+          ? ['JAL', 'JTA', 'RAC', 'JAC', 'HAC']
           : [airline];
-      final allFlightsResponse = await Supabase.instance.client
-          .from('schedules')
-          .select()
-          .inFilter('airline_code', airlineCodes)
-          .eq('departure_code', departure)
-          .eq('is_active', true)
-          .order('departure_time', ascending: true);
+      var query = Supabase.instance.client
+        .from('schedules')
+        .select();
+    if (airline == 'JAL') {
+      query = query.or('airline_code.eq.JAL,airline_code.eq.JTA,airline_code.eq.RAC,airline_code.eq.JAC,airline_code.eq.HAC');
+    } else {
+      query = query.eq('airline_code', airline);
+    }
+    final allFlightsResponse = await query
+        .eq('departure_code', departure)
+        .eq('is_active', true)
+        .order('departure_time', ascending: true);
       var allFlights = _filterFlightsByDateRule(
         (allFlightsResponse as List).cast<Map<String, dynamic>>(),
         targetDate,
@@ -1604,7 +1606,7 @@ class SimulationScreenState extends State<SimulationScreen>
 
     // JAL形式の解析
     final jalPattern = RegExp(
-      r'\((\d+)\)\s*(\d{4})年(\d{1,2})月(\d{1,2})日\s+(JAL|JTA|RAC|JAC)\s*(\d+)便\s+([^\d]+?)\s*(\d{1,2}:\d{2})発\s*→\s*([^\d]+?)\s*(\d{1,2}:\d{2})着\s+(普通席|ファーストクラス|クラスJ)\s+ご利用運賃\s+([^/]+?)(?:/|合計)',
+      r'\((\d+)\)\s*(\d{4})年(\d{1,2})月(\d{1,2})日\s+(JAL|JTA|RAC|JAC|HAC)\s*(\d+)便\s+([^\d]+?)\s*(\d{1,2}:\d{2})発\s*→\s*([^\d]+?)\s*(\d{1,2}:\d{2})着\s+(普通席|ファーストクラス|クラスJ)\s+ご利用運賃\s+([^/]+?)(?:/|合計)',
       multiLine: true,
     );
 
@@ -1917,7 +1919,6 @@ class SimulationScreenState extends State<SimulationScreen>
                               );
                             }
                             final data = response.data as Map<String, dynamic>;
-                            print('DEBUG: Edge Function response legs = ${data['legs']}');
                             var parsedLegs = (data['legs'] as List<dynamic>)
                                 .map((e) => Map<String, dynamic>.from(e as Map))
                                 .map((l) {
@@ -1957,11 +1958,6 @@ class SimulationScreenState extends State<SimulationScreen>
                             final emailText = controller.text;
                             final yearMatch = RegExp(r'202\d年|202\d/|/202\d|202\d-|-202\d').firstMatch(emailText);
                             final hasYearInEmail = yearMatch != null;
-                            print('DEBUG: hasYearInEmail = $hasYearInEmail');
-                            if (yearMatch != null) {
-                              print('DEBUG: matched year text = "${yearMatch.group(0)}"');
-                              print('DEBUG: context = "${emailText.substring((yearMatch.start - 20).clamp(0, emailText.length), (yearMatch.end + 20).clamp(0, emailText.length))}"');
-                            }
                             
                             if (!hasYearInEmail && dialogContext.mounted) {
                               setDialogState(() => isLoading = false);
@@ -4411,7 +4407,8 @@ class SimulationScreenState extends State<SimulationScreen>
         children: [
           Row(
             children: [
-              Expanded(
+              SizedBox(
+                width: 80,
                 child: _buildMobileDropdown(
                   '航空会社',
                   leg['airline'] as String,
@@ -4433,9 +4430,7 @@ class SimulationScreenState extends State<SimulationScreen>
                   color: airlineColor,
                 ),
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 110,
+              Expanded(
                 child: _buildMobileDatePicker(
                   '日付（任意）',
                   dateControllers[legId]!,

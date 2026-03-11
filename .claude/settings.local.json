@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /c/flight_mvp/lib/*.dart 2>/dev/null | wc -l && ls -la /c/flight_mvp/lib/ | grep -E \"^d\")",
+      "Bash(ls -la /c/flight_mvp/lib/*.dart 2>/dev/null | wc -l && find /c/flight_mvp/lib -name \"*.dart\" -type f | wc -l)",
+      "Bash(grep -n \"paintItBlackUpdateNotifier\" lib/*.dart | head -20)",
+      "Bash(grep -n \"class.*extends.*State\\\\|class.*extends.*Widget\" /c/flight_mvp/lib/*.dart | head -40)",
+      "Bash(find /c/flight_mvp/lib -type f -name \"*.dart\" | xargs wc -l | sort -rn | head -20)",
+      "Bash(grep -r \"ScaffoldMessenger.*showSnackBar\" /c/flight_mvp/lib/*.dart | wc -l && grep -r \"\\\\.listen\\\\|onAuthStateChange\" /c/flight_mvp/lib/*.dart | wc -l)"
+    ]
+  }
+}

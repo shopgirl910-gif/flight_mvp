@@ -267,7 +267,7 @@ class _EmailParseDialogState extends State<EmailParseDialog> {
         });
       }
     } catch (e) {
-      debugPrint('プロフィール読み込みエラー: $e');
+      // プロフィール読み込みエラー
     }
   }
 
@@ -311,8 +311,6 @@ class _EmailParseDialogState extends State<EmailParseDialog> {
 
       // メール本文に年が含まれているかチェック
       final hasYearInEmail = RegExp(r'20[012]\d年|20[012]\d/|/20[012]\d|20[012]\d-|-20[012]\d').hasMatch(emailText);
-      print('DEBUG: hasYearInEmail = $hasYearInEmail');
-      
       int? selectedYear;
       if (!hasYearInEmail && mounted) {
         // 年を確認するダイアログを表示（ドロップダウン形式）
